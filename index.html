@@ -88,6 +88,8 @@
   .preset-section-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
   .preset-section-hdr .section-title{margin-bottom:0;}
   .restore-link{font-size:10px;color:var(--muted);cursor:pointer;text-decoration:underline;}
+  .simple-mode-btn{font-size:11px;font-weight:700;padding:4px 12px;border-radius:14px;border:1px solid var(--border);background:var(--surface2);color:var(--text);cursor:pointer;touch-action:manipulation;white-space:nowrap;}
+  .simple-mode-btn.on{background:var(--green);border-color:var(--green);color:#0f1117;}
   .help-tip{display:inline-block;width:15px;height:15px;line-height:13px;text-align:center;border-radius:50%;background:var(--surface2);border:1px solid var(--border);color:var(--muted);font-size:9px;font-style:normal;font-weight:700;cursor:pointer;margin-left:3px;vertical-align:middle;touch-action:manipulation;}
   #helpTipPopover{display:none;position:fixed;z-index:9999;max-width:230px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:11px;line-height:1.45;color:var(--text);box-shadow:0 4px 16px rgba(0,0,0,.45);}
   .rc-row{display:flex;justify-content:space-between;align-items:baseline;padding:14px 0;border-bottom:1px solid var(--border);}
@@ -140,11 +142,13 @@
       <div class="preset-section-hdr">
         <div class="section-title">Quick Presets</div>
         <div style="display:flex;gap:10px;align-items:center;">
+          <button type="button" class="simple-mode-btn" id="simpleModeLink" onclick="toggleSimpleMode()">Single Load Mode: Off</button>
           <span class="restore-link" id="sortModeLink" onclick="toggleSortMode()">Sort by calibre</span>
-          <span class="restore-link" onclick="restoreDefaults()">Restore defaults</span>
+          <span class="restore-link" id="restoreDefaultsLink" onclick="restoreDefaults()">Clear all</span>
         </div>
       </div>
       <div class="preset-grid" id="presetGrid"></div>
+      <p id="simpleModeNote" style="font-size:11px;color:var(--muted);margin:6px 0 0;display:none;"></p>
       <div id="deleteUndoBar" style="display:none;margin-top:8px;padding:8px 10px;background:rgba(224,108,58,.12);border:1px solid rgba(224,108,58,.35);border-radius:6px;font-size:12px;justify-content:space-between;align-items:center;gap:10px;">
         <span id="deleteUndoText"></span>
         <span class="restore-link" style="text-decoration:none;font-weight:700;" onclick="undoDelete()">Undo</span>
@@ -169,12 +173,12 @@
       </div>
       <div class="field"><label>Calibre / Cartridge</label><input type="text" id="fCalibr" placeholder="e.g. .22 Air / .308 Win"/></div>
       <div class="row2">
-        <div class="field"><label>Bullet Weight (gr)</label><input type="number" id="fWeight" value="40" min="1" max="1000" step="0.1"/></div>
-        <div class="field"><label>BC (G1)<span class="help-tip" data-tip="Ballistic Coefficient: one number summarizing how well the projectile resists air drag and holds velocity. Higher = flatter trajectory, less wind drift. G1 is the traditional flat-base reference standard - always enter this one, even if you also have a G7 value below." onclick="showHelpTip(this,event)">?</span></label><input type="number" id="fBC" value="0.045" min="0.01" max="1.5" step="0.001"/></div>
+        <div class="field"><label>Bullet Weight (gr)</label><input type="number" id="fWeight" placeholder="e.g. 150" min="1" max="1000" step="0.1"/></div>
+        <div class="field"><label>BC (G1)<span class="help-tip" data-tip="Ballistic Coefficient: one number summarizing how well the projectile resists air drag and holds velocity. Higher = flatter trajectory, less wind drift. G1 is the traditional flat-base reference standard - always enter this one, even if you also have a G7 value below." onclick="showHelpTip(this,event)">?</span></label><input type="number" id="fBC" placeholder="e.g. 0.400" min="0.01" max="1.5" step="0.001"/></div>
       </div>
       <div class="field"><label>BC (G7)<span class="help-tip" data-tip="G7 is a boat-tail-shaped reference standard - a better match for modern long-range bullets than G1. If you have a real published G7 number, enter it here and it will be used directly instead of an estimate." onclick="showHelpTip(this,event)">?</span> <span style="color:var(--muted);font-size:10px;">optional &mdash; used automatically when Drag Model is G7</span></label><input type="number" id="fBC7" value="" min="0.01" max="1.5" step="0.001" placeholder="leave blank to estimate from G1"/></div>
       <div class="row2">
-        <div class="field"><label id="lblMV">Muzzle Vel. (fps)</label><input type="number" id="fMV" value="900" min="1" max="5000" step="1"/></div>
+        <div class="field"><label id="lblMV">Muzzle Vel. (fps)</label><input type="number" id="fMV" placeholder="e.g. 2800" min="1" max="5000" step="1"/></div>
         <div class="field"><label id="lblSH">Scope Height (in)</label><input type="number" id="fSH" value="1.5" min="0.1" max="20" step="0.1"/></div>
       </div>
       <div class="row3">
@@ -197,9 +201,9 @@
         <option value="diabolo">Diabolo (pellet skirt)</option>
       </select></div>
       <div class="row3">
-        <div class="field"><label id="lblDia">Diameter (in)</label><input type="number" id="fDia" value="0.2175" min="0.1" max="30" step="0.001"/></div>
-        <div class="field"><label id="lblLen">Length (in)</label><input type="number" id="fLen" value="0.72" min="0.1" max="100" step="0.001"/></div>
-        <div class="field"><label id="lblTwist">Twist 1:X (in)</label><span class="help-tip" data-tip="Barrel twist rate: one full rifling rotation per X inches (or mm) of travel. A lower number means faster/tighter twist - more spin for a given velocity, needed to stabilize longer/heavier projectiles." onclick="showHelpTip(this,event)">?</span><input type="number" id="fTwist" value="16" min="4" max="36" step="0.5"/></div>
+        <div class="field"><label id="lblDia">Diameter (in)</label><input type="number" id="fDia" placeholder="e.g. 0.308" min="0.1" max="30" step="0.001"/></div>
+        <div class="field"><label id="lblLen">Length (in)</label><input type="number" id="fLen" placeholder="e.g. 1.20" min="0.1" max="100" step="0.001"/></div>
+        <div class="field"><label id="lblTwist">Twist 1:X (in)</label><span class="help-tip" data-tip="Barrel twist rate: one full rifling rotation per X inches (or mm) of travel. A lower number means faster/tighter twist - more spin for a given velocity, needed to stabilize longer/heavier projectiles." onclick="showHelpTip(this,event)">?</span><input type="number" id="fTwist" placeholder="e.g. 10" min="4" max="36" step="0.5"/></div>
       </div>
       <div class="field" style="margin-top:-2px;">
         <label>Twist Direction <span style="color:var(--muted);font-size:10px;">(for spin drift)</span></label>
@@ -519,25 +523,14 @@ function dismissBcWarning(){
 }
 
 // ── Presets ─────────────────────────────────────────────────────────────────
+// General Release variant: no built-in loads are shipped at all (unlike the main app and the
+// Single Load Mode variant, which both include the author's personal pellet/cartridge library).
+// This keeps the file's only saved data as whatever each user enters and saves themselves -
+// nothing to hide behind a toggle, and nothing personal ever surfaces even if a recipient
+// switches Single Load Mode off to see their full saved list.
 var PRESETS={
-  air:[
-    {name:'JSB Exact .177 8.44gr',        calibr:'.177 JSB',    wt:8.44,  bc:0.019,mv:789, sh:2.0, zero:30,dia:0.177, len:0.220,twist:17.7,drag:'g1'},
-    {name:'JSB Exact Heavy .177 10.34gr', calibr:'.177 JSB',    wt:10.34, bc:0.031,mv:734, sh:2.0, zero:30,dia:0.177, len:0.240,twist:17.7,drag:'g1'},
-    {name:'ZAN Hyperline .22 34.6gr',     calibr:'.22 ZAN',     wt:34.6,  bc:0.180,mv:938, sh:3.25,zero:50,dia:0.2175,len:0.405,twist:18,  drag:'g1',max:200},
-    {name:'ZAN ELR .22 33gr',             calibr:'.22 ZAN',     wt:33.0,  bc:0.175,mv:921, sh:3.25,zero:50,dia:0.2175,len:0.440,twist:18,  drag:'g1',max:200},
-    {name:'JSB Hades .22 15.89gr',        calibr:'.22 JSB',     wt:15.89, bc:0.016,mv:681, sh:2.0, zero:30,dia:0.2175,len:0.253,twist:17.7,drag:'g1'},
-    {name:'JSB Exact Monster .22 25.4gr', calibr:'.22 JSB',     wt:25.4,  bc:0.084,mv:850, sh:3.25,zero:50,dia:0.2175,len:0.315,twist:18,  drag:'g1',max:200},
-    {name:'FX .25 34gr',                  calibr:'.25 FX',      wt:34.0,  bc:0.330,mv:855, sh:3.0, zero:50,dia:0.250, len:0.330,twist:16,  drag:'g1',max:200},
-    {name:'H&N Heavy Slug .25 38gr',      calibr:'.25 H&N',     wt:38.0,  bc:0.094,mv:923, sh:3.0, zero:50,dia:0.250, len:0.340,twist:16,  drag:'g1',max:200},
-    {name:'ZAN .25 45gr',                 calibr:'.25 ZAN',     wt:45.0,  bc:0.138,mv:900, sh:3.0, zero:50,dia:0.250, len:0.421,twist:16,  drag:'g1',max:200}
-  ],
-  cf:[
-    {name:'.243 Win 100gr',      calibr:'.243 Win',      wt:100,bc:0.257,mv:2938,sh:2.0,zero:100,dia:0.243,len:1.008,twist:10},
-    {name:'.264 CM 130gr',       calibr:'6.5 Creedmoor', wt:130,bc:0.469,mv:2718,sh:2.0,zero:100,dia:0.264,len:1.126,twist:8},
-    {name:'.264 CM 129gr',       calibr:'6.5 Creedmoor', wt:129,bc:0.265,mv:2950,sh:2.0,zero:100,dia:0.264,len:1.335,twist:8},
-    {name:'.264 CM ABLR 129gr',  calibr:'6.5 CM ABLR',   wt:129,bc:0.440,mv:2707,sh:2.0,zero:100,dia:0.264,len:1.350,twist:8},
-    {name:'.308 Win 150gr',      calibr:'.308 Win',      wt:150,bc:0.397,mv:2843,sh:2.0,zero:100,dia:0.308,len:1.228,twist:10}
-  ]
+  air:[],
+  cf:[]
 };
 
 var currentMode='air',editingCustomIdx=null,editingBuiltinIdx=null;
@@ -560,6 +553,20 @@ function saveOrder(d){safeLS(function(){localStorage.setItem(ORDER_KEY,JSON.stri
 // display sort by diameter — never written to the persisted order, so toggling back to
 // manual instantly restores whatever was dragged into place, untouched).
 var presetSortMode={air:'manual',cf:'manual'};
+// Single Load Mode (internally still keyed/named "simple" - see SIMPLE_KEY/simpleMode below):
+// a view/save-behavior layer on top of the same storage used everywhere else. It never
+// deletes anything — built-ins are just not rendered, and any custom presets beyond the one
+// currently shown stay in localStorage untouched (surfaced via a note instead of silently
+// discarded), so switching it off restores the full picture exactly as it was.
+var SIMPLE_KEY='ballistics_simpleMode_v1'; // localStorage key backing Single Load Mode
+// General Release variant: Single Load Mode defaults ON out of the box (there's no personal
+// preset library to browse here, so the single-slot-per-section view is the more sensible
+// default for a first-time user) - but an explicit prior choice, once ever saved, is always
+// respected.
+var simpleMode=(function(){
+  var v=safeLS(function(){return localStorage.getItem(SIMPLE_KEY);});
+  return v===null?true:v==='1';
+})();
 // Returns ordered array of {type:'b'|'c', p:presetObj, ci:customArrayIdx, bi:builtinArrayIdx}
 function getOrderedPresets(mode){
   var custom=loadCustom()[mode]||[];
@@ -584,6 +591,16 @@ function getOrderedPresets(mode){
   if(presetSortMode[mode]==='calibre'){
     result=result.slice().sort(function(a,b){return(a.p.dia||0)-(b.p.dia||0);});
   }
+  if(simpleMode){
+    var customOnly=result.filter(function(e){return e.type==='c';});
+    if(customOnly.length===0)return[];
+    var preferred=null;
+    if(loadedPresetRef&&loadedPresetRef.type==='c'&&mode===currentMode){
+      preferred=customOnly.find(function(e){return e.p.name===loadedPresetRef.name;});
+    }
+    if(!preferred)preferred=customOnly[customOnly.length-1];
+    return[preferred];
+  }
   return result;
 }
 function toggleSortMode(){
@@ -593,6 +610,22 @@ function toggleSortMode(){
 }
 function updateSortModeLink(){
   document.getElementById('sortModeLink').textContent=presetSortMode[currentMode]==='calibre'?'Manual order':'Sort by calibre';
+}
+function toggleSimpleMode(){
+  simpleMode=!simpleMode;
+  safeLS(function(){localStorage.setItem(SIMPLE_KEY,simpleMode?'1':'0');});
+  updateSimpleModeUI();
+  renderPresets();
+}
+// Shows/hides the sort & restore-defaults links (meaningless once only one preset is ever
+// shown) and relabels the toggle itself. Does not touch stored data either way.
+function updateSimpleModeUI(){
+  var link=document.getElementById('simpleModeLink');
+  if(link){link.textContent=simpleMode?'Single Load Mode: On':'Single Load Mode: Off';link.classList.toggle('on',simpleMode);}
+  var sortLink=document.getElementById('sortModeLink');
+  if(sortLink)sortLink.style.display=simpleMode?'none':'';
+  var restoreLink=document.getElementById('restoreDefaultsLink');
+  if(restoreLink)restoreLink.style.display=simpleMode?'none':'';
 }
 function persistOrder(orderedList,mode){
   var d=loadOrder();
@@ -682,6 +715,41 @@ function renderPresets(){
     }
     grid.appendChild(btn);
   });
+  var noteEl=document.getElementById('simpleModeNote');
+  if(noteEl){
+    if(simpleMode){
+      // Counted by unique name, matching how getOrderedPresets() itself de-dupes custom entries
+      // (via its usedC map) — so this number always matches what actually appears once Single
+      // Load Mode is switched off, rather than a raw array length that could include stale
+      // duplicate names left over from old saves.
+      var seenNames={};
+      var totalCustom=(loadCustom()[currentMode]||[]).filter(function(p){
+        if(seenNames[p.name])return false;seenNames[p.name]=1;return true;
+      }).length;
+      var shown=ordered.length;
+      var extra=Math.max(0,totalCustom-shown);
+      // Built-ins are always hidden while Single Load Mode is on, regardless of custom preset
+      // count — surface that count too so "X hidden" actually matches what reappears when
+      // Single Load Mode is switched off, rather than only counting the user's own saved loads.
+      var hiddenBuiltins=loadHidden()[currentMode]||new Set();
+      var builtinCount=Math.max(0,PRESETS[currentMode].length-hiddenBuiltins.size);
+      var parts=[];
+      if(extra>0)parts.push(extra+' other saved load'+(extra===1?'':'s'));
+      if(builtinCount>0)parts.push(builtinCount+' built-in preset'+(builtinCount===1?'':'s'));
+      var hiddenTail='';
+      if(parts.length){
+        var verb=(parts.length===1&&(extra>0?extra:builtinCount)===1)?'is':'are';
+        hiddenTail=' '+parts.join(' and ')+' '+verb+' hidden until you turn Single Load Mode off.';
+      }
+      noteEl.style.display='';
+      noteEl.textContent=shown===0?
+        ('Single Load Mode is on — save your load below and it will appear here.'+hiddenTail):
+        (extra>0?('Single Load Mode is on — showing your most recent load.'+hiddenTail):
+        ('Single Load Mode is on — only one load is kept per section.'+hiddenTail));
+    } else {
+      noteEl.style.display='none';
+    }
+  }
 }
 function cancelPresetEdit(){
   editingCustomIdx=null;editingBuiltinIdx=null;
@@ -769,19 +837,32 @@ function saveCurrentAsPreset(){
   // temporary multiplier — reload later starts clean (untrued) but already accurate.
   var bake=bakeTruingIntoFields();
   var d=loadCustom();
-  var priorEntry=editingCustomIdx!==null?d[currentMode][editingCustomIdx]:null;
+  var targetIdx=editingCustomIdx;
+  // Single Load Mode keeps at most one custom preset per section. If this is a fresh save (the
+  // user isn't already editing a specific slot via the ✏ icon) and a custom preset already
+  // exists, offer to replace it instead of silently creating a second entry. Declining aborts
+  // the save entirely — nothing is written.
+  if(simpleMode&&targetIdx===null&&d[currentMode].length>0){
+    var slotIdx=(loadedPresetRef&&loadedPresetRef.type==='c')?
+      d[currentMode].findIndex(function(p){return p.name===loadedPresetRef.name;}):-1;
+    if(slotIdx<0)slotIdx=d[currentMode].length-1;
+    if(!confirm('Single Load Mode keeps one load per section. Replace "'+d[currentMode][slotIdx].name+'" with "'+name+'"?'))return;
+    targetIdx=slotIdx;
+  }
+  var priorEntry=targetIdx!==null?d[currentMode][targetIdx]:null;
   var entry=buildPresetEntryFromForm(name);
   entry=withRestoreMetadata(entry,priorEntry,editingBuiltinIdx,bake.wasTrued,bake.nominal);
-  if(editingCustomIdx!==null){
-    d[currentMode][editingCustomIdx]=entry;
-    loadedPresetRef={type:'c',idx:editingCustomIdx,name:name};
+  if(targetIdx!==null){
+    d[currentMode][targetIdx]=entry;
+    loadedPresetRef={type:'c',idx:targetIdx,name:name};
   } else {
     d[currentMode].push(entry);
     loadedPresetRef={type:'c',idx:d[currentMode].length-1,name:name};
-    // If editing a built-in, hide the original so the custom version replaces it
-    if(editingBuiltinIdx!==null){
-      var h=loadHidden();h[currentMode].add(editingBuiltinIdx);saveHidden(h);
-    }
+  }
+  // If editing (or, in Single Load Mode, replacing while) a built-in was loaded, hide the original
+  // so the custom version replaces it regardless of which branch above ran.
+  if(editingBuiltinIdx!==null){
+    var h=loadHidden();h[currentMode].add(editingBuiltinIdx);saveHidden(h);
   }
   saveCustom(d);
   if(bake.wasTrued){clearTruingState();calculate();} // correction is now baked into the saved number, not a live multiplier
@@ -804,6 +885,14 @@ function saveTruingToPreset(){
       var entry=buildPresetEntryFromForm(loadedPresetRef.name);
       entry=withRestoreMetadata(entry,existing,null,true,bake.nominal);
       d[currentMode][loadedPresetRef.idx]=entry;
+    } else if(simpleMode&&d[currentMode].length>0){
+      // Tracked slot moved/was deleted, but Single Load Mode still only keeps one — replace
+      // whatever custom preset remains rather than pushing a second entry.
+      var slotIdx=d[currentMode].length-1;
+      var entry=withRestoreMetadata(buildPresetEntryFromForm(loadedPresetRef.name),d[currentMode][slotIdx],null,true,bake.nominal);
+      d[currentMode][slotIdx]=entry;
+      loadedPresetRef={type:'c',idx:slotIdx,name:loadedPresetRef.name};
+      movedFallback=true;
     } else {
       // Tracked slot moved or was deleted — don't risk overwriting the wrong preset.
       var entry=withRestoreMetadata(buildPresetEntryFromForm(loadedPresetRef.name),null,null,true,bake.nominal);
@@ -812,12 +901,21 @@ function saveTruingToPreset(){
       movedFallback=true;
     }
   } else {
-    var biName=(PRESETS[currentMode][loadedPresetRef.idx]||{}).name||loadedPresetRef.name;
-    var entry=withRestoreMetadata(buildPresetEntryFromForm(biName),null,loadedPresetRef.idx,true,bake.nominal);
-    d[currentMode].push(entry);
-    var h=loadHidden();h[currentMode].add(loadedPresetRef.idx);saveHidden(h);
+    var biIdx=loadedPresetRef.idx;
+    var biName=(PRESETS[currentMode][biIdx]||{}).name||loadedPresetRef.name;
+    var entry;
+    if(simpleMode&&d[currentMode].length>0){
+      var slotIdx=d[currentMode].length-1;
+      entry=withRestoreMetadata(buildPresetEntryFromForm(biName),d[currentMode][slotIdx],biIdx,true,bake.nominal);
+      d[currentMode][slotIdx]=entry;
+      loadedPresetRef={type:'c',idx:slotIdx,name:biName};
+    } else {
+      entry=withRestoreMetadata(buildPresetEntryFromForm(biName),null,biIdx,true,bake.nominal);
+      d[currentMode].push(entry);
+      loadedPresetRef={type:'c',idx:d[currentMode].length-1,name:biName};
+    }
+    var h=loadHidden();h[currentMode].add(biIdx);saveHidden(h);
     var ord=loadOrder();if(ord[currentMode])ord[currentMode]=ord[currentMode].filter(function(o){return!(o.t==='b'&&o.name===biName);});saveOrder(ord);
-    loadedPresetRef={type:'c',idx:d[currentMode].length-1,name:biName};
   }
   saveCustom(d);
   var savedName=loadedPresetRef.name;
@@ -829,7 +927,11 @@ function saveTruingToPreset(){
     '<span style="color:var(--green);">&#10003; Saved to "'+savedName+'"</span>';
 }
 function restoreDefaults(){
-  if(!confirm('Restore defaults?'))return;
+  // General Release variant ships with no built-in presets, so there's nothing to "restore
+  // to" - this now just clears whatever the user has saved for this section. Wording updated
+  // accordingly (main app / Single Load Mode variant keep the original "Restore defaults" wording,
+  // since those do restore to a real built-in library).
+  if(!confirm('Clear all saved loads for this section? This cannot be undone.'))return;
   var d=loadCustom();d[currentMode]=[];saveCustom(d);
   var h=loadHidden();h[currentMode]=new Set();saveHidden(h);
   var ord=loadOrder();ord[currentMode]=null;saveOrder(ord);
@@ -1266,6 +1368,24 @@ function dismissPlausibilityWarning(){var el=document.getElementById('plausibili
 function calculate(){
   try{
     var met=unitSystem==='metric';
+    // General Release variant ships with no built-in loads and blank load-specific fields
+    // (see PRESETS above), so - unlike the main app, which always has sensible fallback
+    // numbers from its own presets - a first-time user can easily hit Calculate with some or
+    // all of Weight/BC/Velocity/Zero/Max left blank. Rather than silently computing a
+    // trajectory from hidden fallback constants (40gr/0.045 BC/etc., leftover from the
+    // airgun-specific defaults this variant intentionally removed), catch that here first
+    // and show a friendly prompt instead of a plausible-looking but meaningless result.
+    var missing=[];
+    if(!(parseFloat(document.getElementById('fWeight').value)>0))missing.push('Bullet Weight');
+    if(!(parseFloat(document.getElementById('fBC').value)>0))missing.push('BC (G1)');
+    if(!(parseFloat(document.getElementById('fMV').value)>0))missing.push('Muzzle Velocity');
+    if(!(parseFloat(document.getElementById('fZero').value)>0))missing.push('Zero Range');
+    if(!(parseFloat(document.getElementById('fMax').value)>0))missing.push('Max Range');
+    if(missing.length){
+      document.getElementById('mainArea').innerHTML='<div style="padding:40px;text-align:center;"><div style="font-size:32px;">&#128221;</div><strong>Enter your load details first</strong><br><span style="color:var(--muted);font-size:12px;">Missing: '+missing.join(', ')+'.</span></div>';
+      if(window.innerWidth<=900)setMobileTab('results');
+      return;
+    }
     // Read inputs and convert to imperial for physics engine
     var mvRaw=parseFloat(document.getElementById('fMV').value)||0;
     var shRaw=parseFloat(document.getElementById('fSH').value)||0;
@@ -1629,6 +1749,7 @@ var _prefs=loadPrefs();
 if(_prefs.unit==='metric')setUnitSystem('metric');
 if(_prefs.mode==='cf')setMode('cf');
 updateSortModeLink();
+updateSimpleModeUI();
 renderPresets();
 syncLayout();
 </script>
