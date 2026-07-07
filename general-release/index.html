@@ -1,0 +1,1757 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Cervid Ballistics</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Cervid">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0f1117">
+<link rel="manifest" href='data:application/manifest+json,{"name":"Cervid Ballistics","short_name":"Cervid","display":"standalone","background_color":"#0f1117","theme_color":"#0f1117","orientation":"any"}'>
+<style>
+  :root{--bg:#0f1117;--surface:#1a1d27;--surface2:#222639;--border:#2e3348;--accent:#4f8ef7;--accent2:#e06c3a;--text:#e8eaf0;--muted:#7a7f99;--green:#3ecf8e;--yellow:#f5c542;--red:#e05252;--radius:8px;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;font-size:14px;min-height:100vh;padding-top:env(safe-area-inset-top,0px);}
+  header{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;gap:16px;}
+  header h1{font-size:19.8px;font-weight:700;}
+  header span{font-size:12px;color:var(--muted);}
+  .mode-toggle{display:flex;background:var(--bg);border:1px solid var(--border);border-radius:6px;overflow:hidden;margin-left:auto;}
+  .mode-toggle button{padding:6px 18px;border:none;background:transparent;color:var(--muted);cursor:pointer;font-size:13px;font-weight:600;transition:all .2s;touch-action:manipulation;}
+  .mode-toggle button.active{background:var(--accent);color:#fff;}
+  .layout{display:grid;grid-template-columns:340px 1fr;gap:0;height:calc(var(--app-height,100vh) - 57px);}
+  .sidebar{background:var(--surface);border-right:1px solid var(--border);overflow-y:auto;padding:20px 16px;padding-bottom:max(20px,env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:16px;}
+  .main{overflow-y:auto;padding:20px;background:var(--bg);}
+  .section{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:14px;}
+  .section-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:12px;}
+  .field{margin-bottom:10px;}
+  .field label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;}
+  .field input,.field select{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:7px 10px;font-size:13px;outline:none;transition:border-color .2s;}
+  .field input:focus,.field select:focus{border-color:var(--accent);}
+  .field select option{background:var(--surface);}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+  .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
+  .btn{width:100%;padding:10px;background:var(--accent);color:#fff;border:none;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer;transition:opacity .2s;margin-top:4px;touch-action:manipulation;}
+  .btn:hover{opacity:.85;}
+  .btn-secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border);}
+  .tag{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;}
+  .tag-air{background:rgba(62,207,142,.15);color:var(--green);border:1px solid rgba(62,207,142,.3);}
+  .tag-cf{background:rgba(79,142,247,.15);color:var(--accent);border:1px solid rgba(79,142,247,.3);}
+  .results-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:12px;}
+  .results-header h2{font-size:16px;font-weight:700;}
+  .stat-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:20px;}
+  .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;}
+  .stat-card .label{font-size:11px;color:var(--muted);margin-bottom:4px;}
+  .stat-card .value{font-size:20px;font-weight:700;}
+  .stat-card .unit{font-size:12px;color:var(--muted);}
+  .stat-card.highlight .value{color:var(--accent);}
+  .stat-card.warn .value{color:var(--yellow);}
+  .stat-card.danger .value{color:var(--red);}
+  .tbl-wrap{overflow-x:auto;border-radius:var(--radius);border:1px solid var(--border);}
+  table{width:100%;border-collapse:collapse;}
+  thead th{background:var(--surface);color:var(--muted);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;padding:10px 14px;text-align:right;white-space:nowrap;position:sticky;top:0;}
+  thead th:first-child{text-align:left;}
+  tbody tr{border-top:1px solid var(--border);}
+  tbody tr:hover{background:var(--surface);}
+  tbody tr.zero-row{background:rgba(79,142,247,.08);}
+  tbody tr.subsonic{background:rgba(240,100,100,.06);}
+  tbody tr.spot-row{background:rgba(224,108,58,.08);}
+  td{padding:8px 14px;text-align:right;font-size:13px;font-variant-numeric:tabular-nums;}
+  td:first-child{text-align:left;font-weight:600;color:var(--accent);}
+  td.neg{color:var(--red);}td.pos{color:var(--green);}td.muted{color:var(--muted);font-size:12px;}
+  .energy-bar{height:4px;background:var(--border);border-radius:2px;margin-top:3px;}
+  .energy-fill{height:100%;border-radius:2px;background:var(--green);}
+  canvas{width:100%;border-radius:var(--radius);background:var(--surface);border:1px solid var(--border);display:block;}
+  .empty-state{text-align:center;padding:60px 20px;color:var(--muted);}
+  .empty-state .icon{font-size:48px;margin-bottom:12px;}
+  .unit-toggle{display:flex;border:1px solid var(--border);border-radius:6px;overflow:hidden;}
+  .unit-toggle button{padding:5px 12px;border:none;background:transparent;color:var(--muted);cursor:pointer;font-size:12px;touch-action:manipulation;}
+  .unit-toggle button.active{background:var(--surface2);color:var(--text);}
+  .sys-toggle{display:flex;background:var(--bg);border:1px solid var(--border);border-radius:6px;overflow:hidden;}
+  .sys-toggle button{flex:1;padding:7px 10px;border:none;background:transparent;color:var(--muted);cursor:pointer;font-size:12px;font-weight:600;touch-action:manipulation;}
+  .sys-toggle button.active{background:var(--accent2);color:#fff;}
+  .preset-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+  .preset-btn{position:relative;padding:7px 8px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);cursor:pointer;font-size:11px;text-align:left;line-height:1.4;touch-action:manipulation;}
+  .preset-btn:active{border-color:var(--accent);color:var(--accent);}
+  .preset-btn strong{display:block;font-size:12px;}
+  .preset-btn.custom{border-color:rgba(224,108,58,.35);}
+  .preset-btn.drag-over{border-color:var(--accent);box-shadow:0 0 0 2px rgba(96,160,255,.35);}
+  .preset-btn[draggable]{cursor:grab;}
+  .preset-del{position:absolute;top:3px;right:3px;width:18px;height:18px;background:rgba(224,82,82,.15);border:1px solid rgba(224,82,82,.3);border-radius:3px;color:var(--red);font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation;}
+  .preset-restore{position:absolute;top:3px;left:3px;width:18px;height:18px;background:rgba(62,207,142,.12);border:1px solid rgba(62,207,142,.35);border-radius:3px;color:var(--green);font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation;}
+  .preset-edit{position:absolute;top:3px;right:23px;width:18px;height:18px;background:rgba(96,160,255,.12);border:1px solid rgba(96,160,255,.3);border-radius:3px;color:var(--accent);font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation;}
+  .save-preset-row{display:flex;gap:5px;margin-top:8px;align-items:center;}
+  .save-preset-row input{flex:1;min-width:0;background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:5px 8px;font-size:12px;outline:none;}
+  .save-preset-row button{padding:5px 10px;background:var(--accent2);color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;touch-action:manipulation;}
+  .cancel-edit-link{font-size:10px;color:var(--muted);cursor:pointer;text-decoration:underline;white-space:nowrap;display:none;}
+  .preset-section-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+  .preset-section-hdr .section-title{margin-bottom:0;}
+  .restore-link{font-size:10px;color:var(--muted);cursor:pointer;text-decoration:underline;}
+  .simple-mode-btn{font-size:11px;font-weight:700;padding:4px 12px;border-radius:14px;border:1px solid var(--border);background:var(--surface2);color:var(--text);cursor:pointer;touch-action:manipulation;white-space:nowrap;}
+  .simple-mode-btn.on{background:var(--green);border-color:var(--green);color:#0f1117;}
+  .help-tip{display:inline-block;width:15px;height:15px;line-height:13px;text-align:center;border-radius:50%;background:var(--surface2);border:1px solid var(--border);color:var(--muted);font-size:9px;font-style:normal;font-weight:700;cursor:pointer;margin-left:3px;vertical-align:middle;touch-action:manipulation;}
+  #helpTipPopover{display:none;position:fixed;z-index:9999;max-width:230px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:11px;line-height:1.45;color:var(--text);box-shadow:0 4px 16px rgba(0,0,0,.45);}
+  .rc-row{display:flex;justify-content:space-between;align-items:baseline;padding:14px 0;border-bottom:1px solid var(--border);}
+  .rc-row.rc-zero{background:rgba(79,142,247,.06);}
+  .rc-row.rc-spot{background:rgba(224,108,58,.06);}
+  .rc-range{color:var(--muted);font-size:22px;font-weight:700;}
+  .rc-val{color:var(--accent);font-size:32px;font-weight:800;}
+  @media print{
+    body *{visibility:hidden;}
+    #rangeCardModal, #rangeCardModal *{visibility:visible;}
+    #rangeCardModal{position:absolute;top:0;left:0;background:#fff;}
+    #rangeCardModal button{display:none;}
+    .rc-range,.rc-val,#rangeCardTitle{color:#000 !important;}
+  }
+  .mobile-tab-bar{display:none;position:fixed;bottom:0;left:0;right:0;height:calc(54px + env(safe-area-inset-bottom,0px));padding-bottom:env(safe-area-inset-bottom,0px);background:var(--surface);border-top:1px solid var(--border);z-index:200;}
+  .mob-tab{flex:1;background:transparent;border:none;color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;touch-action:manipulation;}
+  .mob-tab.active{color:var(--accent);}
+  .mob-tab .ti{font-size:22px;line-height:1;}
+  .pane-hidden{display:none!important;}
+  @media(max-width:900px){
+    .layout{grid-template-columns:1fr;height:calc(var(--app-height,100vh) - 57px - 54px);overflow:hidden;}
+    .sidebar{border-right:none;height:100%;overflow-y:auto;}
+    .main{height:100%;overflow-y:auto;}
+    .mobile-tab-bar{display:flex;}
+  }
+</style>
+</head>
+<body>
+<header>
+  <div><h1>&#127919; Cervid Ballistics</h1><span>Air Rifle &amp; Centrefire</span></div>
+  <div class="mode-toggle">
+    <button class="active" id="btnAir" onclick="setMode('air')">Air Rifle</button>
+    <button id="btnCF" onclick="setMode('cf')">Centrefire</button>
+  </div>
+</header>
+<div class="layout">
+  <div class="sidebar" id="sidebarPane">
+
+    <!-- Unit System -->
+    <div class="section">
+      <div class="section-title">Unit System</div>
+      <div class="sys-toggle">
+        <button class="active" id="btnImperial" onclick="setUnitSystem('imperial')">Imperial</button>
+        <button id="btnMetric" onclick="setUnitSystem('metric')">Metric</button>
+      </div>
+    </div>
+
+    <!-- Presets -->
+    <div class="section">
+      <div class="preset-section-hdr">
+        <div class="section-title">Quick Presets</div>
+        <div style="display:flex;gap:10px;align-items:center;">
+          <button type="button" class="simple-mode-btn" id="simpleModeLink" onclick="toggleSimpleMode()">Single Load Mode: Off</button>
+          <span class="restore-link" id="sortModeLink" onclick="toggleSortMode()">Sort by calibre</span>
+          <span class="restore-link" id="restoreDefaultsLink" onclick="restoreDefaults()">Clear all</span>
+        </div>
+      </div>
+      <div class="preset-grid" id="presetGrid"></div>
+      <p id="simpleModeNote" style="font-size:11px;color:var(--muted);margin:6px 0 0;display:none;"></p>
+      <div id="deleteUndoBar" style="display:none;margin-top:8px;padding:8px 10px;background:rgba(224,108,58,.12);border:1px solid rgba(224,108,58,.35);border-radius:6px;font-size:12px;justify-content:space-between;align-items:center;gap:10px;">
+        <span id="deleteUndoText"></span>
+        <span class="restore-link" style="text-decoration:none;font-weight:700;" onclick="undoDelete()">Undo</span>
+      </div>
+      <div class="save-preset-row">
+        <input type="text" id="presetNameInput" placeholder="Name this load&hellip;" maxlength="28"/>
+        <button id="presetSaveBtn" onclick="saveCurrentAsPreset()">+ Save</button>
+        <span class="cancel-edit-link" id="cancelEditLink" onclick="cancelPresetEdit()">cancel</span>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center;margin-top:8px;">
+        <span class="restore-link" onclick="exportPresets()">&#11015; Export presets</span>
+        <span class="restore-link" onclick="document.getElementById('importPresetsFile').click()">&#11014; Import presets</span>
+        <input type="file" id="importPresetsFile" accept="application/json" style="display:none;" onchange="importPresetsFile(this)"/>
+      </div>
+    </div>
+
+    <!-- Firearm & Load -->
+    <div class="section">
+      <div class="preset-section-hdr">
+        <div class="section-title">Firearm &amp; Load</div>
+        <button onclick="clearLoadFields()" style="padding:3px 10px;background:var(--accent2);border:none;border-radius:5px;color:#fff;font-size:11px;font-weight:700;cursor:pointer;touch-action:manipulation;" title="Clear all fields to enter a new load">&#10011; New Load</button>
+      </div>
+      <div class="field"><label>Calibre / Cartridge</label><input type="text" id="fCalibr" placeholder="e.g. .22 Air / .308 Win"/></div>
+      <div class="row2">
+        <div class="field"><label>Bullet Weight (gr)</label><input type="number" id="fWeight" placeholder="e.g. 150" min="1" max="1000" step="0.1"/></div>
+        <div class="field"><label>BC (G1)<span class="help-tip" data-tip="Ballistic Coefficient: one number summarizing how well the projectile resists air drag and holds velocity. Higher = flatter trajectory, less wind drift. G1 is the traditional flat-base reference standard - always enter this one, even if you also have a G7 value below." onclick="showHelpTip(this,event)">?</span></label><input type="number" id="fBC" placeholder="e.g. 0.400" min="0.01" max="1.5" step="0.001"/></div>
+      </div>
+      <div class="field"><label>BC (G7)<span class="help-tip" data-tip="G7 is a boat-tail-shaped reference standard - a better match for modern long-range bullets than G1. If you have a real published G7 number, enter it here and it will be used directly instead of an estimate." onclick="showHelpTip(this,event)">?</span> <span style="color:var(--muted);font-size:10px;">optional &mdash; used automatically when Drag Model is G7</span></label><input type="number" id="fBC7" value="" min="0.01" max="1.5" step="0.001" placeholder="leave blank to estimate from G1"/></div>
+      <div class="row2">
+        <div class="field"><label id="lblMV">Muzzle Vel. (fps)</label><input type="number" id="fMV" placeholder="e.g. 2800" min="1" max="5000" step="1"/></div>
+        <div class="field"><label id="lblSH">Scope Height (in)</label><input type="number" id="fSH" value="1.5" min="0.1" max="20" step="0.1"/></div>
+      </div>
+      <div class="row3">
+        <div class="field"><label id="lblZero">Zero Range (yd)</label><input type="number" id="fZero" value="30" min="1" max="1000" step="5"/></div>
+        <div class="field"><label id="lblMax">Max Range (yd)</label><input type="number" id="fMax" value="100" min="10" max="2000" step="25"/></div>
+        <div class="field"><label id="lblInterval">Interval (yd)</label><input type="number" id="fInterval" value="10" min="1" max="500" step="5" placeholder="auto"/></div>
+      </div>
+      <div class="field"><label>Spot Range (<span id="lblSpotUnit">yd</span>) <span style="color:var(--accent2);font-size:10px;">&#9670; single extra row</span></label><input type="number" id="fSpot" value="" min="1" max="2000" step="1" placeholder="optional"/></div>
+      <div class="field"><label>Drag Model<span class="help-tip" data-tip="Which drag reference standard your BC number is calibrated against. G1 suits flat-base pellets and bullets; G7 suits boat-tail long-range bullets. Picking the wrong one changes how accurate the trajectory prediction is." onclick="showHelpTip(this,event)">?</span></label><select id="fDrag" onchange="onDragModelChange()"><option value="g1">G1 (flat-base / pellets)</option><option value="g7">G7 (boat-tail / long-range)</option></select></div>
+      <div id="bcWarning" style="display:none;background:rgba(245,197,66,.10);border:1px solid rgba(245,197,66,.35);border-radius:6px;padding:8px 10px;margin-bottom:10px;font-size:11px;color:var(--yellow);line-height:1.5;">
+        <div id="bcWarningText"></div>
+        <div style="display:flex;gap:8px;margin-top:6px;">
+          <button type="button" onclick="estimateG7FromG1()" style="padding:3px 10px;background:var(--yellow);border:none;border-radius:5px;color:#1a1d27;font-size:11px;font-weight:700;cursor:pointer;touch-action:manipulation;">&asymp; Estimate BC (G7) for me</button>
+          <button type="button" onclick="dismissBcWarning()" style="padding:3px 10px;background:transparent;border:1px solid var(--border);border-radius:5px;color:var(--muted);font-size:11px;cursor:pointer;touch-action:manipulation;">Dismiss</button>
+        </div>
+      </div>
+      <div class="field"><label>Projectile Shape <span style="color:var(--muted);font-size:10px;">(approx. gyro stability correction)</span></label><select id="fShape">
+        <option value="flatbase">Flat-base</option>
+        <option value="boattail">Boat-tail</option>
+        <option value="diabolo">Diabolo (pellet skirt)</option>
+      </select></div>
+      <div class="row3">
+        <div class="field"><label id="lblDia">Diameter (in)</label><input type="number" id="fDia" placeholder="e.g. 0.308" min="0.1" max="30" step="0.001"/></div>
+        <div class="field"><label id="lblLen">Length (in)</label><input type="number" id="fLen" placeholder="e.g. 1.20" min="0.1" max="100" step="0.001"/></div>
+        <div class="field"><label id="lblTwist">Twist 1:X (in)</label><span class="help-tip" data-tip="Barrel twist rate: one full rifling rotation per X inches (or mm) of travel. A lower number means faster/tighter twist - more spin for a given velocity, needed to stabilize longer/heavier projectiles." onclick="showHelpTip(this,event)">?</span><input type="number" id="fTwist" placeholder="e.g. 10" min="4" max="36" step="0.5"/></div>
+      </div>
+      <div class="field" style="margin-top:-2px;">
+        <label>Twist Direction <span style="color:var(--muted);font-size:10px;">(for spin drift)</span></label>
+        <div class="unit-toggle">
+          <button class="active" id="btnRH" onclick="setTwistDir(1)">RH &#8635; (standard)</button>
+          <button id="btnLH" onclick="setTwistDir(-1)">LH &#8634;</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Environmental -->
+    <div class="section">
+      <div class="preset-section-hdr">
+        <div class="section-title">Environmental</div>
+        <div style="display:flex;gap:4px;">
+          <button onclick="fetchWeather()" id="btnLiveWeather" style="padding:3px 10px;background:var(--accent);border:none;border-radius:5px;color:#fff;font-size:11px;font-weight:700;cursor:pointer;touch-action:manipulation;">&#127756; Weather</button>
+        </div>
+      </div>
+      <div id="weatherStatus" style="font-size:10px;color:var(--muted);margin-bottom:4px;min-height:14px;"></div>
+      <div class="row2">
+        <div class="field"><label id="lblAlt">Altitude (ft)</label><input type="number" id="fAlt" value="0" min="0" max="20000" step="100"/></div>
+        <div class="field"><label id="lblTemp">Temp (&deg;C)</label><input type="number" id="fTemp" value="15" min="-40" max="50" step="1"/></div>
+      </div>
+      <div class="row2">
+        <div class="field"><label>Humidity (%)</label><input type="number" id="fHumid" value="50" min="0" max="100" step="5"/></div>
+        <div class="field"><label id="lblPress">Pressure (inHg)</label><input type="number" id="fPress" value="29.92" min="10" max="1100" step="0.01"/></div>
+      </div>
+      <div class="row2">
+        <div class="field"><label id="lblWind">Wind Speed (mph)</label><input type="number" id="fWind" value="10" min="0" max="200" step="1"/></div>
+        <div class="field"><label>Wind Clock (hr)</label><input type="number" id="fWindDir" value="3" min="1" max="12" step="1"/><small style="color:var(--muted);font-size:10px;">3=full R, 9=full L</small></div>
+      </div>
+      <button class="btn btn-secondary" onclick="autoFillPressure()" style="margin-bottom:6px;font-size:12px;padding:6px;">&#128205; Pressure from altitude</button>
+    </div>
+
+    <!-- Location -->
+    <div class="section">
+      <div class="section-title">Location (Coriolis)</div>
+      <div class="row2">
+        <div class="field"><label>Latitude (&deg;N)</label><input type="number" id="fLat" value="54" min="-90" max="90" step="0.5"/></div>
+        <div class="field"><label>Azimuth (&deg;)<span class="help-tip" data-tip="The compass direction you are firing toward, in degrees (0=North, 90=East, 180=South, 270=West). Used with Latitude to calculate the Coriolis effect - the Earth's rotation deflecting the bullet slightly, which only matters at longer ranges. If you do not know it, 0 (North) is a reasonable default and the effect is small anyway." onclick="showHelpTip(this,event)">?</span></label><input type="number" id="fAzimuth" value="0" min="0" max="360" step="5"/><small style="color:var(--muted);font-size:10px;">0=N 90=E 180=S</small></div>
+      </div>
+    </div>
+
+    <!-- Angle -->
+    <div class="section">
+      <div class="section-title">Angle</div>
+      <div class="field"><label>Shooting Angle (&deg;) &mdash; uphill positive</label><input type="number" id="fAngle" value="0" min="-60" max="60" step="5"/></div>
+    </div>
+
+    <div id="plausibilityWarning" style="display:none;background:rgba(245,197,66,.10);border:1px solid rgba(245,197,66,.35);border-radius:6px;padding:8px 10px;margin-bottom:10px;font-size:11px;color:var(--yellow);line-height:1.5;">
+      <div id="plausibilityWarningText"></div>
+      <div style="display:flex;gap:8px;margin-top:6px;">
+        <button type="button" onclick="dismissPlausibilityWarning()" style="padding:3px 10px;background:transparent;border:1px solid var(--border);border-radius:5px;color:var(--muted);font-size:11px;cursor:pointer;touch-action:manipulation;">Dismiss</button>
+      </div>
+    </div>
+    <button type="button" class="btn" onclick="calculate()">Calculate Trajectory</button>
+
+    <!-- Trajectory Truing -->
+    <div class="section" style="border-color:rgba(224,108,58,.35);">
+      <div class="preset-section-hdr">
+        <div class="section-title" style="color:var(--accent2);">&#127919; Trajectory Truing</div>
+        <button id="btnResetTruing" onclick="resetTruing()" style="display:none;padding:3px 8px;background:transparent;border:1px solid var(--border);border-radius:5px;color:var(--muted);font-size:11px;cursor:pointer;touch-action:manipulation;">Reset</button>
+      </div>
+      <p style="font-size:11px;color:var(--muted);margin-bottom:10px;line-height:1.5;">Fire at a known distance, enter the actual holdover required, and the app will tune the BC to match real-world conditions.</p>
+      <div class="row2">
+        <div class="field"><label id="lblTrueRange">Validation Range (yd)</label><input type="number" id="fTrueRange" placeholder="e.g. 300" min="1" max="2000" step="1"/></div>
+        <div class="field"><label>Observed Holdover</label><input type="number" id="fTrueObs" placeholder="e.g. 2.4" step="0.01"/></div>
+      </div>
+      <div class="field">
+        <label>Holdover Unit</label>
+        <div class="unit-toggle" style="width:100%;">
+          <button class="active" id="btnTrueUnitMils" onclick="setTrueUnit('mils')" style="flex:1;">mils</button>
+          <button id="btnTrueUnitMoa" onclick="setTrueUnit('moa')" style="flex:1;">MOA</button>
+          <button id="btnTrueUnitIn" onclick="setTrueUnit('in')" style="flex:1;">inches</button>
+          <button id="btnTrueUnitCm" onclick="setTrueUnit('cm')" style="flex:1;">cm</button>
+        </div>
+      </div>
+      <button type="button" class="btn" style="background:var(--accent2);margin-top:2px;" onclick="applyTruing()">True Trajectory</button>
+      <div id="trueStatus" style="font-size:11px;color:var(--muted);margin-top:6px;min-height:14px;line-height:1.4;"></div>
+      <button type="button" id="btnSaveTruing" onclick="saveTruingToPreset()" style="display:none;background:var(--green);color:#0f1117;margin-top:6px;" class="btn">&#128190; Save to preset</button>
+
+      <div style="border-top:1px solid var(--border);margin-top:12px;padding-top:10px;">
+        <p style="font-size:11px;color:var(--muted);margin-bottom:8px;line-height:1.5;">Optional: check the (now trued) model against a second real shot at a different distance — this doesn't refit anything, it just tells you whether the correction above actually holds up further out, or whether the gap grows (a sign the real issue may be muzzle velocity, not BC).</p>
+        <div class="row2">
+          <div class="field"><label id="lblVerifyRange">Verify At (yd)</label><input type="number" id="fVerifyRange" placeholder="e.g. 500" min="1" max="2000" step="1"/></div>
+          <div class="field"><label>Observed Holdover</label><input type="number" id="fVerifyObs" placeholder="e.g. 4.5" step="0.01"/></div>
+        </div>
+        <button type="button" class="btn" style="background:var(--accent);margin-top:2px;" onclick="verifyTruing()">Verify Second Point</button>
+        <div id="verifyStatus" style="font-size:11px;color:var(--muted);margin-top:6px;min-height:14px;line-height:1.4;"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="main" id="mainArea">
+    <div class="empty-state"><div class="icon">&#127919;</div><p>Configure your load and tap <strong>Calculate Trajectory</strong></p></div>
+  </div>
+</div>
+<div class="mobile-tab-bar" id="mobileTabBar">
+  <button class="mob-tab active" id="mobTabInputs" onclick="setMobileTab('inputs')"><span class="ti">&#9881;&#65039;</span>Inputs</button>
+  <button class="mob-tab" id="mobTabResults" onclick="setMobileTab('results')"><span class="ti">&#128202;</span>Results</button>
+</div>
+<div id="helpTipPopover"></div>
+<div id="rangeCardModal" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:10000;overflow:auto;">
+  <div style="max-width:440px;margin:0 auto;padding:20px 18px 60px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:10px;">
+      <div>
+        <h2 id="rangeCardTitle" style="margin:0;font-size:19px;"></h2>
+        <div id="rangeCardSubtitle" style="color:var(--muted);font-size:12px;margin-top:2px;"></div>
+      </div>
+      <button onclick="hideRangeCard()" style="background:var(--accent2);color:#fff;border:none;border-radius:6px;padding:8px 14px;font-weight:700;cursor:pointer;touch-action:manipulation;flex-shrink:0;">Close</button>
+    </div>
+    <div id="rangeCardBody"></div>
+    <button onclick="window.print()" style="margin-top:20px;width:100%;padding:12px;background:var(--accent);color:#fff;border:none;border-radius:6px;font-weight:700;font-size:14px;cursor:pointer;touch-action:manipulation;">&#128424; Print</button>
+  </div>
+</div>
+<script>
+// ── App height (iOS safe area) ──────────────────────────────────────────────
+function setAppHeight(){document.documentElement.style.setProperty('--app-height',window.innerHeight+'px');}
+window.addEventListener('resize',setAppHeight);
+window.addEventListener('orientationchange',function(){setTimeout(setAppHeight,200);});
+setAppHeight();
+
+// ── Mobile tab layout ───────────────────────────────────────────────────────
+var mobileTab='inputs';
+function setMobileTab(tab){
+  mobileTab=tab;
+  document.getElementById('sidebarPane').classList.toggle('pane-hidden',tab!=='inputs');
+  document.getElementById('mainArea').classList.toggle('pane-hidden',tab!=='results');
+  document.getElementById('mobTabInputs').classList.toggle('active',tab==='inputs');
+  document.getElementById('mobTabResults').classList.toggle('active',tab==='results');
+}
+function syncLayout(){
+  var mob=window.innerWidth<=900;
+  if(mob){setMobileTab(mobileTab);}
+  else{document.getElementById('sidebarPane').classList.remove('pane-hidden');document.getElementById('mainArea').classList.remove('pane-hidden');}
+}
+window.addEventListener('resize',syncLayout);
+
+// ── Help tooltips ───────────────────────────────────────────────────────────
+// The "?" badges used to rely on the native title="" attribute, which only shows on hover —
+// so tapping/clicking one (no mouse, or on a touchscreen) did nothing. Replaced with a real
+// click-triggered popover: tapping the icon shows it near that icon, tapping it again (or
+// anywhere else on the page) dismisses it.
+function showHelpTip(el,evt){
+  if(evt){evt.stopPropagation();evt.preventDefault();}
+  var pop=document.getElementById('helpTipPopover');
+  if(!pop)return;
+  if(pop.style.display==='block'&&pop._forEl===el){
+    pop.style.display='none';pop._forEl=null;return;
+  }
+  pop.textContent=el.getAttribute('data-tip')||'';
+  pop.style.display='block';
+  pop._forEl=el;
+  var rect=el.getBoundingClientRect?el.getBoundingClientRect():{bottom:0,left:0};
+  var vw=window.innerWidth||1000;
+  var left=Math.min(Math.max(8,rect.left),vw-238);
+  pop.style.top=(rect.bottom+6)+'px';
+  pop.style.left=left+'px';
+}
+document.addEventListener('click',function(){
+  var pop=document.getElementById('helpTipPopover');
+  if(pop){pop.style.display='none';pop._forEl=null;}
+});
+
+// ── Unit system ─────────────────────────────────────────────────────────────
+var unitSystem='imperial';
+// Remembers last-used mode & unit system across reloads, so the app doesn't reset to
+// Air Rifle / Imperial every time it's reopened. Purely a UI convenience — never touches
+// preset data, so it's safe alongside everything else in localStorage.
+var PREF_KEY='ballistics_prefs_v1';
+function loadPrefs(){return safeLS(function(){return JSON.parse(localStorage.getItem(PREF_KEY));})||{};}
+function savePrefs(p){safeLS(function(){var cur=loadPrefs();for(var k in p)cur[k]=p[k];localStorage.setItem(PREF_KEY,JSON.stringify(cur));});}
+
+var LABELS={
+  imperial:{lblMV:'Muzzle Vel. (fps)',lblSH:'Scope Height (in)',lblZero:'Zero Range (yd)',lblMax:'Max Range (yd)',lblAlt:'Altitude (ft)',lblTemp:'Temp (°C)',lblPress:'Pressure (inHg)',lblWind:'Wind Speed (mph)',lblDia:'Diameter (in)',lblLen:'Length (in)',lblInterval:'Interval (yd)',lblSpotUnit:'yd',lblTwist:'Twist 1:X (in)'},
+  metric:  {lblMV:'Muzzle Vel. (m/s)',lblSH:'Scope Height (cm)',lblZero:'Zero Range (m)',lblMax:'Max Range (m)',lblAlt:'Altitude (m)',lblTemp:'Temp (°C)',lblPress:'Pressure (hPa)',lblWind:'Wind Speed (km/h)',lblDia:'Diameter (mm)',lblLen:'Length (mm)',lblInterval:'Interval (m)',lblSpotUnit:'m',lblTwist:'Twist 1:X (mm)'}
+};
+
+function updateLabels(){
+  var L=LABELS[unitSystem];
+  for(var id in L)document.getElementById(id).textContent=L[id];
+}
+
+// Canonical imperial min/max/step for fields whose bounds should track the unit system.
+// fPress is deliberately excluded: its static bounds (10-1100) are already wide enough
+// to work sensibly for both inHg and hPa without conversion.
+var BASE_BOUNDS={
+  fMV:{min:1,max:5000,step:1},fSH:{min:0.1,max:20,step:0.1},
+  fZero:{min:1,max:1000,step:5},fMax:{min:10,max:2000,step:25},
+  fAlt:{min:0,max:20000,step:100},fWind:{min:0,max:200,step:1},
+  fDia:{min:0.1,max:30,step:0.001},fLen:{min:0.1,max:100,step:0.001},
+  fInterval:{min:1,max:500,step:5},fSpot:{min:1,max:2000,step:1},
+  fTwist:{min:4,max:36,step:0.5}
+};
+var BOUND_FACTORS={fMV:0.3048,fSH:2.54,fZero:0.9144,fMax:0.9144,fAlt:0.3048,fWind:1.60934,fDia:25.4,fLen:25.4,fInterval:0.9144,fSpot:0.9144,fTwist:25.4};
+function roundClean(v){return Math.round(v*1000)/1000;}
+function applyBounds(sys){
+  var met=sys==='metric';
+  for(var id in BASE_BOUNDS){
+    var el=document.getElementById(id);if(!el)continue;
+    var b=BASE_BOUNDS[id],k=met?BOUND_FACTORS[id]:1;
+    el.min=roundClean(b.min*k);el.max=roundClean(b.max*k);el.step=roundClean(b.step*k);
+  }
+}
+
+function setUnitSystem(sys){
+  if(sys===unitSystem)return;
+  var prev=unitSystem;
+  unitSystem=sys;
+  document.getElementById('btnImperial').classList.toggle('active',sys==='imperial');
+  document.getElementById('btnMetric').classList.toggle('active',sys==='metric');
+
+  // Read current displayed values then convert
+  var mv=parseFloat(document.getElementById('fMV').value)||0;
+  var sh=parseFloat(document.getElementById('fSH').value)||0;
+  var zero=parseFloat(document.getElementById('fZero').value)||0;
+  var max=parseFloat(document.getElementById('fMax').value)||0;
+  var alt=parseFloat(document.getElementById('fAlt').value)||0;
+  var wind=parseFloat(document.getElementById('fWind').value)||0;
+  var dia=parseFloat(document.getElementById('fDia').value)||0;
+  var len=parseFloat(document.getElementById('fLen').value)||0;
+  var press=parseFloat(document.getElementById('fPress').value)||0;
+  var twist=parseFloat(document.getElementById('fTwist').value)||0;
+
+  if(sys==='metric'){
+    document.getElementById('fMV').value=(mv*0.3048).toFixed(1);
+    document.getElementById('fSH').value=(sh*2.54).toFixed(1);
+    document.getElementById('fZero').value=Math.round(zero*0.9144);
+    document.getElementById('fMax').value=Math.round(max*0.9144);
+    document.getElementById('fAlt').value=Math.round(alt*0.3048);
+    document.getElementById('fWind').value=(wind*1.60934).toFixed(1);
+    document.getElementById('fDia').value=(dia*25.4).toFixed(2);
+    document.getElementById('fLen').value=(len*25.4).toFixed(2);
+    document.getElementById('fPress').value=(press*33.8639).toFixed(1);
+    var intv=parseFloat(document.getElementById('fInterval').value)||0;
+    if(intv>0)document.getElementById('fInterval').value=Math.round(intv*0.9144);
+    var spot=parseFloat(document.getElementById('fSpot').value)||0;
+    if(spot>0)document.getElementById('fSpot').value=Math.round(spot*0.9144);
+    var trv=parseFloat(document.getElementById('fTrueRange').value)||0;
+    if(trv>0)document.getElementById('fTrueRange').value=Math.round(trv*0.9144);
+    document.getElementById('lblTrueRange').textContent='Validation Range (m)';
+    var vrv=parseFloat(document.getElementById('fVerifyRange').value)||0;
+    if(vrv>0)document.getElementById('fVerifyRange').value=Math.round(vrv*0.9144);
+    document.getElementById('lblVerifyRange').textContent='Verify At (m)';
+    if(twist>0)document.getElementById('fTwist').value=(twist*25.4).toFixed(1);
+  } else {
+    document.getElementById('fMV').value=Math.round(mv/0.3048);
+    document.getElementById('fSH').value=(sh/2.54).toFixed(2);
+    document.getElementById('fZero').value=Math.round(zero/0.9144);
+    document.getElementById('fMax').value=Math.round(max/0.9144);
+    document.getElementById('fAlt').value=Math.round(alt/0.3048);
+    document.getElementById('fWind').value=(wind/1.60934).toFixed(1);
+    document.getElementById('fDia').value=(dia/25.4).toFixed(4);
+    document.getElementById('fLen').value=(len/25.4).toFixed(4);
+    document.getElementById('fPress').value=(press/33.8639).toFixed(2);
+    var intv=parseFloat(document.getElementById('fInterval').value)||0;
+    if(intv>0)document.getElementById('fInterval').value=Math.round(intv/0.9144);
+    var spot2=parseFloat(document.getElementById('fSpot').value)||0;
+    if(spot2>0)document.getElementById('fSpot').value=Math.round(spot2/0.9144);
+    var trv2=parseFloat(document.getElementById('fTrueRange').value)||0;
+    if(trv2>0)document.getElementById('fTrueRange').value=Math.round(trv2/0.9144);
+    document.getElementById('lblTrueRange').textContent='Validation Range (yd)';
+    var vrv2=parseFloat(document.getElementById('fVerifyRange').value)||0;
+    if(vrv2>0)document.getElementById('fVerifyRange').value=Math.round(vrv2/0.9144);
+    document.getElementById('lblVerifyRange').textContent='Verify At (yd)';
+    if(twist>0)document.getElementById('fTwist').value=(twist/25.4).toFixed(2);
+  }
+
+  applyBounds(sys);
+  updateLabels();
+  if(lastResults)renderResults(lastResults.results,lastResults.params,lastResults.stability);
+  savePrefs({unit:sys});
+}
+
+// ── BC standard (G1/G7) ───────────────────────────────────────────────────────
+// G1 and G7 BCs are NOT the same number for the same projectile — they normalize drag
+// against differently-shaped reference standards. BC (G1) is always required and always
+// means G1. BC (G7) is optional: if the user has a real published G7 number, it's entered
+// here and used directly ("joined to the model") whenever Drag Model = G7. If left blank,
+// calculate() falls back to an approximate G1÷1.9 estimate so the physics never mistakes
+// a raw G1 number for a G7 one — the estimate is flagged in the results header either way.
+// There's no exact universal G1<->G7 conversion (the true ratio depends on the bullet's own
+// form factor); 1.9 is a commonly-cited approximation for modern boat-tail rifle bullets,
+// not valid for pellets or flat-base slugs.
+var BC_STANDARD_RATIO=1.9;
+var lastDragModel='g1';
+// Returns {bc, estimated} for whichever drag model is currently selected, applying the
+// G7 fallback rule above. Shared by calculate(), applyTruing(), and preset saving so they
+// never disagree about which BC value is actually in effect.
+function effectiveBc(){
+  var model=document.getElementById('fDrag').value||'g1';
+  var bc1=parseFloat(document.getElementById('fBC').value)||0.045;
+  if(model!=='g7')return{bc:bc1,estimated:false};
+  var bc7=parseFloat(document.getElementById('fBC7').value)||0;
+  if(bc7>0)return{bc:bc7,estimated:false};
+  return{bc:bc1/BC_STANDARD_RATIO,estimated:true};
+}
+function onDragModelChange(){
+  var newModel=document.getElementById('fDrag').value;
+  var bc7=parseFloat(document.getElementById('fBC7').value)||0;
+  if(newModel==='g7'&&!bc7){
+    document.getElementById('bcWarningText').textContent='No BC (G7) entered. Until you add one above, the model will use an approximate estimate (BC(G1) ÷ '+BC_STANDARD_RATIO+') — reasonable for boat-tail centrefire bullets, not meaningful for pellets or flat-base slugs. Click below to pre-fill that estimate so you can review or edit it.';
+    document.getElementById('bcWarning').style.display='block';
+  } else {
+    document.getElementById('bcWarning').style.display='none';
+  }
+  lastDragModel=newModel;
+}
+function estimateG7FromG1(){
+  var bc1=parseFloat(document.getElementById('fBC').value)||0;
+  if(!bc1)return;
+  document.getElementById('fBC7').value=(bc1/BC_STANDARD_RATIO).toFixed(4);
+  dismissBcWarning();
+}
+function dismissBcWarning(){
+  document.getElementById('bcWarning').style.display='none';
+}
+
+// ── Presets ─────────────────────────────────────────────────────────────────
+// General Release variant: no built-in loads are shipped at all (unlike the main app and the
+// Single Load Mode variant, which both include the author's personal pellet/cartridge library).
+// This keeps the file's only saved data as whatever each user enters and saves themselves -
+// nothing to hide behind a toggle, and nothing personal ever surfaces even if a recipient
+// switches Single Load Mode off to see their full saved list.
+var PRESETS={
+  air:[],
+  cf:[]
+};
+
+var currentMode='air',editingCustomIdx=null,editingBuiltinIdx=null;
+// Tracks which preset (if any) the form currently represents, so Trajectory Truing's
+// "Save to preset" button knows what to amend. {type:'c'|'b', idx, name} or null if the
+// form doesn't correspond to a saved preset (fresh/New Load, or fields edited by hand).
+// Verified by name (not just index) at save time since custom preset order/contents can
+// change between load and save (matches how getOrderedPresets() already resolves by name).
+var loadedPresetRef=null;
+var CUSTOM_KEY='ballistics_custom_v1',HIDDEN_KEY='ballistics_hidden_v1';
+function safeLS(fn){try{return fn();}catch(e){return null;}}
+function loadCustom(){return safeLS(function(){return JSON.parse(localStorage.getItem(CUSTOM_KEY));})||{air:[],cf:[]};}
+function saveCustom(d){safeLS(function(){localStorage.setItem(CUSTOM_KEY,JSON.stringify(d));});}
+function loadHidden(){var r=safeLS(function(){return JSON.parse(localStorage.getItem(HIDDEN_KEY));})||{air:[],cf:[]};return{air:new Set(r.air),cf:new Set(r.cf)};}
+function saveHidden(d){safeLS(function(){localStorage.setItem(HIDDEN_KEY,JSON.stringify({air:[...d.air],cf:[...d.cf]}));});}
+var ORDER_KEY='ballistics_order_v1';
+function loadOrder(){return safeLS(function(){return JSON.parse(localStorage.getItem(ORDER_KEY));})||{air:null,cf:null};}
+function saveOrder(d){safeLS(function(){localStorage.setItem(ORDER_KEY,JSON.stringify(d));});}
+// 'manual' (drag-and-drop order, persisted via loadOrder/saveOrder) or 'calibre' (computed
+// display sort by diameter — never written to the persisted order, so toggling back to
+// manual instantly restores whatever was dragged into place, untouched).
+var presetSortMode={air:'manual',cf:'manual'};
+// Single Load Mode (internally still keyed/named "simple" - see SIMPLE_KEY/simpleMode below):
+// a view/save-behavior layer on top of the same storage used everywhere else. It never
+// deletes anything — built-ins are just not rendered, and any custom presets beyond the one
+// currently shown stay in localStorage untouched (surfaced via a note instead of silently
+// discarded), so switching it off restores the full picture exactly as it was.
+var SIMPLE_KEY='ballistics_simpleMode_v1'; // localStorage key backing Single Load Mode
+// General Release variant: Single Load Mode defaults ON out of the box (there's no personal
+// preset library to browse here, so the single-slot-per-section view is the more sensible
+// default for a first-time user) - but an explicit prior choice, once ever saved, is always
+// respected.
+var simpleMode=(function(){
+  var v=safeLS(function(){return localStorage.getItem(SIMPLE_KEY);});
+  return v===null?true:v==='1';
+})();
+// Returns ordered array of {type:'b'|'c', p:presetObj, ci:customArrayIdx, bi:builtinArrayIdx}
+function getOrderedPresets(mode){
+  var custom=loadCustom()[mode]||[];
+  var hidden=loadHidden()[mode]||new Set();
+  var stored=loadOrder()[mode]; // array of {t:'b'|'c', name:'...'}
+  var result=[];
+  var usedB={},usedC={};
+  if(stored){
+    stored.forEach(function(e){
+      if(e.t==='b'){
+        var bi=PRESETS[mode].findIndex(function(p){return p.name===e.name;});
+        if(bi>=0&&!hidden.has(bi)&&!usedB[e.name]){result.push({type:'b',p:PRESETS[mode][bi],bi:bi,ci:-1});usedB[e.name]=1;}
+      } else {
+        var ci=custom.findIndex(function(p){return p.name===e.name;});
+        if(ci>=0&&!usedC[e.name]){result.push({type:'c',p:custom[ci],bi:-1,ci:ci});usedC[e.name]=1;}
+      }
+    });
+  }
+  // Append any presets not yet in stored order
+  PRESETS[mode].forEach(function(p,bi){if(!hidden.has(bi)&&!usedB[p.name]){result.push({type:'b',p:p,bi:bi,ci:-1});usedB[p.name]=1;}});
+  custom.forEach(function(p,ci){if(!usedC[p.name]){result.push({type:'c',p:p,bi:-1,ci:ci});usedC[p.name]=1;}});
+  if(presetSortMode[mode]==='calibre'){
+    result=result.slice().sort(function(a,b){return(a.p.dia||0)-(b.p.dia||0);});
+  }
+  if(simpleMode){
+    var customOnly=result.filter(function(e){return e.type==='c';});
+    if(customOnly.length===0)return[];
+    var preferred=null;
+    if(loadedPresetRef&&loadedPresetRef.type==='c'&&mode===currentMode){
+      preferred=customOnly.find(function(e){return e.p.name===loadedPresetRef.name;});
+    }
+    if(!preferred)preferred=customOnly[customOnly.length-1];
+    return[preferred];
+  }
+  return result;
+}
+function toggleSortMode(){
+  presetSortMode[currentMode]=presetSortMode[currentMode]==='calibre'?'manual':'calibre';
+  updateSortModeLink();
+  renderPresets();
+}
+function updateSortModeLink(){
+  document.getElementById('sortModeLink').textContent=presetSortMode[currentMode]==='calibre'?'Manual order':'Sort by calibre';
+}
+function toggleSimpleMode(){
+  simpleMode=!simpleMode;
+  safeLS(function(){localStorage.setItem(SIMPLE_KEY,simpleMode?'1':'0');});
+  updateSimpleModeUI();
+  renderPresets();
+}
+// Shows/hides the sort & restore-defaults links (meaningless once only one preset is ever
+// shown) and relabels the toggle itself. Does not touch stored data either way.
+function updateSimpleModeUI(){
+  var link=document.getElementById('simpleModeLink');
+  if(link){link.textContent=simpleMode?'Single Load Mode: On':'Single Load Mode: Off';link.classList.toggle('on',simpleMode);}
+  var sortLink=document.getElementById('sortModeLink');
+  if(sortLink)sortLink.style.display=simpleMode?'none':'';
+  var restoreLink=document.getElementById('restoreDefaultsLink');
+  if(restoreLink)restoreLink.style.display=simpleMode?'none':'';
+}
+function persistOrder(orderedList,mode){
+  var d=loadOrder();
+  d[mode]=orderedList.map(function(e){return {t:e.type==='b'?'b':'c',name:e.p.name};});
+  saveOrder(d);
+}
+
+var _dragSrcPos=null;
+function renderPresets(){
+  var grid=document.getElementById('presetGrid');grid.innerHTML='';
+  var ordered=getOrderedPresets(currentMode);
+  ordered.forEach(function(item,pos){
+    var p=item.p,isC=(item.type==='c'),bi=item.bi,ci=item.ci;
+    var btn=document.createElement('button');
+    btn.className='preset-btn'+(isC?' custom':'');
+    var wtDisp=unitSystem==='metric'?(p.wt*0.0647989).toFixed(1)+'g':p.wt+'gr';
+    var mvDisp=unitSystem==='metric'?Math.round(p.mv*0.3048)+'m/s':p.mv+'fps';
+    btn.innerHTML='<strong>'+p.name+'</strong>'+wtDisp+' &middot; '+mvDisp;
+    // Dragging only makes sense in manual order — it's inert while viewing the computed
+    // calibre sort, so a drop can't silently clobber the real manual arrangement underneath.
+    btn.draggable=(presetSortMode[currentMode]!=='calibre');
+    // Click to load
+    btn.onclick=function(){
+      if(isC&&editingCustomIdx===ci)return;
+      cancelPresetEdit();loadPreset(p,{type:isC?'c':'b',idx:isC?ci:bi,name:p.name});
+    };
+    // Drag-and-drop
+    btn.addEventListener('dragstart',function(e){
+      _dragSrcPos=pos;e.dataTransfer.effectAllowed='move';
+      setTimeout(function(){btn.style.opacity='0.4';},0);
+    });
+    btn.addEventListener('dragend',function(){
+      btn.style.opacity='';
+      grid.querySelectorAll('.preset-btn').forEach(function(b){b.classList.remove('drag-over');});
+    });
+    btn.addEventListener('dragover',function(e){e.preventDefault();e.dataTransfer.dropEffect='move';});
+    btn.addEventListener('dragenter',function(e){e.preventDefault();btn.classList.add('drag-over');});
+    btn.addEventListener('dragleave',function(){btn.classList.remove('drag-over');});
+    btn.addEventListener('drop',function(e){
+      e.preventDefault();e.stopPropagation();
+      btn.classList.remove('drag-over');
+      if(_dragSrcPos===null||_dragSrcPos===pos)return;
+      var ord=getOrderedPresets(currentMode);
+      var moved=ord.splice(_dragSrcPos,1)[0];
+      ord.splice(pos,0,moved);
+      persistOrder(ord,currentMode);
+      _dragSrcPos=null;renderPresets();
+    });
+    // Edit button
+    var ed=document.createElement('button');ed.className='preset-edit';ed.textContent='✏';
+    if(isC){
+      ed.title='Edit preset';
+      ed.onclick=function(e){e.stopPropagation();editingCustomIdx=ci;loadPreset(p,{type:'c',idx:ci,name:p.name});document.getElementById('presetNameInput').value=p.name;document.getElementById('presetSaveBtn').textContent='✓ Update';document.getElementById('cancelEditLink').style.display='';};
+    } else {
+      ed.title='Edit this preset';
+      ed.onclick=function(e){e.stopPropagation();cancelPresetEdit();editingBuiltinIdx=bi;loadPreset(p,{type:'b',idx:bi,name:p.name});document.getElementById('presetNameInput').value=p.name;document.getElementById('presetSaveBtn').textContent='✓ Save';document.getElementById('cancelEditLink').style.display='';document.getElementById('presetNameInput').focus();};
+    }
+    // Delete/hide button
+    var del=document.createElement('button');del.className='preset-del';del.textContent='x';
+    if(isC){
+      del.title='Delete';
+      del.onclick=function(e){e.stopPropagation();if(confirm('Delete "'+p.name+'"?')){
+        var mode=currentMode;
+        var d=loadCustom();
+        var customSnapshot=JSON.parse(JSON.stringify(d[mode]));
+        var ord=loadOrder();
+        var orderSnapshot=ord[mode]?JSON.parse(JSON.stringify(ord[mode])):null;
+        d[mode].splice(ci,1);saveCustom(d);
+        if(ord[mode])ord[mode]=ord[mode].filter(function(o){return!(o.t==='c'&&o.name===p.name);});saveOrder(ord);
+        lastDeleted={mode:mode,customSnapshot:customSnapshot,orderSnapshot:orderSnapshot,name:p.name};
+        showDeleteUndo(p.name);
+        renderPresets();}};
+    } else {
+      del.title='Hide';
+      del.onclick=function(e){e.stopPropagation();var h=loadHidden();h[currentMode].add(bi);saveHidden(h);
+        var ord=loadOrder();if(ord[currentMode])ord[currentMode]=ord[currentMode].filter(function(o){return!(o.t==='b'&&o.name===p.name);});saveOrder(ord);
+        renderPresets();};
+    }
+    btn.appendChild(ed);btn.appendChild(del);
+    // Restore-to-original icon — only shown on custom presets with something to restore to.
+    if(isC&&(p._restoreBuiltinIdx!==undefined||p._preTruingBackup)){
+      var restoreBtn=document.createElement('button');
+      restoreBtn.className='preset-restore';restoreBtn.textContent='↺';
+      restoreBtn.title=p._restoreBuiltinIdx!==undefined?'Restore original built-in':'Restore pre-truing BC';
+      restoreBtn.onclick=function(e){e.stopPropagation();restorePresetOriginal(ci);};
+      btn.appendChild(restoreBtn);
+    }
+    grid.appendChild(btn);
+  });
+  var noteEl=document.getElementById('simpleModeNote');
+  if(noteEl){
+    if(simpleMode){
+      // Counted by unique name, matching how getOrderedPresets() itself de-dupes custom entries
+      // (via its usedC map) — so this number always matches what actually appears once Single
+      // Load Mode is switched off, rather than a raw array length that could include stale
+      // duplicate names left over from old saves.
+      var seenNames={};
+      var totalCustom=(loadCustom()[currentMode]||[]).filter(function(p){
+        if(seenNames[p.name])return false;seenNames[p.name]=1;return true;
+      }).length;
+      var shown=ordered.length;
+      var extra=Math.max(0,totalCustom-shown);
+      // Built-ins are always hidden while Single Load Mode is on, regardless of custom preset
+      // count — surface that count too so "X hidden" actually matches what reappears when
+      // Single Load Mode is switched off, rather than only counting the user's own saved loads.
+      var hiddenBuiltins=loadHidden()[currentMode]||new Set();
+      var builtinCount=Math.max(0,PRESETS[currentMode].length-hiddenBuiltins.size);
+      var parts=[];
+      if(extra>0)parts.push(extra+' other saved load'+(extra===1?'':'s'));
+      if(builtinCount>0)parts.push(builtinCount+' built-in preset'+(builtinCount===1?'':'s'));
+      var hiddenTail='';
+      if(parts.length){
+        var verb=(parts.length===1&&(extra>0?extra:builtinCount)===1)?'is':'are';
+        hiddenTail=' '+parts.join(' and ')+' '+verb+' hidden until you turn Single Load Mode off.';
+      }
+      noteEl.style.display='';
+      noteEl.textContent=shown===0?
+        ('Single Load Mode is on — save your load below and it will appear here.'+hiddenTail):
+        (extra>0?('Single Load Mode is on — showing your most recent load.'+hiddenTail):
+        ('Single Load Mode is on — only one load is kept per section.'+hiddenTail));
+    } else {
+      noteEl.style.display='none';
+    }
+  }
+}
+function cancelPresetEdit(){
+  editingCustomIdx=null;editingBuiltinIdx=null;
+  document.getElementById('presetNameInput').value='';
+  document.getElementById('presetSaveBtn').textContent='+ Save';
+  document.getElementById('cancelEditLink').style.display='none';
+  renderPresets();
+}
+// Bakes any active truing into the appropriate BC field (fBC for G1, fBC7 for G7) so the
+// number itself becomes the calibrated value instead of a separate multiplier. No-op if not
+// currently trued. Returns {wasTrued, nominal:{field,value}|null} — nominal is the pre-bake
+// value, captured so callers can stash it as a restore point before it's overwritten.
+function bakeTruingIntoFields(){
+  var wasTrued=Math.abs(bcMultiplier-1)>0.001;
+  var nominal=null;
+  if(wasTrued){
+    var eff=effectiveBc();
+    var field=document.getElementById('fDrag').value==='g7'?'bc7':'bc';
+    nominal={field:field,value:eff.bc};
+    var trued=(eff.bc*bcMultiplier).toFixed(4);
+    if(field==='bc7')document.getElementById('fBC7').value=trued;
+    else document.getElementById('fBC').value=trued;
+  }
+  return{wasTrued:wasTrued,nominal:nominal};
+}
+// Decides which restore marker (if any) a saved preset entry should carry:
+// - _restoreBuiltinIdx: this preset supersedes a built-in; restoring deletes the custom copy
+//   and un-hides the built-in, recovering the exact untouched original.
+// - _preTruingBackup: {field,value} — this preset's BC before its first-ever truing bake;
+//   restoring reverts that field in place. Never overwritten by a later re-truing, so restore
+//   always returns to the shooter's original baseline, not just "undo the last truing."
+// Built-in lineage always wins over a truing backup (there's only ever one restore path per
+// preset). A deliberate manual edit (wasTrued=false) drops any truing backup, since hand-editing
+// establishes a fresh intentional baseline — but built-in lineage still carries forward.
+function withRestoreMetadata(entry,priorEntry,supersedingBuiltinIdx,wasTrued,nominal){
+  if(supersedingBuiltinIdx!==undefined&&supersedingBuiltinIdx!==null){
+    entry._restoreBuiltinIdx=supersedingBuiltinIdx;
+  } else if(priorEntry&&priorEntry._restoreBuiltinIdx!==undefined){
+    entry._restoreBuiltinIdx=priorEntry._restoreBuiltinIdx;
+  } else if(wasTrued){
+    entry._preTruingBackup=(priorEntry&&priorEntry._preTruingBackup)||(nominal?{field:nominal.field,value:nominal.value}:null);
+  }
+  return entry;
+}
+// Reads the Firearm & Load section into a plain preset object. Pure — does not touch storage.
+function buildPresetEntryFromForm(name){
+  var met=unitSystem==='metric';
+  var maxRaw=parseFloat(document.getElementById('fMax').value)||0;
+  var zeroRaw=parseFloat(document.getElementById('fZero').value)||0;
+  var mvRaw=parseFloat(document.getElementById('fMV').value)||0;
+  var shRaw=parseFloat(document.getElementById('fSH').value)||0;
+  var entry={
+    name:name,calibr:document.getElementById('fCalibr').value,
+    wt:parseFloat(document.getElementById('fWeight').value),
+    bc:parseFloat(document.getElementById('fBC').value),
+    bc7:(parseFloat(document.getElementById('fBC7').value)||0)>0?parseFloat(document.getElementById('fBC7').value):undefined,
+    mv:met?Math.round(mvRaw/0.3048):mvRaw,
+    sh:met?parseFloat((shRaw/2.54).toFixed(2)):shRaw,
+    zero:met?Math.round(zeroRaw/0.9144):zeroRaw,
+    max:met?Math.round(maxRaw/0.9144):maxRaw,
+    drag:document.getElementById('fDrag').value,
+    shape:document.getElementById('fShape').value||'flatbase',
+    twistDir:twistDir,
+    custom:true
+  };
+  // dia, len, and twist stored in inches regardless of unit system
+  if(met){
+    var diaRaw=parseFloat(document.getElementById('fDia').value)||0;
+    var lenRaw=parseFloat(document.getElementById('fLen').value)||0;
+    var twistRaw2=parseFloat(document.getElementById('fTwist').value)||0;
+    entry.dia=parseFloat((diaRaw/25.4).toFixed(4));
+    entry.len=parseFloat((lenRaw/25.4).toFixed(4));
+    entry.twist=parseFloat((twistRaw2/25.4).toFixed(3));
+  } else {
+    entry.dia=parseFloat(document.getElementById('fDia').value)||0;
+    entry.len=parseFloat(document.getElementById('fLen').value)||0;
+    entry.twist=parseFloat(document.getElementById('fTwist').value)||0;
+  }
+  return entry;
+}
+function saveCurrentAsPreset(){
+  var nameEl=document.getElementById('presetNameInput'),name=nameEl.value.trim();
+  if(!name){nameEl.style.borderColor='var(--red)';setTimeout(function(){nameEl.style.borderColor='';},800);return;}
+  // Bake in any active truing so the saved preset carries a calibrated BC rather than a
+  // temporary multiplier — reload later starts clean (untrued) but already accurate.
+  var bake=bakeTruingIntoFields();
+  var d=loadCustom();
+  var targetIdx=editingCustomIdx;
+  // Single Load Mode keeps at most one custom preset per section. If this is a fresh save (the
+  // user isn't already editing a specific slot via the ✏ icon) and a custom preset already
+  // exists, offer to replace it instead of silently creating a second entry. Declining aborts
+  // the save entirely — nothing is written.
+  if(simpleMode&&targetIdx===null&&d[currentMode].length>0){
+    var slotIdx=(loadedPresetRef&&loadedPresetRef.type==='c')?
+      d[currentMode].findIndex(function(p){return p.name===loadedPresetRef.name;}):-1;
+    if(slotIdx<0)slotIdx=d[currentMode].length-1;
+    if(!confirm('Single Load Mode keeps one load per section. Replace "'+d[currentMode][slotIdx].name+'" with "'+name+'"?'))return;
+    targetIdx=slotIdx;
+  }
+  var priorEntry=targetIdx!==null?d[currentMode][targetIdx]:null;
+  var entry=buildPresetEntryFromForm(name);
+  entry=withRestoreMetadata(entry,priorEntry,editingBuiltinIdx,bake.wasTrued,bake.nominal);
+  if(targetIdx!==null){
+    d[currentMode][targetIdx]=entry;
+    loadedPresetRef={type:'c',idx:targetIdx,name:name};
+  } else {
+    d[currentMode].push(entry);
+    loadedPresetRef={type:'c',idx:d[currentMode].length-1,name:name};
+  }
+  // If editing (or, in Single Load Mode, replacing while) a built-in was loaded, hide the original
+  // so the custom version replaces it regardless of which branch above ran.
+  if(editingBuiltinIdx!==null){
+    var h=loadHidden();h[currentMode].add(editingBuiltinIdx);saveHidden(h);
+  }
+  saveCustom(d);
+  if(bake.wasTrued){clearTruingState();calculate();} // correction is now baked into the saved number, not a live multiplier
+  cancelPresetEdit();
+}
+// Amends whichever preset is currently loaded (tracked via loadedPresetRef) in place, baking
+// in any active truing — the "Save to preset" shortcut inside Trajectory Truing. If the
+// tracked custom preset no longer matches by name (deleted/renamed since it was loaded), falls
+// back to saving as a new preset rather than silently overwriting the wrong slot. If the
+// tracked preset is a built-in, creates a custom copy under the same name and hides the
+// original, same as the existing pencil-edit-a-built-in flow.
+function saveTruingToPreset(){
+  if(!loadedPresetRef)return;
+  var bake=bakeTruingIntoFields();
+  var d=loadCustom();
+  var movedFallback=false;
+  if(loadedPresetRef.type==='c'){
+    var existing=d[currentMode][loadedPresetRef.idx];
+    if(existing&&existing.name===loadedPresetRef.name){
+      var entry=buildPresetEntryFromForm(loadedPresetRef.name);
+      entry=withRestoreMetadata(entry,existing,null,true,bake.nominal);
+      d[currentMode][loadedPresetRef.idx]=entry;
+    } else if(simpleMode&&d[currentMode].length>0){
+      // Tracked slot moved/was deleted, but Single Load Mode still only keeps one — replace
+      // whatever custom preset remains rather than pushing a second entry.
+      var slotIdx=d[currentMode].length-1;
+      var entry=withRestoreMetadata(buildPresetEntryFromForm(loadedPresetRef.name),d[currentMode][slotIdx],null,true,bake.nominal);
+      d[currentMode][slotIdx]=entry;
+      loadedPresetRef={type:'c',idx:slotIdx,name:loadedPresetRef.name};
+      movedFallback=true;
+    } else {
+      // Tracked slot moved or was deleted — don't risk overwriting the wrong preset.
+      var entry=withRestoreMetadata(buildPresetEntryFromForm(loadedPresetRef.name),null,null,true,bake.nominal);
+      d[currentMode].push(entry);
+      loadedPresetRef={type:'c',idx:d[currentMode].length-1,name:loadedPresetRef.name};
+      movedFallback=true;
+    }
+  } else {
+    var biIdx=loadedPresetRef.idx;
+    var biName=(PRESETS[currentMode][biIdx]||{}).name||loadedPresetRef.name;
+    var entry;
+    if(simpleMode&&d[currentMode].length>0){
+      var slotIdx=d[currentMode].length-1;
+      entry=withRestoreMetadata(buildPresetEntryFromForm(biName),d[currentMode][slotIdx],biIdx,true,bake.nominal);
+      d[currentMode][slotIdx]=entry;
+      loadedPresetRef={type:'c',idx:slotIdx,name:biName};
+    } else {
+      entry=withRestoreMetadata(buildPresetEntryFromForm(biName),null,biIdx,true,bake.nominal);
+      d[currentMode].push(entry);
+      loadedPresetRef={type:'c',idx:d[currentMode].length-1,name:biName};
+    }
+    var h=loadHidden();h[currentMode].add(biIdx);saveHidden(h);
+    var ord=loadOrder();if(ord[currentMode])ord[currentMode]=ord[currentMode].filter(function(o){return!(o.t==='b'&&o.name===biName);});saveOrder(ord);
+  }
+  saveCustom(d);
+  var savedName=loadedPresetRef.name;
+  clearTruingState();
+  calculate();
+  renderPresets();
+  document.getElementById('trueStatus').innerHTML=movedFallback?
+    '<span style="color:var(--yellow);">Preset had changed &mdash; saved as a new copy ("'+savedName+'") instead of overwriting.</span>':
+    '<span style="color:var(--green);">&#10003; Saved to "'+savedName+'"</span>';
+}
+function restoreDefaults(){
+  // General Release variant ships with no built-in presets, so there's nothing to "restore
+  // to" - this now just clears whatever the user has saved for this section. Wording updated
+  // accordingly (main app / Single Load Mode variant keep the original "Restore defaults" wording,
+  // since those do restore to a real built-in library).
+  if(!confirm('Clear all saved loads for this section? This cannot be undone.'))return;
+  var d=loadCustom();d[currentMode]=[];saveCustom(d);
+  var h=loadHidden();h[currentMode]=new Set();saveHidden(h);
+  var ord=loadOrder();ord[currentMode]=null;saveOrder(ord);
+  cancelPresetEdit();
+}
+// ── Delete undo ──────────────────────────────────────────────────────────────
+// Snapshots the whole custom+order array for the affected mode at the moment of deletion, so
+// Undo can restore exactly what was there rather than re-deriving it. Expires after a few
+// seconds so the state doesn't linger indefinitely; a new delete replaces any pending one.
+var lastDeleted=null,deleteUndoTimer=null;
+function showDeleteUndo(name){
+  document.getElementById('deleteUndoText').textContent='Deleted "'+name+'".';
+  document.getElementById('deleteUndoBar').style.display='flex';
+  clearTimeout(deleteUndoTimer);
+  deleteUndoTimer=setTimeout(hideDeleteUndo,8000);
+}
+function hideDeleteUndo(){
+  document.getElementById('deleteUndoBar').style.display='none';
+  lastDeleted=null;
+}
+function undoDelete(){
+  if(!lastDeleted)return;
+  var mode=lastDeleted.mode;
+  var d=loadCustom();d[mode]=lastDeleted.customSnapshot;saveCustom(d);
+  var ord=loadOrder();ord[mode]=lastDeleted.orderSnapshot;saveOrder(ord);
+  clearTimeout(deleteUndoTimer);
+  document.getElementById('deleteUndoBar').style.display='none';
+  lastDeleted=null;
+  if(mode===currentMode)renderPresets();
+}
+// ── Preset export / import (backup & restore) ───────────────────────────────
+// Exports only custom presets (not hidden built-ins or drag-order, which are per-device view
+// preferences rather than data worth carrying between machines/browsers).
+function exportPresets(){
+  var payload={version:1,exportedAt:new Date().toISOString(),custom:loadCustom()};
+  var blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='cervid_presets_'+new Date().toISOString().slice(0,10)+'.json';
+  a.click();
+}
+// Pure merge — never overwrites a preset whose name already exists in that section, so
+// importing can't silently clobber anything already saved. Returns counts so the caller can
+// report exactly what happened.
+function mergeImportedPresets(existing,imported){
+  var merged={air:existing.air.slice(),cf:existing.cf.slice()};
+  var added=0,skipped=0;
+  ['air','cf'].forEach(function(mode){
+    var existingNames={};
+    merged[mode].forEach(function(p){existingNames[p.name]=1;});
+    (imported&&imported[mode]||[]).forEach(function(p){
+      if(!p||!p.name)return;
+      if(existingNames[p.name]){skipped++;}
+      else{merged[mode].push(p);existingNames[p.name]=1;added++;}
+    });
+  });
+  return{merged:merged,added:added,skipped:skipped};
+}
+function importPresetsFile(fileInput){
+  var file=fileInput.files&&fileInput.files[0];
+  if(!file)return;
+  var reader=new FileReader();
+  reader.onload=function(e){
+    var parsed;
+    try{parsed=JSON.parse(e.target.result);}catch(err){alert('That file is not valid JSON — is it a Cervid Ballistics preset export?');fileInput.value='';return;}
+    if(!parsed||!parsed.custom||!parsed.custom.air||!parsed.custom.cf){alert('That file does not look like a Cervid Ballistics preset export.');fileInput.value='';return;}
+    var result=mergeImportedPresets(loadCustom(),parsed.custom);
+    saveCustom(result.merged);
+    renderPresets();
+    fileInput.value='';
+    alert('Imported '+result.added+' preset'+(result.added===1?'':'s')+(result.skipped>0?('. Skipped '+result.skipped+' with a name that already exists.'):'.'));
+  };
+  reader.readAsText(file);
+}
+// Reverts a single custom preset (by array index) to its pre-truing/pre-edit original, without
+// touching any other preset, hidden state, or ordering — the scoped counterpart to the global
+// "Restore defaults" above. See withRestoreMetadata() for how the two marker types are set.
+// If the restored preset is the one currently loaded in the form, reloads it so the displayed
+// values refresh immediately.
+function restorePresetOriginal(ci){
+  var d=loadCustom();
+  var entry=d[currentMode][ci];
+  if(!entry)return;
+  var wasLoaded=loadedPresetRef&&loadedPresetRef.type==='c'&&loadedPresetRef.name===entry.name;
+  if(entry._restoreBuiltinIdx!==undefined){
+    if(!confirm('Restore "'+entry.name+'" to the original built-in and remove this custom copy?'))return;
+    var bi=entry._restoreBuiltinIdx;
+    d[currentMode].splice(ci,1);saveCustom(d);
+    var h=loadHidden();h[currentMode].delete(bi);saveHidden(h);
+    var ord=loadOrder();if(ord[currentMode])ord[currentMode]=ord[currentMode].filter(function(o){return!(o.t==='c'&&o.name===entry.name);});saveOrder(ord);
+    renderPresets();
+    if(wasLoaded&&PRESETS[currentMode][bi]){
+      loadPreset(PRESETS[currentMode][bi],{type:'b',idx:bi,name:PRESETS[currentMode][bi].name});
+    }
+  } else if(entry._preTruingBackup){
+    if(!confirm('Restore "'+entry.name+'" to its pre-truing BC?'))return;
+    var backup=entry._preTruingBackup;
+    entry[backup.field]=backup.value;
+    delete entry._preTruingBackup;
+    d[currentMode][ci]=entry;saveCustom(d);
+    renderPresets();
+    if(wasLoaded){loadPreset(entry,{type:'c',idx:ci,name:entry.name});}
+  }
+}
+function setMode(m){
+  currentMode=m;editingCustomIdx=null;
+  document.getElementById('btnAir').classList.toggle('active',m==='air');
+  document.getElementById('btnCF').classList.toggle('active',m==='cf');
+  document.getElementById('presetNameInput').value='';
+  document.getElementById('presetSaveBtn').textContent='+ Save';
+  document.getElementById('cancelEditLink').style.display='none';
+  updateSortModeLink(); // sort choice is tracked per mode — refresh the link label to match
+  renderPresets();
+  if(window.innerWidth<=900)setMobileTab('inputs');
+  // Switching category (air/centrefire) means an entirely different class of load — start from
+  // a blank form rather than carrying over the previous mode's weight/BC/velocity/etc, which
+  // would otherwise sit under the new mode's label looking like a real (but nonsensical) load.
+  // Mirrors what "+ New Load" (clearLoadFields()) already does; Zero/Max are handled separately
+  // just below since they get mode-appropriate defaults rather than being left blank.
+  document.getElementById('fCalibr').value='';
+  document.getElementById('fWeight').value='';
+  document.getElementById('fBC').value='';
+  document.getElementById('fBC7').value='';
+  document.getElementById('fMV').value='';
+  document.getElementById('fSH').value='';
+  document.getElementById('fDia').value='';
+  document.getElementById('fLen').value='';
+  document.getElementById('fTwist').value='';
+  document.getElementById('fDrag').value='g1';
+  document.getElementById('fShape').value='flatbase';
+  lastDragModel='g1';dismissBcWarning();
+  var defMax=m==='air'?100:500,defZero=m==='air'?30:100;
+  document.getElementById('fMax').value=unitSystem==='metric'?Math.round(defMax*0.9144):defMax;
+  document.getElementById('fZero').value=unitSystem==='metric'?Math.round(defZero*0.9144):defZero;
+  clearTruingState(); // switching category (air/centrefire) always means a different load
+  loadedPresetRef=null;
+  lastResults=null; // old trajectory no longer describes anything meaningful — clear it rather
+  // than leaving a stale chart/table on screen computed from the load that just got wiped above.
+  document.getElementById('mainArea').innerHTML='<div class="empty-state"><div class="icon">&#127919;</div><p>Configure your load and tap <strong>Calculate Trajectory</strong></p></div>';
+  savePrefs({mode:m});
+}
+
+// Load preset — always stored in imperial; convert to display units.
+// ref (optional) identifies which preset this is ({type:'c'|'b', idx, name}), so Trajectory
+// Truing's "Save to preset" button knows what to amend later. Omit ref for a preset object
+// that isn't backed by a saved slot (there currently is no such caller, but it's the safe default).
+function loadPreset(p,ref){
+  loadedPresetRef=ref||null;
+  if(p.calibr&&p.calibr.indexOf('.177')!==-1){unitDrop='moa';}else{unitDrop='mils';}
+  document.getElementById('fCalibr').value=p.calibr||'';
+  document.getElementById('fBC').value=p.bc;
+  document.getElementById('fBC7').value=p.bc7!==undefined&&p.bc7!==null?p.bc7:'';
+  if(p.twist)document.getElementById('fTwist').value=unitSystem==='metric'?(p.twist*25.4).toFixed(1):p.twist;
+  if(p.drag)document.getElementById('fDrag').value=p.drag;
+  document.getElementById('fShape').value=p.shape||'flatbase';
+  // Presets carry their own correctly-paired BC(s) + drag model, so just sync state silently
+  // (no warning banner — the field wasn't left over from a different standard).
+  lastDragModel=document.getElementById('fDrag').value;dismissBcWarning();
+  if(p.twistDir!==undefined)setTwistDir(p.twistDir);else setTwistDir(1);
+
+  var met=unitSystem==='metric';
+  document.getElementById('fWeight').value=p.wt;
+  document.getElementById('fMV').value=met?(p.mv*0.3048).toFixed(1):p.mv;
+  document.getElementById('fSH').value=met?(p.sh*2.54).toFixed(1):p.sh;
+  document.getElementById('fZero').value=met?Math.round(p.zero*0.9144):p.zero;
+  var defMax=p.max||(currentMode==='air'?100:500);
+  document.getElementById('fMax').value=met?Math.round(defMax*0.9144):defMax;
+  if(p.dia)document.getElementById('fDia').value=met?(p.dia*25.4).toFixed(2):p.dia;
+  if(p.len)document.getElementById('fLen').value=met?(p.len*25.4).toFixed(2):p.len;
+  clearTruingState(); // a new load starts untrued — truing from a previous load must not carry over
+  calculate();
+}
+
+// ── Physics helpers ─────────────────────────────────────────────────────────
+function airDensityRatio(altFt,tempC,humidPct,presHPa){
+  var T=tempC+273.15,Tstd=288.15,Pstd=101325,P=presHPa*100;
+  var Psat=611.21*Math.exp((18.678-tempC/234.5)*(tempC/(257.14+tempC)));
+  var Pv=(humidPct/100)*Psat,Pd=P-Pv;
+  return(Pd/Pstd)*(Tstd/T)*(1-0.378*Pv/P);
+}
+function speedOfSound(tempC){return 1116.45*Math.sqrt((tempC+273.15)/288.15);}
+function autoFillPressure(){
+  var altRaw=parseFloat(document.getElementById('fAlt').value)||0;
+  var altFt=unitSystem==='metric'?altRaw*3.28084:altRaw;
+  var P=1013.25*Math.pow(1-0.0000225577*altFt*0.3048,5.25588);
+  document.getElementById('fPress').value=unitSystem==='metric'?P.toFixed(1):(P/33.8639).toFixed(2);
+}
+
+var G1=[[0,0.2629],[0.05,0.2558],[0.1,0.2487],[0.15,0.2413],[0.2,0.2344],[0.25,0.2278],[0.3,0.2214],[0.35,0.2155],[0.4,0.2104],[0.45,0.2061],[0.5,0.2032],[0.55,0.202],[0.6,0.2034],[0.65,0.2083],[0.7,0.2162],[0.725,0.2218],[0.75,0.2286],[0.775,0.2368],[0.8,0.2465],[0.825,0.2574],[0.85,0.2691],[0.875,0.2813],[0.9,0.2939],[0.925,0.3065],[0.95,0.3188],[0.975,0.3309],[1,0.3428],[1.025,0.3546],[1.05,0.3657],[1.1,0.3875],[1.15,0.4075],[1.2,0.4258],[1.25,0.4425],[1.3,0.4579],[1.35,0.4718],[1.4,0.4847],[1.45,0.495],[1.5,0.5034],[1.55,0.5104],[1.6,0.516],[1.65,0.5202],[1.7,0.5235],[1.75,0.5259],[1.8,0.5278],[1.85,0.529],[1.9,0.5295],[1.95,0.5296],[2,0.5292],[2.1,0.5266],[2.2,0.522],[2.3,0.5162],[2.4,0.5099],[2.5,0.5028],[2.6,0.4955],[2.7,0.4884],[2.8,0.4817],[2.9,0.4753],[3,0.4693],[3.5,0.4441],[4,0.4262],[5,0.4032]];
+var G7=[[0,0.1198],[0.4,0.1193],[0.5,0.1194],[0.6,0.1194],[0.7,0.1202],[0.75,0.1215],[0.8,0.1242],[0.85,0.1306],[0.9,0.1464],[0.95,0.2054],[0.975,0.2993],[1,0.3803],[1.025,0.4015],[1.05,0.4043],[1.1,0.4034],[1.2,0.3987],[1.3,0.3919],[1.4,0.3839],[1.5,0.375],[1.6,0.3657],[1.7,0.3561],[1.8,0.3462],[1.9,0.3363],[2,0.3265],[2.5,0.2818],[3,0.2455],[3.5,0.2182],[4,0.198],[5,0.1739]];
+function getCd(mach,tbl){
+  if(mach<=tbl[0][0])return tbl[0][1];
+  if(mach>=tbl[tbl.length-1][0])return tbl[tbl.length-1][1];
+  for(var i=0;i<tbl.length-1;i++){if(mach>=tbl[i][0]&&mach<=tbl[i+1][0]){var t=(mach-tbl[i][0])/(tbl[i+1][0]-tbl[i][0]);return tbl[i][1]+t*(tbl[i+1][1]-tbl[i][1]);}}
+  return tbl[tbl.length-1][1];
+}
+function millerSg(w,d,l,tw,rho){if(!d||!l||!tw)return null;var lc=l/d,n=tw/d;return(30*w)/(n*n*d*d*d*lc*(1+lc*lc))/rho;}
+function millerMinTwist(w,d,l,rho){if(!d||!l)return null;var lc=l/d;return Math.sqrt((30*w*rho)/(1.5*d*d*d*lc*(1+lc*lc)))*d;}
+function greenhillTwist(d,l,mv){if(!d||!l)return null;return(mv>=2700?180:150)*d*d/l;}
+function stabStatus(Sg){if(Sg===null)return{label:'—',cls:''};if(Sg<1)return{label:'Unstable',cls:'danger'};if(Sg<1.4)return{label:'Marginal',cls:'warn'};if(Sg<2.5)return{label:'Stable',cls:'highlight'};if(Sg<4)return{label:'Over-stabilised',cls:'warn'};return{label:'Excessively fast',cls:'danger'};}
+
+// Miller's formula infers stability purely from length/diameter/weight, which assumes a
+// roughly solid, uniform-density projectile. It has no way to "see" that a boat-tail sheds
+// mass toward the rear (needs less spin than a flat-base of the same L/D), or that a diabolo
+// pellet's skirt is mostly hollow (much less of its length behaves like solid destabilising
+// mass than the formula assumes). These factors are approximate, commonly-cited corrections
+// from the reloading/airgun community — NOT a first-principles moment-of-inertia recalculation.
+// Sg scales up by the factor; twist requirement (in calibers) scales by sqrt(factor).
+var SHAPE_SG_FACTOR={flatbase:1.0,boattail:1.08,diabolo:1.20};
+
+// ── Trajectory engine (always works in imperial internally) ─────────────────
+// dense=true returns a point at every 1-yard step (the physics loop's native resolution)
+// instead of only at the table's configured interval — used for the chart, which needs enough
+// points to draw a smooth curve regardless of how coarse the table's interval is set. A short
+// zero range (e.g. 30yd) compresses the whole rise-above-sightline-then-drop arc into just the
+// first couple of interval marks, which looks visibly kinked/polygonal at typical 10-25yd
+// table intervals — the table itself is unaffected, this only changes what gets charted.
+function computeTrajectory(p,dense){
+  var g=32.174,OMEGA=7.292115e-5;
+  var latR=(p.latDeg||0)*Math.PI/180,azR=(p.azimuthDeg||0)*Math.PI/180;
+  var eotv_k=2*OMEGA*Math.cos(latR)*Math.sin(azR);
+  var cor_h=2*OMEGA*Math.sin(latR),cor_v=2*OMEGA*Math.cos(latR)*Math.cos(azR);
+  var stepFt=3,sos=speedOfSound(p.tempC),rho=airDensityRatio(p.altFt,p.tempC,p.humidPct,p.presHPa);
+  var windFps=p.windMph*1.46667*Math.sin((p.windClock/6)*Math.PI);
+  var angR=p.angleDeg*Math.PI/180,cosA=Math.cos(angR),tanA=Math.tan(angR);
+  var tbl=p.dragModel==='g7'?G7:G1;
+  function decel(v){return rho*2.085e-4*getCd(v/sos,tbl)*v*v/p.bc;}
+  function derivX(vx,vy){var v=Math.sqrt(vx*vx+vy*vy),d=decel(Math.max(v,0.1)),vxd=Math.max(vx,0.1),ge=g-eotv_k*vx;return{dy:vy/vxd,dvx:-d/Math.max(v,0.1),dvy:(-d*(vy/Math.max(v,0.1))-ge)/vxd,dt:1/vxd};}
+  function rk4(y,vx,vy,t,dx){var k1=derivX(vx,vy),k2=derivX(vx+.5*dx*k1.dvx,vy+.5*dx*k1.dvy),k3=derivX(vx+.5*dx*k2.dvx,vy+.5*dx*k2.dvy),k4=derivX(vx+dx*k3.dvx,vy+dx*k3.dvy),w=dx/6;return{y:y+w*(k1.dy+2*k2.dy+2*k3.dy+k4.dy),vx:vx+w*(k1.dvx+2*k2.dvx+2*k3.dvx+k4.dvx),vy:vy+w*(k1.dvy+2*k2.dvy+2*k3.dvy+k4.dvy),t:t+w*(k1.dt+2*k2.dt+2*k3.dt+k4.dt)};}
+  var maxFt=p.maxYd*3,zeroFt=p.zeroYd*3;
+  var p1vx=p.mvFps*cosA,p1vy=0,p1x=0,p1t=0,t0=0,p1ly=-1;
+  while(p1x<=zeroFt+stepFt*4){var p1yd=Math.round(p1x/3);if(p1yd===p.zeroYd&&p1ly!==p.zeroYd){t0=p1t;break;}p1ly=p1yd;var p1s=rk4(0,p1vx,p1vy,p1t,stepFt);p1vx=Math.max(p1s.vx,1);p1vy=p1s.vy;p1t=p1s.t;p1x+=stepFt;}
+  var vyB=t0>0.001?(p.scopeInch/12+zeroFt*tanA+0.5*g*t0*t0)/t0-p.mvFps*Math.sin(angR):0;
+  for(var bi=0;bi<8;bi++){var bivx=p.mvFps*cosA,bivy=p.mvFps*Math.sin(angR)+vyB,bix=0,biy=-p.scopeInch/12,bily=-1,ref=false;while(bix<=zeroFt+stepFt*4){var biyd=Math.round(bix/3);if(biyd===p.zeroYd&&bily!==p.zeroYd){var gap=bix*tanA-biy;if(Math.abs(gap*12)<0.005){ref=true;break;}vyB+=gap/t0*0.85;break;}bily=biyd;var bis=rk4(biy,bivx,bivy,0,stepFt);biy=bis.y;bivx=Math.max(bis.vx,1);bivy=bis.vy;bix+=stepFt;}if(ref)break;}
+  var vx=p.mvFps*cosA,vy=p.mvFps*Math.sin(angR)+vyB,x=0,y=-p.scopeInch/12,t=0,wc=0,vwc=0;
+  // Sample points at clean marks in whatever unit is actually displayed, not always in whole
+  // yards. The physics loop below only has 1-yard resolution (stepFt=3ft), so a metric "10m"
+  // interval used to get rounded to the nearest yard (11yd) and applied repeatedly - each step
+  // is individually a rounding-error's worth off, and those errors compound every row, so what
+  // looked like clean 10m increments actually drifted (...80, 91, 101, 111...) a few rows in.
+  // Instead, generate the target marks in native units (metres if metric, yards otherwise) and
+  // convert each one to its own nearest yard independently, so errors never accumulate.
+  var maxNative=p.metric?(p.maxNative||p.maxYd*0.9144):p.maxYd;
+  var nativeStep=p.intervalNative||(maxNative<=200?10:maxNative<=500?25:50);
+  var toYd=function(nv){return p.metric?Math.round(nv/0.9144):Math.round(nv);};
+  var rec=new Set();for(var nv=0;nv<=maxNative+1e-9;nv+=nativeStep)rec.add(toYd(nv));rec.add(p.zeroYd);
+  if(p.spotYd&&p.spotYd>0&&p.spotYd<=p.maxYd)rec.add(p.spotYd);
+  var raw=[],lastYd=-1;
+  while(x<=maxFt+stepFt){var v=Math.sqrt(vx*vx+vy*vy),xyd=Math.round(x/3);if((dense||rec.has(xyd))&&xyd!==lastYd){raw.push({xYd:xyd,xFt:x,y:y,v:v,mach:v/sos,t:t,wc:wc});lastYd=xyd;}if(x>maxFt+stepFt*2)break;var s=rk4(y,vx,vy,t,stepFt);y=s.y;vx=Math.max(s.vx,1);vy=s.vy;t=s.t;var dt=stepFt/Math.max(vx,1);vwc+=(cor_h*vx-cor_v*vy)*dt;wc+=vwc*dt;x+=stepFt;}
+  var zr=raw.find(function(r){return r.xYd===p.zeroYd;}),zoff=zr?zr.y:0,zxft=zr?zr.xFt:zeroFt,zLOS=zoff-zxft*tanA,cosA2=cosA*cosA;
+  return raw.map(function(r){
+    var dIn=(r.y-r.xFt*tanA-zLOS)*12,eKE=r.v*r.v*(p.weightGr/7000)/(2*32.174),eJ=eKE*1.35582;
+    var moa=r.xYd>0?-dIn*cosA2/(r.xYd/100*1.0472):0;
+    var mils=r.xYd>0?-dIn*cosA2/(r.xYd*0.036):0;
+    var drift=windFps*(r.t-r.xFt/p.mvFps)*12;
+    var driftMoa=r.xYd>0?drift*cosA2/(r.xYd/100*1.0472):0;
+    var driftMils=r.xYd>0?drift*cosA2/(r.xYd*0.036):0;
+    // Spin drift — Litz formula: SD(in) = 1.25 × (Sg + 1.2) × ToF²
+    var sdIn=p.Sg!==null&&p.Sg!==undefined?(p.twistDir||1)*1.25*(p.Sg+1.2)*r.t*r.t:0;
+    var sdMoa=r.xYd>0?sdIn*cosA2/(r.xYd/100*1.0472):0;
+    var sdMils=r.xYd>0?sdIn*cosA2/(r.xYd*0.036):0;
+    return{
+      yd:r.xYd,fps:Math.round(r.v),mach:r.mach.toFixed(2),
+      dropIn:dIn.toFixed(2),dropCm:(dIn*2.54).toFixed(1),
+      moa:moa.toFixed(2),mils:mils.toFixed(2),clicks:(moa/clickSizeMoa).toFixed(0),
+      energyFtLb:eKE.toFixed(1),energyJ:eJ.toFixed(0),
+      driftIn:drift.toFixed(2),driftCm:(drift*2.54).toFixed(1),
+      driftMoa:driftMoa.toFixed(2),driftMils:driftMils.toFixed(2),
+      spinIn:sdIn.toFixed(2),spinCm:(sdIn*2.54).toFixed(1),
+      spinMoa:sdMoa.toFixed(2),spinMils:sdMils.toFixed(2),
+      coriolisIn:(r.wc*12).toFixed(2),coriolisCm:(r.wc*12*2.54).toFixed(1),
+      tof:r.t.toFixed(3),isZero:r.xYd===p.zeroYd,isSpot:p.spotYd&&r.xYd===p.spotYd,isSubsonic:r.mach<1
+    };
+  });
+}
+
+// ── Calculate ───────────────────────────────────────────────────────────────
+var lastResults=null,unitDrop='mils',clickSizeMoa=0.25,twistDir=1,bcMultiplier=1.0,trueUnit='mils';
+function setTwistDir(d){twistDir=d;document.getElementById('btnRH').classList.toggle('active',d===1);document.getElementById('btnLH').classList.toggle('active',d===-1);}
+function setClickSize(v){clickSizeMoa=parseFloat(v)||0.25;if(lastResults)renderResults(lastResults.results,lastResults.params,lastResults.stability);}
+function setDropUnit(u){unitDrop=u;if(lastResults)renderResults(lastResults.results,lastResults.params,lastResults.stability);}
+function setTrueUnit(u){trueUnit=u;['Mils','Moa','In','Cm'].forEach(function(k){var el=document.getElementById('btnTrueUnit'+k);if(el)el.classList.toggle('active',u===k.toLowerCase());});}
+
+// ── Trajectory Truing ────────────────────────────────────────────────────────
+function applyTruing(){
+  if(!lastResults){document.getElementById('trueStatus').textContent='Run Calculate first.';document.getElementById('trueStatus').style.color='var(--yellow)';return;}
+  var met=unitSystem==='metric';
+  var distRaw=parseFloat(document.getElementById('fTrueRange').value)||0;
+  var obsVal=parseFloat(document.getElementById('fTrueObs').value);
+  if(!distRaw||isNaN(obsVal)){document.getElementById('trueStatus').textContent='Enter validation range and observed holdover.';document.getElementById('trueStatus').style.color='var(--yellow)';return;}
+  var distYd=Math.round(met?distRaw/0.9144:distRaw);
+  var maxYd=Math.round(lastResults.params.maxYd);
+  if(distYd>maxYd){document.getElementById('trueStatus').textContent='Validation range ('+distYd+'yd) exceeds max range ('+maxYd+'yd). Increase max range.';document.getElementById('trueStatus').style.color='var(--yellow)';return;}
+
+  var baseBc=effectiveBc().bc||lastResults.params.bc/bcMultiplier;
+
+  function modelValAt(bcMult){
+    var p2=Object.assign({},lastResults.params,{bc:baseBc*bcMult,stepYd:null,spotYd:distYd,maxYd:distYd+20});
+    var res=computeTrajectory(p2);
+    var row=res.find(function(r){return r.yd===distYd;});
+    if(!row)return null;
+    if(trueUnit==='moa')return parseFloat(row.moa);
+    if(trueUnit==='in')return parseFloat(row.dropIn);
+    if(trueUnit==='cm')return parseFloat(row.dropCm);
+    return parseFloat(row.mils);
+  }
+
+  // Higher BC → less drag → less drop → smaller positive mils/moa value
+  // If model > observed: model predicts too much drop → BC too low → increase BC (lo=mid)
+  // If model < observed: model predicts too little drop → BC too high → decrease BC (hi=mid)
+  var lo=0.3,hi=2.5,bestMult=1.0;
+  var loV=modelValAt(lo),hiV=modelValAt(hi);
+  if(loV===null||hiV===null){document.getElementById('trueStatus').textContent='Could not find row at '+distYd+'yd. Check range settings.';document.getElementById('trueStatus').style.color='var(--red)';return;}
+  // Check if observed is within bounds of what BC adjustment can achieve
+  if((obsVal<loV&&obsVal<hiV)||(obsVal>loV&&obsVal>hiV)){
+    // clamp to nearest
+    bestMult=(Math.abs(modelValAt(lo)-obsVal)<Math.abs(modelValAt(hi)-obsVal))?lo:hi;
+  } else {
+    for(var i=0;i<40;i++){
+      var mid=(lo+hi)/2;
+      var v=modelValAt(mid);
+      if(v===null)break;
+      if(Math.abs(v-obsVal)<0.0005){bestMult=mid;break;}
+      if(v>obsVal)lo=mid;else hi=mid;
+      bestMult=mid;
+    }
+  }
+
+  bcMultiplier=bestMult;
+  var newBc=(baseBc*bcMultiplier).toFixed(4);
+  document.getElementById('trueStatus').innerHTML='<span style="color:var(--green);">&#10003; Trued</span> &middot; BC &times;'+bcMultiplier.toFixed(3)+' &middot; '+baseBc.toFixed(3)+' &rarr; '+newBc;
+  document.getElementById('btnResetTruing').style.display='';
+  updateSaveTruingButton();
+  calculate();
+}
+// Shows/hides the "Save to preset" shortcut and labels it with whichever preset is currently
+// loaded (if any) — lets truing be saved back onto that exact preset instead of requiring the
+// separate name-and-Save flow in the Presets section above.
+function updateSaveTruingButton(){
+  var btn=document.getElementById('btnSaveTruing');
+  if(loadedPresetRef){
+    btn.style.display='';
+    btn.textContent='💾 Save to "'+loadedPresetRef.name+'"';
+  } else {
+    btn.style.display='none';
+  }
+}
+// Checks the current model (trued or not — whatever's currently in effect) against a second
+// real observation at a different distance. Deliberately does NOT refit anything — no new
+// solving, no second BC. It's a sanity check: does the single-point BC truing above actually
+// hold up further out, or does the gap grow (which would point to muzzle velocity or another
+// input being off, not BC — see the note in the UI).
+function verifyTruing(){
+  var statusEl=document.getElementById('verifyStatus');
+  if(!lastResults){statusEl.textContent='Run Calculate first.';statusEl.style.color='var(--yellow)';return;}
+  var met=unitSystem==='metric';
+  var distRaw=parseFloat(document.getElementById('fVerifyRange').value)||0;
+  var obsVal=parseFloat(document.getElementById('fVerifyObs').value);
+  if(!distRaw||isNaN(obsVal)){statusEl.textContent='Enter a verification range and observed holdover.';statusEl.style.color='var(--yellow)';return;}
+  var distYd=Math.round(met?distRaw/0.9144:distRaw);
+  var maxYd=Math.round(lastResults.params.maxYd);
+  if(distYd>maxYd){statusEl.textContent='Verify range ('+distYd+'yd) exceeds max range ('+maxYd+'yd). Increase max range.';statusEl.style.color='var(--yellow)';return;}
+
+  // lastResults.params.bc already reflects whatever's currently in effect (trued or not) —
+  // just re-run the same model at the new distance, no refitting.
+  var p2=Object.assign({},lastResults.params,{stepYd:null,spotYd:distYd,maxYd:distYd+20});
+  var res=computeTrajectory(p2);
+  var row=res.find(function(r){return r.yd===distYd;});
+  if(!row){statusEl.textContent='Could not find row at '+distYd+'yd. Check range settings.';statusEl.style.color='var(--red)';return;}
+  var predicted=trueUnit==='moa'?parseFloat(row.moa):trueUnit==='in'?parseFloat(row.dropIn):trueUnit==='cm'?parseFloat(row.dropCm):parseFloat(row.mils);
+  var unitLabel=trueUnit==='moa'?'MOA':trueUnit==='in'?'in':trueUnit==='cm'?'cm':'mils';
+  var diff=predicted-obsVal;
+  var pct=Math.abs(obsVal)>0.05?Math.abs(diff/obsVal*100):null;
+
+  // Rough qualitative bands only — not a statistical claim, just "close / drifting / diverging"
+  // to help judge whether the truing above is generalizing or whether something else (most
+  // often muzzle velocity) needs a look.
+  var absPct=pct!==null?pct:(Math.abs(diff)<=0.05?0:100);
+  var cls,verdict;
+  if(absPct<=5){cls='var(--green)';verdict='Holds up well';}
+  else if(absPct<=12){cls='var(--yellow)';verdict='Some drift';}
+  else{cls='var(--red)';verdict='Diverging — worth re-checking muzzle velocity';}
+
+  var untruedNote=Math.abs(bcMultiplier-1)<=0.001?' (model is currently untrued)':'';
+  statusEl.innerHTML='<span style="color:'+cls+';">'+verdict+'</span> &middot; at '+distYd+(met?'m':'yd')+': predicted '+predicted.toFixed(2)+' '+unitLabel+' vs observed '+obsVal.toFixed(2)+' '+unitLabel+' (&Delta; '+(diff>=0?'+':'')+diff.toFixed(2)+(pct!==null?' / '+pct.toFixed(0)+'%':'')+')'+untruedNote;
+}
+
+// Truing (bcMultiplier) is calibrated against one specific load's validation range/observed
+// holdover. It must not silently carry over when a different load is opened — clears the
+// multiplier plus the validation-range/observed-holdover inputs so a new load always starts untrued.
+function clearTruingState(){
+  bcMultiplier=1.0;
+  document.getElementById('trueStatus').textContent='';
+  document.getElementById('btnResetTruing').style.display='none';
+  document.getElementById('btnSaveTruing').style.display='none';
+  document.getElementById('fTrueRange').value='';
+  document.getElementById('fTrueObs').value='';
+  document.getElementById('fVerifyRange').value='';
+  document.getElementById('fVerifyObs').value='';
+  document.getElementById('verifyStatus').textContent='';
+}
+function resetTruing(){
+  clearTruingState();
+  if(lastResults)calculate();
+}
+
+// Soft, non-blocking sanity checks on the values just read from the form. Flags likely typos
+// (a BC of 4, a muzzle velocity that suggests a fps/m-s mixup) without ever altering or
+// blocking the calculation - purely advisory, and re-evaluated fresh on every calculate() call.
+function checkPlausibility(p){
+  var msgs=[];
+  if(p.baseBc<=0||p.baseBc>1.0){
+    msgs.push('BC of '+p.baseBc.toFixed(3)+' is outside the realistic range for small-arms projectiles (roughly 0.01-1.0) - check for a typo or wrong decimal place.');
+  }
+  var mvBounds=currentMode==='air'?{min:150,max:1700}:{min:500,max:5000};
+  if(p.mvFps<mvBounds.min||p.mvFps>mvBounds.max){
+    msgs.push('Muzzle velocity of '+Math.round(p.mvFps)+' fps looks unusual for '+(currentMode==='air'?'an air rifle':'a centrefire rifle')+' - double-check the value and units (fps vs m/s).');
+  }
+  var wtBounds=currentMode==='air'?{min:3,max:120}:{min:20,max:700};
+  if(p.weightGr<wtBounds.min||p.weightGr>wtBounds.max){
+    msgs.push('Bullet/pellet weight of '+p.weightGr+'gr looks unusual for '+(currentMode==='air'?'an air rifle load':'a centrefire load')+' - double-check the value.');
+  }
+  return msgs;
+}
+function renderPlausibilityWarning(msgs){
+  var el=document.getElementById('plausibilityWarning');
+  if(!el)return;
+  if(!msgs||!msgs.length){el.style.display='none';return;}
+  document.getElementById('plausibilityWarningText').innerHTML=msgs.map(function(m){return'&bull; '+m;}).join('<br>');
+  el.style.display='block';
+}
+function dismissPlausibilityWarning(){var el=document.getElementById('plausibilityWarning');if(el)el.style.display='none';}
+
+function calculate(){
+  try{
+    var met=unitSystem==='metric';
+    // General Release variant ships with no built-in loads and blank load-specific fields
+    // (see PRESETS above), so - unlike the main app, which always has sensible fallback
+    // numbers from its own presets - a first-time user can easily hit Calculate with some or
+    // all of Weight/BC/Velocity/Zero/Max left blank. Rather than silently computing a
+    // trajectory from hidden fallback constants (40gr/0.045 BC/etc., leftover from the
+    // airgun-specific defaults this variant intentionally removed), catch that here first
+    // and show a friendly prompt instead of a plausible-looking but meaningless result.
+    var missing=[];
+    if(!(parseFloat(document.getElementById('fWeight').value)>0))missing.push('Bullet Weight');
+    if(!(parseFloat(document.getElementById('fBC').value)>0))missing.push('BC (G1)');
+    if(!(parseFloat(document.getElementById('fMV').value)>0))missing.push('Muzzle Velocity');
+    if(!(parseFloat(document.getElementById('fZero').value)>0))missing.push('Zero Range');
+    if(!(parseFloat(document.getElementById('fMax').value)>0))missing.push('Max Range');
+    if(missing.length){
+      document.getElementById('mainArea').innerHTML='<div style="padding:40px;text-align:center;"><div style="font-size:32px;">&#128221;</div><strong>Enter your load details first</strong><br><span style="color:var(--muted);font-size:12px;">Missing: '+missing.join(', ')+'.</span></div>';
+      if(window.innerWidth<=900)setMobileTab('results');
+      return;
+    }
+    // Read inputs and convert to imperial for physics engine
+    var mvRaw=parseFloat(document.getElementById('fMV').value)||0;
+    var shRaw=parseFloat(document.getElementById('fSH').value)||0;
+    var zeroRaw=parseFloat(document.getElementById('fZero').value)||0;
+    var maxRaw=parseFloat(document.getElementById('fMax').value)||0;
+    var altRaw=parseFloat(document.getElementById('fAlt').value)||0;
+    var windRaw=parseFloat(document.getElementById('fWind').value)||0;
+    var diaRaw=parseFloat(document.getElementById('fDia').value)||0;
+    var lenRaw=parseFloat(document.getElementById('fLen').value)||0;
+    var pressRaw=parseFloat(document.getElementById('fPress').value)||0;
+    var twistRaw3=parseFloat(document.getElementById('fTwist').value)||0;
+
+    var mvFps    = met ? mvRaw/0.3048    : mvRaw;
+    var scopeIn  = met ? shRaw/2.54      : shRaw;
+    var zeroYd   = met ? zeroRaw/0.9144  : zeroRaw;
+    var maxYd    = met ? maxRaw/0.9144   : maxRaw;
+    var altFt    = met ? altRaw*3.28084  : altRaw;
+    var windMph  = met ? windRaw/1.60934 : windRaw;
+    var diaIn    = met ? diaRaw/25.4     : diaRaw;
+    var lenIn    = met ? lenRaw/25.4     : lenRaw;
+    var presHPa  = met ? pressRaw        : pressRaw*33.8639;
+    var twistIn  = twistRaw3 ? (met ? twistRaw3/25.4 : twistRaw3) : null;
+    var intervalRaw=parseFloat(document.getElementById('fInterval').value)||0;
+    var stepYd=intervalRaw>0?(met?intervalRaw/0.9144:intervalRaw):null;
+    var spotRaw=parseFloat(document.getElementById('fSpot').value)||0;
+    var spotYd=spotRaw>0?Math.round(met?spotRaw/0.9144:spotRaw):null;
+
+    var effBc=effectiveBc();
+    var rawBc=effBc.bc;
+    var params={
+      weightGr:parseFloat(document.getElementById('fWeight').value)||40,
+      bc:rawBc*bcMultiplier,baseBc:rawBc,bcEstimated:effBc.estimated,
+      mvFps:mvFps,scopeInch:scopeIn,zeroYd:Math.round(zeroYd),maxYd:Math.round(maxYd),
+      altFt:altFt,tempC:parseFloat(document.getElementById('fTemp').value)||15,
+      humidPct:parseFloat(document.getElementById('fHumid').value)||50,
+      presHPa:presHPa,
+      windMph:windMph,windClock:parseFloat(document.getElementById('fWindDir').value)||3,
+      angleDeg:parseFloat(document.getElementById('fAngle').value)||0,
+      latDeg:parseFloat(document.getElementById('fLat').value)||0,
+      azimuthDeg:parseFloat(document.getElementById('fAzimuth').value)||0,
+      dragModel:document.getElementById('fDrag').value||'g1',
+      diaIn:diaIn||null,lenIn:lenIn||null,
+      twistIn:twistIn,
+      stepYd:stepYd,spotYd:spotYd,twistDir:twistDir,
+      metric:met,intervalNative:intervalRaw>0?intervalRaw:null,maxNative:maxRaw
+    };
+    if(params.zeroYd>=params.maxYd)params.maxYd=params.zeroYd+20;
+    var rho=airDensityRatio(params.altFt,params.tempC,params.humidPct,params.presHPa);
+    var shape=document.getElementById('fShape').value||'flatbase';
+    var shapeFactor=SHAPE_SG_FACTOR[shape]||1.0;
+    var rawSg=millerSg(params.weightGr,params.diaIn,params.lenIn,params.twistIn,rho);
+    var rawMinTwist=millerMinTwist(params.weightGr,params.diaIn,params.lenIn,rho);
+    var stability={
+      Sg:rawSg!==null?rawSg*shapeFactor:null,
+      minTwist:rawMinTwist!==null?rawMinTwist*Math.sqrt(shapeFactor):null,
+      ghTwist:greenhillTwist(params.diaIn,params.lenIn,params.mvFps),
+      rhoRatio:rho,shape:shape
+    };
+    params.Sg=stability.Sg;
+    renderPlausibilityWarning(checkPlausibility(params));
+    var results=computeTrajectory(params);
+    if(!results||!results.length)throw new Error('No data. Check zero vs max range.');
+    // Chart-only dense pass (every yard) so the drawn curve stays smooth regardless of the
+    // table's interval — same physics call, same cost (the RK4 stepping already runs every
+    // yard internally either way), just recording every point instead of only the interval marks.
+    var chartResults=computeTrajectory(params,true);
+    lastResults={results:results,params:params,stability:stability,chartResults:chartResults};
+    renderResults(results,params,stability);
+    if(window.innerWidth<=900)setMobileTab('results');
+  }catch(err){
+    document.getElementById('mainArea').innerHTML='<div style="padding:40px;color:var(--red);text-align:center;"><div style="font-size:32px;">&#9888;&#65039;</div><strong>Error</strong><br><span style="color:var(--muted);font-size:12px;">'+err.message+'</span></div>';
+    if(window.innerWidth<=900)setMobileTab('results');
+  }
+}
+
+function fmtDir(val){var d=parseFloat(val);if(d===0)return'&mdash;';return d>0?val+' R':Math.abs(d).toFixed(2)+' L';}
+
+// ── Render results ──────────────────────────────────────────────────────────
+function renderResults(results,params,stability){
+  var met=unitSystem==='metric';
+  var calibr=document.getElementById('fCalibr').value||params.dragModel.toUpperCase();
+  var r0=results[0],rL=results[results.length-1];
+  var muzzE=parseFloat(r0.energyFtLb),eSt=currentMode==='air'?(muzzE>100?'danger':muzzE>80?'warn':'highlight'):'highlight';
+  // eTag mirrors eSt in words, not just colour, so the warn/danger tiers are readable without
+  // relying on distinguishing red from yellow (colour-vision deficiency, bright sunlight, etc.)
+  var eTag=eSt==='danger'?'<span style="color:var(--red);">&#9888; Very high power</span>':(eSt==='warn'?'<span style="color:var(--yellow);">&#9888; High power</span>':'');
+  var sub=results.find(function(r){return parseFloat(r.mach)<1;});
+
+  // Range label for stat cards
+  var rLRange=met?Math.round(rL.yd*0.9144)+' m':rL.yd+' yd';
+  var subTxt=sub?(met?Math.round(sub.yd*0.9144)+' m':sub.yd+' yd'):'&gt; max range';
+
+  var modeTag=currentMode==='air'?'<span class="tag tag-air">Air Rifle</span>':'<span class="tag tag-cf">Centrefire</span>';
+  var sg=stability.Sg,sgSt=stabStatus(sg);
+  var shapeLabels={flatbase:'Flat-base',boattail:'Boat-tail',diabolo:'Diabolo'};
+  var shapeNote=(stability.shape&&stability.shape!=='flatbase')?(' &middot; '+shapeLabels[stability.shape]+' &times;'+SHAPE_SG_FACTOR[stability.shape].toFixed(2)):'';
+  var sgHelp='<span class="help-tip" data-tip="Gyroscopic stability factor from barrel twist rate. Below 1.0 = unstable, may tumble. 1.0-1.5 = marginal. Above 1.5 = stable. A very high number is not necessarily bad, it just means more spin than strictly required." onclick="showHelpTip(this,event)">?</span>';
+  var sgCard=sg===null?'<div class="stat-card"><div class="label">Gyro Stability (Sg)'+sgHelp+'</div><div class="value" style="font-size:14px;color:var(--muted)">Enter dia &amp; len</div></div>':
+    '<div class="stat-card '+sgSt.cls+'"><div class="label">Gyro Stability (Sg)'+sgHelp+'</div><div class="value">'+sg.toFixed(2)+'</div><div class="unit">'+sgSt.label+shapeNote+'</div></div>'+
+    '<div class="stat-card"><div class="label">Min Twist (Sg 1.5)</div><div class="value" style="font-size:16px;">1:'+(stability.minTwist?stability.minTwist.toFixed(1):'?')+'"</div><div class="unit">Miller &middot; GH 1:'+(stability.ghTwist?stability.ghTwist.toFixed(1):'?')+'"</div></div>';
+
+  var clickSel='<option value="0.125" '+(Math.abs(clickSizeMoa-0.125)<0.001?'selected':'')+'>1/8 MOA/click</option><option value="0.25" '+(Math.abs(clickSizeMoa-0.25)<0.001?'selected':'')+'>1/4 MOA/click</option><option value="0.5" '+(Math.abs(clickSizeMoa-0.5)<0.001?'selected':'')+'>1/2 MOA/click</option><option value="0.343775" '+(Math.abs(clickSizeMoa-0.343775)<0.001?'selected':'')+'>0.1 MRAD/click</option><option value="0.68755" '+(Math.abs(clickSizeMoa-0.68755)<0.001?'selected':'')+'>0.2 MRAD/click</option>';
+
+  // Wind column: mils→driftMils, moa→driftMoa, else linear (in or cm by unit system)
+  var windIsAngular=unitDrop==='moa'||unitDrop==='mils';
+  var windCol=unitDrop==='moa'?'driftMoa':unitDrop==='mils'?'driftMils':(met?'driftCm':'driftIn');
+  var windHdr=unitDrop==='moa'?'Wind(MOA)':unitDrop==='mils'?'Wind(mil)':(met?'Wind(cm)':'Wind(in)');
+  var spinCol=unitDrop==='moa'?'spinMoa':unitDrop==='mils'?'spinMils':(met?'spinCm':'spinIn');
+  var spinHdr=unitDrop==='moa'?'Spin(MOA)':unitDrop==='mils'?'Spin(mil)':(met?'Spin(cm)':'Spin(in)');
+
+  // Range & velocity columns
+  var rngHdr=met?'Range(m)':'Range(yd)';
+  var velHdr=met?'Vel(m/s)':'Vel(fps)';
+  var eHdrA=met?'E(J)':'E(ft-lb)';
+  var eHdrB=met?'E(ft-lb)':'E(J)';
+  var corHdr=met?'Cor(cm)':'Cor(in)';
+
+  var rows=results.map(function(r){
+    var rng=met?Math.round(r.yd*0.9144):r.yd;
+    var vel=met?Math.round(r.fps*0.3048):r.fps;
+    var eA=met?r.energyJ:r.energyFtLb;
+    var eB=met?r.energyFtLb:r.energyJ;
+    var cor=met?r.coriolisCm:r.coriolisIn;
+    var drop=unitDrop==='in'?r.dropIn:unitDrop==='cm'?r.dropCm:unitDrop==='moa'?r.moa:unitDrop==='clicks'?r.clicks:r.mils;
+    var dn=parseFloat(drop),isMM=unitDrop==='moa'||unitDrop==='mils'||unitDrop==='clicks';
+    var dc=isMM?(dn>0?'pos':dn<0?'neg':''):(dn<0?'neg':dn>0?'pos':'');
+    return'<tr class="'+(r.isSubsonic?' subsonic':'')+(r.isZero?' zero-row':'')+(r.isSpot?' spot-row':'')+'">'+
+      '<td>'+(r.isZero?'<strong>':'')+(r.isSpot?'<span style="color:var(--accent2);">':'')+rng+(r.isZero?' &#9733;</strong>':'')+(r.isSpot?' &#9670;</span>':'')+'</td>'+
+      '<td>'+vel+'</td>'+
+      '<td class="'+dc+'">'+drop+'</td>'+
+      '<td>'+fmtDir(r[windCol])+'</td>'+
+      '<td class="muted">'+fmtDir(r[spinCol])+'</td>'+
+      '<td class="'+(r.isSubsonic?'neg':'muted')+'">'+r.mach+(r.isSubsonic?' (sub)':'')+'</td>'+
+      '<td class="muted">'+r.tof+'</td>'+
+      '<td>'+eA+'</td>'+
+      '<td class="muted">'+eB+'</td>'+
+      '<td class="muted">'+fmtDir(cor)+'</td></tr>';
+  }).join('');
+
+  // Stat card values
+  var muzzVel=met?(params.mvFps*0.3048).toFixed(0)+' m/s':params.mvFps+' fps';
+  var muzzVelSub=met?params.mvFps.toFixed(2)+' fps':(params.mvFps*0.3048).toFixed(0)+' m/s';
+  var velAtMax=met?Math.round(rL.fps*0.3048)+' m/s &middot; M'+rL.mach:rL.fps+' fps &middot; M'+rL.mach;
+  var eAtMuzz=met?r0.energyJ+' J &middot; '+muzzE.toFixed(0)+' ft-lb':muzzE.toFixed(0)+' ft-lbs &middot; '+r0.energyJ+' J';
+  var eAtMax=met?rL.energyJ+' J &middot; '+rL.energyFtLb+' ft-lb':rL.energyFtLb+' ft-lbs &middot; '+rL.energyJ+' J';
+  var dropAtMax=met?rL.dropCm+'cm &middot; '+rL.moa+' MOA':rL.dropIn+'" &middot; '+rL.dropCm+'cm';
+  var windAtMax=met?rL.driftCm+'cm':rL.driftIn+'"';
+  var spinAtMax=met?rL.spinCm+'cm':rL.spinIn+'"';
+  var spinDir=params.twistDir===(-1)?'LH ↺':'RH ↻';
+  var spinCard=params.Sg!==null&&params.Sg!==undefined?
+    '<div class="stat-card"><div class="label">Spin Drift at '+rLRange+'</div><div class="value" style="font-size:16px;">'+spinAtMax+'</div><div class="unit">'+spinDir+' &middot; Sg '+params.Sg.toFixed(2)+'</div></div>':
+    '<div class="stat-card"><div class="label">Spin Drift</div><div class="value" style="font-size:14px;color:var(--muted);">Enter dia &amp; len</div></div>';
+  var windSpeedDisp=met?(params.windMph*1.60934).toFixed(1)+'km/h':params.windMph+'mph';
+
+  var truingBadge=Math.abs(bcMultiplier-1)>0.001?'<span style="background:rgba(224,108,58,.15);border:1px solid rgba(224,108,58,.4);color:var(--accent2);border-radius:4px;padding:2px 8px;font-size:11px;font-weight:700;">&#127919; Trued &times;'+bcMultiplier.toFixed(3)+'</span>':'';
+  var bcDisp=(params.bc).toFixed(4);
+  var bcSrcNote=params.bcEstimated?', estimated from G1':'';
+  var html='<div class="results-header"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;"><h2>'+calibr+'</h2>'+modeTag+truingBadge+'<span style="color:var(--muted);font-size:12px;">'+params.weightGr+'gr &middot; '+(met?(params.mvFps*0.3048).toFixed(0)+'m/s':params.mvFps+'fps')+' &middot; BC '+bcDisp+' ('+params.dragModel.toUpperCase()+bcSrcNote+')</span></div>'+
+    '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;"><div class="unit-toggle">'+
+    '<button class="'+(unitDrop==='mils'?'active':'')+'" onclick="setDropUnit(\'mils\')">mils</button>'+
+    '<button class="'+(unitDrop==='moa'?'active':'')+'" onclick="setDropUnit(\'moa\')">MOA</button>'+
+    '<button class="'+(unitDrop==='clicks'?'active':'')+'" onclick="setDropUnit(\'clicks\')">clicks</button>'+
+    '<button class="'+(unitDrop==='in'?'active':'')+'" onclick="setDropUnit(\'in\')">inches</button>'+
+    '<button class="'+(unitDrop==='cm'?'active':'')+'" onclick="setDropUnit(\'cm\')">cm</button></div>'+
+    '<span class="help-tip" data-tip="mils (milliradians): 1 mil at 100m is about 10cm of drop or drift. MOA (Minutes of Angle): 1 MOA at 100yd is about 1.047in. clicks: scope adjustment clicks, converted using your selected click size below." onclick="showHelpTip(this,event)">?</span>'+
+    (unitDrop==='clicks'?'<select onchange="setClickSize(this.value)" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 8px;font-size:12px;">'+clickSel+'</select>':'')+
+    '<button class="btn btn-secondary" style="width:auto;padding:5px 14px;font-size:12px;" onclick="exportCSV()">Export CSV</button>'+
+    '<button class="btn btn-secondary" style="width:auto;padding:5px 14px;font-size:12px;" onclick="showRangeCard()">&#128203; Range Card</button></div></div>'+
+    '<div class="stat-cards">'+
+    '<div class="stat-card '+eSt+'"><div class="label">Muzzle Energy</div><div class="value">'+(met?r0.energyJ:muzzE.toFixed(0))+'</div><div class="unit">'+eAtMuzz+(eTag?'<br><strong>'+eTag+'</strong>':'')+'</div>'+(currentMode==='air'?'<div class="energy-bar"><div class="energy-fill" style="width:'+Math.min(100,muzzE)+'%;background:'+(muzzE>100?'var(--red)':muzzE>80?'var(--yellow)':'var(--green)')+'"></div></div>':'')+'</div>'+
+    '<div class="stat-card"><div class="label">Muzzle Velocity</div><div class="value">'+muzzVel+'</div><div class="unit">'+muzzVelSub+'</div></div>'+
+    '<div class="stat-card"><div class="label">Velocity at '+rLRange+'</div><div class="value" style="font-size:16px;">'+velAtMax+'</div></div>'+
+    '<div class="stat-card"><div class="label">Energy at '+rLRange+'</div><div class="value" style="font-size:16px;">'+eAtMax+'</div></div>'+
+    '<div class="stat-card"><div class="label">Drop at '+rLRange+'</div><div class="value" style="font-size:16px;">'+dropAtMax+'</div></div>'+
+    '<div class="stat-card"><div class="label">Wind at '+rLRange+'</div><div class="value" style="font-size:16px;">'+windAtMax+'</div><div class="unit">'+windSpeedDisp+" @ "+params.windClock+"o'clock</div></div>"+
+    spinCard+
+    (Math.abs(bcMultiplier-1)>0.001?'<div class="stat-card" style="border-color:rgba(224,108,58,.4);"><div class="label" style="color:var(--accent2);">&#127919; BC Truing</div><div class="value" style="font-size:16px;color:var(--accent2);">&times;'+bcMultiplier.toFixed(3)+'</div><div class="unit">'+params.baseBc.toFixed(4)+' &rarr; '+params.bc.toFixed(4)+'</div></div>':'')+
+    '<div class="stat-card"><div class="label">Subsonic at</div><div class="value" style="font-size:16px;">'+subTxt+'</div><div class="unit">Sound: '+(met?(speedOfSound(params.tempC)*0.3048).toFixed(0)+' m/s':speedOfSound(params.tempC).toFixed(0)+' fps')+'</div></div>'+
+    '<div class="stat-card"><div class="label">Air Density</div><div class="value" style="font-size:16px;">'+(airDensityRatio(params.altFt,params.tempC,params.humidPct,params.presHPa)*100).toFixed(1)+'%</div><div class="unit">of std atmosphere</div></div>'+
+    sgCard+'</div>'+
+    '<div style="margin-bottom:20px;"><canvas id="trajCanvas" height="180"></canvas></div>'+
+    '<div class="tbl-wrap"><table><thead><tr>'+
+    '<th>'+rngHdr+'</th><th>'+velHdr+'</th><th>Drop('+unitDrop+')</th><th>'+windHdr+'</th><th>'+spinHdr+'</th>'+
+    '<th>Mach</th><th>ToF(s)</th><th>'+eHdrA+'</th><th>'+eHdrB+'</th><th>'+corHdr+'</th>'+
+    '</tr></thead><tbody>'+rows+'</tbody></table></div>'+
+    '<p style="color:var(--muted);font-size:11px;margin-top:8px;">&#9733; = zero &middot; <span style="color:var(--accent2);">&#9670;</span> = spot range &middot; Red = subsonic &middot; Positive drop = dial up &middot; Spin drift via Litz (Sg)</p>';
+  var ma=document.getElementById('mainArea');ma.innerHTML=html;ma.scrollTop=0;
+  // Chart uses the dense (every-yard) point set when available, so the curve stays smooth even
+  // when the table's own interval is coarse (e.g. 10-25yd) — falls back to the table's own
+  // results if for some reason the dense set wasn't computed (shouldn't normally happen).
+  drawChart((lastResults&&lastResults.chartResults)||results,params);
+}
+
+function drawChart(results,params){
+  var canvas=document.getElementById('trajCanvas');if(!canvas)return;
+  var met=unitSystem==='metric';
+  var W=canvas.offsetWidth||600,H=180;canvas.width=W;canvas.height=H;
+  var ctx=canvas.getContext('2d');ctx.fillStyle='#1a1d27';ctx.fillRect(0,0,W,H);
+  var dropVal=function(r){return met?parseFloat(r.dropCm):parseFloat(r.dropIn);};
+  var energyVal=function(r){return met?parseFloat(r.energyJ):parseFloat(r.energyFtLb);};
+  var drops=results.map(dropVal);
+  var minD=Math.min.apply(null,drops),maxD=Math.max.apply(null,drops),pad=32,rng=maxD-minD||1;
+  function tx(yd){return pad+(yd/params.maxYd)*(W-pad*2);}
+  function ty(d){return H-pad-((d-minD)/rng)*(H-pad*2);}
+  ctx.lineWidth=1;ctx.font='10px system-ui';
+  for(var i=0;i<=4;i++){
+    var yy=pad+(i/4)*(H-pad*2);
+    ctx.strokeStyle='#2e3348';ctx.beginPath();ctx.moveTo(pad,yy);ctx.lineTo(W-pad,yy);ctx.stroke();
+    var dVal=minD+rng*(1-i/4);
+    var dRounded=met?Math.round(dVal):Math.round(dVal*10)/10;
+    if(dRounded===0)dRounded=0; // avoid rendering "-0"
+    ctx.fillStyle='#7a7f99';ctx.textAlign='right';ctx.fillText(String(dRounded),pad-4,yy+3);ctx.textAlign='left';
+  }
+  ctx.strokeStyle='rgba(79,142,247,0.4)';ctx.setLineDash([4,4]);ctx.beginPath();ctx.moveTo(pad,ty(0));ctx.lineTo(W-pad,ty(0));ctx.stroke();ctx.setLineDash([]);
+  ctx.beginPath();results.forEach(function(r,i){var x=tx(r.yd),y=ty(dropVal(r));i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);});ctx.strokeStyle='#4f8ef7';ctx.lineWidth=2.5;ctx.stroke();
+  ctx.beginPath();results.forEach(function(r,i){var x=tx(r.yd),y=ty(dropVal(r));i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);});ctx.lineTo(tx(results[results.length-1].yd),H);ctx.lineTo(tx(results[0].yd),H);ctx.closePath();ctx.fillStyle='rgba(79,142,247,0.08)';ctx.fill();
+  var maxE=Math.max.apply(null,results.map(energyVal));
+  ctx.beginPath();results.forEach(function(r,i){var x=tx(r.yd),y=H-pad-(energyVal(r)/maxE)*(H-pad*2)*0.8;i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);});ctx.strokeStyle='#3ecf8e';ctx.lineWidth=1.5;ctx.setLineDash([3,3]);ctx.stroke();ctx.setLineDash([]);
+  ctx.fillStyle='#7a7f99';ctx.font='11px system-ui';
+  ctx.fillText('Drop('+(met?'cm':'in')+')',pad+4,14);ctx.fillStyle='#3ecf8e';ctx.fillText('Energy',W-60,14);
+  ctx.fillStyle='#7a7f99';
+  // Gridline spacing computed in the units actually shown, so metric gets clean 50/100/200m steps
+  // instead of yard-derived values converted after the fact (e.g. "46m").
+  var maxDisp=met?params.maxYd*0.9144:params.maxYd;
+  var ls=maxDisp<=200?50:maxDisp<=500?100:200;
+  for(var rv=0;rv<=maxDisp;rv+=ls){
+    var ydEquiv=met?rv/0.9144:rv;
+    ctx.fillText(Math.round(rv)+(met?'m':'yd'),tx(ydEquiv)-14,H-6);
+  }
+}
+
+function exportCSV(){
+  if(!lastResults)return;
+  var r=lastResults,calibr=document.getElementById('fCalibr').value||'unknown';
+  var csv='Cervid Ballistics - '+calibr+'\nRange(yd),Range(m),Vel(fps),Vel(m/s),Drop(in),Drop(cm),MOA,Mils,Wind(in),Wind(cm),Wind(MOA),Wind(mil),Mach,ToF(s),E(ft-lb),E(J),Coriolis(in),Coriolis(cm)\n';
+  r.results.forEach(function(row){csv+=row.yd+','+Math.round(row.yd*0.9144)+','+row.fps+','+Math.round(row.fps*0.3048)+','+row.dropIn+','+row.dropCm+','+row.moa+','+row.mils+','+row.driftIn+','+row.driftCm+','+row.driftMoa+','+row.driftMils+','+row.mach+','+row.tof+','+row.energyFtLb+','+row.energyJ+','+row.coriolisIn+','+row.coriolisCm+'\n';});
+  var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='ballistics_'+calibr.replace(/\s+/g,'_')+'.csv';a.click();
+}
+
+// ── Range Card: a stripped-down, large-print range-vs-holdover view for glancing at in the
+// field (or on a bright phone screen) rather than the full stat-card/chart/table layout, which
+// is built for a desk. Reuses the currently selected drop unit so it matches whatever the main
+// results table is already showing.
+function showRangeCard(){
+  if(!lastResults)return;
+  var r=lastResults,met=unitSystem==='metric';
+  var calibr=document.getElementById('fCalibr').value||'Range Card';
+  var unitLabel=unitDrop==='in'?(met?'cm':'in'):unitDrop==='cm'?'cm':unitDrop==='moa'?'MOA':unitDrop==='clicks'?'clicks':'mils';
+  var rows=r.results.map(function(row){
+    var val=unitDrop==='in'?row.dropIn:unitDrop==='cm'?row.dropCm:unitDrop==='moa'?row.moa:unitDrop==='clicks'?row.clicks:row.mils;
+    var rng=(met?Math.round(row.yd*0.9144):row.yd)+(met?'m':'yd');
+    var rowCls=row.isZero?' rc-zero':(row.isSpot?' rc-spot':'');
+    var marker=row.isZero?' &#9733;':(row.isSpot?' &#9670;':'');
+    return '<div class="rc-row'+rowCls+'"><span class="rc-range">'+rng+marker+'</span><span class="rc-val">'+val+'</span></div>';
+  }).join('');
+  document.getElementById('rangeCardBody').innerHTML=rows;
+  document.getElementById('rangeCardTitle').textContent=calibr;
+  document.getElementById('rangeCardSubtitle').textContent='Holdover in '+unitLabel+' · ★ zero · ◆ spot range';
+  document.getElementById('rangeCardModal').style.display='block';
+}
+function hideRangeCard(){
+  var el=document.getElementById('rangeCardModal');
+  if(el)el.style.display='none';
+}
+
+function clearLoadFields(){
+  document.getElementById('fCalibr').value='';
+  document.getElementById('fWeight').value='';
+  document.getElementById('fBC').value='';
+  document.getElementById('fBC7').value='';
+  document.getElementById('fMV').value='';
+  document.getElementById('fSH').value='';
+  document.getElementById('fZero').value='';
+  document.getElementById('fMax').value='';
+  document.getElementById('fDia').value='';
+  document.getElementById('fLen').value='';
+  document.getElementById('fTwist').value='';
+  document.getElementById('fDrag').value='g1';
+  document.getElementById('fShape').value='flatbase';
+  lastDragModel='g1';dismissBcWarning();
+  clearTruingState(); // a blank new load starts untrued
+  loadedPresetRef=null;
+  document.getElementById('presetNameInput').value='';
+  document.getElementById('fCalibr').focus();
+}
+
+// ── Live weather (Open-Meteo, no API key required) ──────────────────────────
+function fetchWeather(){
+  var statusEl=document.getElementById('weatherStatus');
+  var btn=document.getElementById('btnLiveWeather');
+  if(!navigator.geolocation){
+    statusEl.textContent='Geolocation not available in this browser';
+    statusEl.style.color='var(--red)';return;
+  }
+  statusEl.textContent='📍 Getting location…';statusEl.style.color='var(--muted)';
+  btn.disabled=true;btn.textContent='…';
+
+  navigator.geolocation.getCurrentPosition(function(pos){
+    var lat=pos.coords.latitude,lon=pos.coords.longitude;
+    var gpsAltM=pos.coords.altitude; // may be null
+    statusEl.textContent='🌤 Fetching weather…';
+
+    var wxUrl='https://api.open-meteo.com/v1/forecast?latitude='+lat.toFixed(4)+'&longitude='+lon.toFixed(4)+
+      '&current=temperature_2m,relative_humidity_2m,surface_pressure,wind_speed_10m,wind_direction_10m'+
+      '&wind_speed_unit=mph&timezone=auto';
+    var elUrl='https://api.open-meteo.com/v1/elevation?latitude='+lat.toFixed(4)+'&longitude='+lon.toFixed(4);
+
+    Promise.all([fetch(wxUrl).then(function(r){return r.json();}),fetch(elUrl).then(function(r){return r.json();})])
+    .then(function(res){
+      var wx=res[0].current;
+      var elevM=(gpsAltM!=null)?gpsAltM:(res[1].elevation?res[1].elevation[0]:0);
+      var met=unitSystem==='metric';
+
+      // Temperature (always °C)
+      document.getElementById('fTemp').value=Math.round(wx.temperature_2m);
+
+      // Pressure: API gives hPa
+      var pressHPa=wx.surface_pressure;
+      document.getElementById('fPress').value=met?pressHPa.toFixed(1):(pressHPa/33.8639).toFixed(2);
+
+      // Humidity
+      document.getElementById('fHumid').value=Math.round(wx.relative_humidity_2m);
+
+      // Altitude: elevM in metres
+      document.getElementById('fAlt').value=met?Math.round(elevM):Math.round(elevM*3.28084);
+
+      // Wind speed: API returns mph
+      var windMph=wx.wind_speed_10m;
+      document.getElementById('fWind').value=met?(windMph*1.60934).toFixed(1):windMph.toFixed(1);
+
+      // Wind clock: convert compass bearing → clock relative to shooter azimuth
+      var shooterAz=parseFloat(document.getElementById('fAzimuth').value)||0;
+      var windFromDeg=wx.wind_direction_10m; // degrees true, where wind comes FROM
+      var relAngle=((windFromDeg-shooterAz)%360+360)%360;
+      var clockPos=Math.round(relAngle/30)%12||12;
+      document.getElementById('fWindDir').value=clockPos;
+
+      // Latitude for Coriolis
+      document.getElementById('fLat').value=lat.toFixed(2);
+
+      var now=new Date();
+      statusEl.textContent='✓ Live data · '+now.toLocaleTimeString()+' · '+lat.toFixed(2)+'°, '+lon.toFixed(2)+'°';
+      statusEl.style.color='var(--green)';
+      btn.disabled=false;btn.textContent='⟳ Refresh';
+    })
+    .catch(function(){
+      statusEl.textContent='⚠ Weather service unavailable — check connection';
+      statusEl.style.color='var(--red)';
+      btn.disabled=false;btn.textContent='🌍 Live Weather';
+    });
+  },function(err){
+    var msg={1:'Location permission denied',2:'Location unavailable',3:'Location request timed out'};
+    statusEl.textContent='⚠ '+(msg[err.code]||'Location error');
+    statusEl.style.color='var(--red)';
+    btn.disabled=false;btn.textContent='🌍 Live Weather';
+  },{enableHighAccuracy:false,timeout:12000,maximumAge:60000});
+}
+
+// Restore last-used mode/unit system, if any were saved, before the first render.
+var _prefs=loadPrefs();
+if(_prefs.unit==='metric')setUnitSystem('metric');
+if(_prefs.mode==='cf')setMode('cf');
+updateSortModeLink();
+updateSimpleModeUI();
+renderPresets();
+syncLayout();
+</script>
+</body>
+</html>
