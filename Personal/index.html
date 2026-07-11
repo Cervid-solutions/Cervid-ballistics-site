@@ -38,6 +38,7 @@
   .tag{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;}
   .tag-air{background:rgba(62,207,142,.15);color:var(--green);border:1px solid rgba(62,207,142,.3);}
   .tag-cf{background:rgba(79,142,247,.15);color:var(--accent);border:1px solid rgba(79,142,247,.3);}
+  .tag-rf{background:rgba(245,197,66,.15);color:var(--yellow);border:1px solid rgba(245,197,66,.3);}
   .results-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:12px;}
   .results-header h2{font-size:16px;font-weight:700;}
   .stat-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:20px;}
@@ -117,9 +118,10 @@
 </head>
 <body>
 <header>
-  <div><h1>&#127919; Cervid Ballistics</h1><span>Air Rifle &amp; Centrefire</span></div>
+  <div><h1>&#127919; Cervid Ballistics</h1><span>Air Rifle, Rimfire &amp; Centrefire</span></div>
   <div class="mode-toggle">
     <button class="active" id="btnAir" onclick="setMode('air')">Air Rifle</button>
+    <button id="btnRF" onclick="setMode('rf')">Rimfire</button>
     <button id="btnCF" onclick="setMode('cf')">Centrefire</button>
   </div>
 </header>
@@ -367,7 +369,8 @@ document.addEventListener('click',function(){
 // ── Unit system ─────────────────────────────────────────────────────────────
 var unitSystem='imperial';
 // Remembers last-used mode & unit system across reloads, so the app doesn't reset to
-// Air Rifle / Imperial every time it's reopened. Purely a UI convenience — never touches
+// Air Rifle / Imperial every time it's reopened (mode may be 'air', 'rf', or 'cf'). Purely a
+// UI convenience — never touches
 // preset data, so it's safe alongside everything else in localStorage.
 var PREF_KEY='ballistics_prefs_v1';
 function loadPrefs(){return safeLS(function(){return JSON.parse(localStorage.getItem(PREF_KEY));})||{};}
@@ -537,9 +540,16 @@ var PRESETS={
     {name:'.264 CM 129gr',       calibr:'6.5 Creedmoor', wt:129,bc:0.265,mv:2950,sh:2.0,zero:100,dia:0.264,len:1.335,twist:8},
     {name:'.264 CM ABLR 129gr',  calibr:'6.5 CM ABLR',   wt:129,bc:0.440,mv:2707,sh:2.0,zero:100,dia:0.264,len:1.350,twist:8},
     {name:'.308 Win 150gr',      calibr:'.308 Win',      wt:150,bc:0.397,mv:2843,sh:2.0,zero:100,dia:0.308,len:1.228,twist:10}
-  ]
+  ],
+  // Starts empty — no built-in rimfire loads shipped yet. Rather than guess at plausible-looking
+  // .22LR/.17HMR/etc figures, this stays blank until real, verified factory or chronographed data
+  // is added; users can add their own via "+ Save" in the meantime.
+  rf:[]
 };
 
+// Per-mode default Zero/Max range (imperial yards), used both when switching modes with a blank
+// form (setMode) and when loading a preset that doesn't specify its own max (loadPreset).
+var MODE_DEFAULT_RANGE={air:{zero:30,max:100},rf:{zero:50,max:150},cf:{zero:100,max:500}};
 var currentMode='air',editingCustomIdx=null,editingBuiltinIdx=null;
 // Tracks which preset (if any) the form currently represents, so Trajectory Truing's
 // "Save to preset" button knows what to amend. {type:'c'|'b', idx, name} or null if the
@@ -549,17 +559,20 @@ var currentMode='air',editingCustomIdx=null,editingBuiltinIdx=null;
 var loadedPresetRef=null;
 var CUSTOM_KEY='ballistics_custom_v1',HIDDEN_KEY='ballistics_hidden_v1';
 function safeLS(fn){try{return fn();}catch(e){return null;}}
-function loadCustom(){return safeLS(function(){return JSON.parse(localStorage.getItem(CUSTOM_KEY));})||{air:[],cf:[]};}
+// Rebuilds the {air,cf,rf} shape key-by-key (rather than a single ||{} fallback on the whole
+// object) so existing users' localStorage from before Rimfire existed — which has air/cf but no
+// rf key at all — still comes back with a valid empty rf array instead of undefined.
+function loadCustom(){var d=safeLS(function(){return JSON.parse(localStorage.getItem(CUSTOM_KEY));})||{};return{air:d.air||[],cf:d.cf||[],rf:d.rf||[]};}
 function saveCustom(d){safeLS(function(){localStorage.setItem(CUSTOM_KEY,JSON.stringify(d));});}
-function loadHidden(){var r=safeLS(function(){return JSON.parse(localStorage.getItem(HIDDEN_KEY));})||{air:[],cf:[]};return{air:new Set(r.air),cf:new Set(r.cf)};}
-function saveHidden(d){safeLS(function(){localStorage.setItem(HIDDEN_KEY,JSON.stringify({air:[...d.air],cf:[...d.cf]}));});}
+function loadHidden(){var r=safeLS(function(){return JSON.parse(localStorage.getItem(HIDDEN_KEY));})||{};return{air:new Set(r.air),cf:new Set(r.cf),rf:new Set(r.rf)};}
+function saveHidden(d){safeLS(function(){localStorage.setItem(HIDDEN_KEY,JSON.stringify({air:[...d.air],cf:[...d.cf],rf:[...d.rf]}));});}
 var ORDER_KEY='ballistics_order_v1';
-function loadOrder(){return safeLS(function(){return JSON.parse(localStorage.getItem(ORDER_KEY));})||{air:null,cf:null};}
+function loadOrder(){return safeLS(function(){return JSON.parse(localStorage.getItem(ORDER_KEY));})||{air:null,cf:null,rf:null};}
 function saveOrder(d){safeLS(function(){localStorage.setItem(ORDER_KEY,JSON.stringify(d));});}
 // 'manual' (drag-and-drop order, persisted via loadOrder/saveOrder) or 'calibre' (computed
 // display sort by diameter — never written to the persisted order, so toggling back to
 // manual instantly restores whatever was dragged into place, untouched).
-var presetSortMode={air:'manual',cf:'manual'};
+var presetSortMode={air:'manual',cf:'manual',rf:'manual'};
 // Returns ordered array of {type:'b'|'c', p:presetObj, ci:customArrayIdx, bi:builtinArrayIdx}
 function getOrderedPresets(mode){
   var custom=loadCustom()[mode]||[];
@@ -875,9 +888,9 @@ function exportPresets(){
 // importing can't silently clobber anything already saved. Returns counts so the caller can
 // report exactly what happened.
 function mergeImportedPresets(existing,imported){
-  var merged={air:existing.air.slice(),cf:existing.cf.slice()};
+  var merged={air:(existing.air||[]).slice(),cf:(existing.cf||[]).slice(),rf:(existing.rf||[]).slice()};
   var added=0,skipped=0;
-  ['air','cf'].forEach(function(mode){
+  ['air','cf','rf'].forEach(function(mode){
     var existingNames={};
     merged[mode].forEach(function(p){existingNames[p.name]=1;});
     (imported&&imported[mode]||[]).forEach(function(p){
@@ -937,6 +950,7 @@ function restorePresetOriginal(ci){
 function setMode(m){
   currentMode=m;editingCustomIdx=null;
   document.getElementById('btnAir').classList.toggle('active',m==='air');
+  document.getElementById('btnRF').classList.toggle('active',m==='rf');
   document.getElementById('btnCF').classList.toggle('active',m==='cf');
   document.getElementById('presetNameInput').value='';
   document.getElementById('presetSaveBtn').textContent='+ Save';
@@ -944,9 +958,9 @@ function setMode(m){
   updateSortModeLink(); // sort choice is tracked per mode — refresh the link label to match
   renderPresets();
   if(window.innerWidth<=900)setMobileTab('inputs');
-  // Switching category (air/centrefire) means an entirely different class of load — start from
-  // a blank form rather than carrying over the previous mode's weight/BC/velocity/etc, which
-  // would otherwise sit under the new mode's label looking like a real (but nonsensical) load.
+  // Switching category (air/rimfire/centrefire) means an entirely different class of load —
+  // start from a blank form rather than carrying over the previous mode's weight/BC/velocity/etc,
+  // which would otherwise sit under the new mode's label looking like a real (but nonsensical) load.
   // Mirrors what "+ New Load" (clearLoadFields()) already does; Zero/Max are handled separately
   // just below since they get mode-appropriate defaults rather than being left blank.
   document.getElementById('fCalibr').value='';
@@ -961,10 +975,10 @@ function setMode(m){
   document.getElementById('fDrag').value='g1';
   document.getElementById('fShape').value='flatbase';
   lastDragModel='g1';dismissBcWarning();
-  var defMax=m==='air'?100:500,defZero=m==='air'?30:100;
+  var modeDef=MODE_DEFAULT_RANGE[m]||MODE_DEFAULT_RANGE.cf,defMax=modeDef.max,defZero=modeDef.zero;
   document.getElementById('fMax').value=unitSystem==='metric'?Math.round(defMax*0.9144):defMax;
   document.getElementById('fZero').value=unitSystem==='metric'?Math.round(defZero*0.9144):defZero;
-  clearTruingState(); // switching category (air/centrefire) always means a different load
+  clearTruingState(); // switching category (air/rimfire/centrefire) always means a different load
   loadedPresetRef=null;
   lastResults=null; // old trajectory no longer describes anything meaningful — clear it rather
   // than leaving a stale chart/table on screen computed from the load that just got wiped above.
@@ -995,7 +1009,7 @@ function loadPreset(p,ref){
   document.getElementById('fMV').value=met?(p.mv*0.3048).toFixed(1):p.mv;
   document.getElementById('fSH').value=met?(p.sh*2.54).toFixed(1):p.sh;
   document.getElementById('fZero').value=met?Math.round(p.zero*0.9144):p.zero;
-  var defMax=p.max||(currentMode==='air'?100:500);
+  var defMax=p.max||(MODE_DEFAULT_RANGE[currentMode]||MODE_DEFAULT_RANGE.cf).max;
   document.getElementById('fMax').value=met?Math.round(defMax*0.9144):defMax;
   if(p.dia)document.getElementById('fDia').value=met?(p.dia*25.4).toFixed(2):p.dia;
   if(p.len)document.getElementById('fLen').value=met?(p.len*25.4).toFixed(2):p.len;
@@ -1239,18 +1253,24 @@ function resetTruing(){
 // Soft, non-blocking sanity checks on the values just read from the form. Flags likely typos
 // (a BC of 4, a muzzle velocity that suggests a fps/m-s mixup) without ever altering or
 // blocking the calculation - purely advisory, and re-evaluated fresh on every calculate() call.
+// Per-mode plausibility bounds + wording, keyed by currentMode so adding a new mode is a
+// one-line table entry rather than another ternary branch.
+var PLAUSIBILITY_BOUNDS={
+  air:{mv:{min:150,max:1700}, wt:{min:3,  max:120}, mvLabel:'an air rifle',     wtLabel:'an air rifle load'},
+  rf: {mv:{min:700,max:2500}, wt:{min:15, max:60},  mvLabel:'a rimfire rifle',  wtLabel:'a rimfire load'},
+  cf: {mv:{min:500,max:5000}, wt:{min:20, max:700}, mvLabel:'a centrefire rifle',wtLabel:'a centrefire load'}
+};
 function checkPlausibility(p){
   var msgs=[];
   if(p.baseBc<=0||p.baseBc>1.0){
     msgs.push('BC of '+p.baseBc.toFixed(3)+' is outside the realistic range for small-arms projectiles (roughly 0.01-1.0) - check for a typo or wrong decimal place.');
   }
-  var mvBounds=currentMode==='air'?{min:150,max:1700}:{min:500,max:5000};
-  if(p.mvFps<mvBounds.min||p.mvFps>mvBounds.max){
-    msgs.push('Muzzle velocity of '+Math.round(p.mvFps)+' fps looks unusual for '+(currentMode==='air'?'an air rifle':'a centrefire rifle')+' - double-check the value and units (fps vs m/s).');
+  var bounds=PLAUSIBILITY_BOUNDS[currentMode]||PLAUSIBILITY_BOUNDS.cf;
+  if(p.mvFps<bounds.mv.min||p.mvFps>bounds.mv.max){
+    msgs.push('Muzzle velocity of '+Math.round(p.mvFps)+' fps looks unusual for '+bounds.mvLabel+' - double-check the value and units (fps vs m/s).');
   }
-  var wtBounds=currentMode==='air'?{min:3,max:120}:{min:20,max:700};
-  if(p.weightGr<wtBounds.min||p.weightGr>wtBounds.max){
-    msgs.push('Bullet/pellet weight of '+p.weightGr+'gr looks unusual for '+(currentMode==='air'?'an air rifle load':'a centrefire load')+' - double-check the value.');
+  if(p.weightGr<bounds.wt.min||p.weightGr>bounds.wt.max){
+    msgs.push('Bullet/pellet weight of '+p.weightGr+'gr looks unusual for '+bounds.wtLabel+' - double-check the value.');
   }
   return msgs;
 }
@@ -1358,7 +1378,7 @@ function renderResults(results,params,stability){
   var rLRange=met?Math.round(rL.yd*0.9144)+' m':rL.yd+' yd';
   var subTxt=sub?(met?Math.round(sub.yd*0.9144)+' m':sub.yd+' yd'):'&gt; max range';
 
-  var modeTag=currentMode==='air'?'<span class="tag tag-air">Air Rifle</span>':'<span class="tag tag-cf">Centrefire</span>';
+  var modeTag=currentMode==='air'?'<span class="tag tag-air">Air Rifle</span>':(currentMode==='rf'?'<span class="tag tag-rf">Rimfire</span>':'<span class="tag tag-cf">Centrefire</span>');
   var sg=stability.Sg,sgSt=stabStatus(sg);
   var shapeLabels={flatbase:'Flat-base',boattail:'Boat-tail',diabolo:'Diabolo'};
   var shapeNote=(stability.shape&&stability.shape!=='flatbase')?(' &middot; '+shapeLabels[stability.shape]+' &times;'+SHAPE_SG_FACTOR[stability.shape].toFixed(2)):'';
@@ -1627,7 +1647,7 @@ function fetchWeather(){
 // Restore last-used mode/unit system, if any were saved, before the first render.
 var _prefs=loadPrefs();
 if(_prefs.unit==='metric')setUnitSystem('metric');
-if(_prefs.mode==='cf')setMode('cf');
+if(_prefs.mode==='cf')setMode('cf');else if(_prefs.mode==='rf')setMode('rf');
 updateSortModeLink();
 renderPresets();
 syncLayout();
