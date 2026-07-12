@@ -30,8 +30,14 @@
   .field input,.field select{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:7px 10px;font-size:13px;outline:none;transition:border-color .2s;}
   .field input:focus,.field select:focus{border-color:var(--accent);}
   .field select option{background:var(--surface);}
-  .row2{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
-  .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
+  /* align-items:end keeps each row's INPUT boxes level with each other even when one field's
+     label wraps to two lines and its neighbour's doesn't (e.g. "Zero Range (yd)" vs "Interval
+     (yd)" at narrower widths) - bottom-aligning cancels out the label-height difference since
+     every field below the label is identical (gap + input). Two rows override back to
+     align-items:start where a field has extra content (a <small> hint) trailing after its
+     input and its neighbour doesn't - bottom-aligning those would misalign them instead. */
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:end;}
+  .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;align-items:end;}
   .btn{width:100%;padding:10px;background:var(--accent);color:#fff;border:none;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer;transition:opacity .2s;margin-top:4px;touch-action:manipulation;}
   .btn:hover{opacity:.85;}
   .btn-secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border);}
@@ -206,7 +212,7 @@
       <div class="row3">
         <div class="field"><label id="lblDia">Diameter (in)</label><input type="number" id="fDia" value="0.2175" min="0.1" max="30" step="0.001"/></div>
         <div class="field"><label id="lblLen">Length (in)</label><input type="number" id="fLen" value="0.72" min="0.1" max="100" step="0.001"/></div>
-        <div class="field"><label id="lblTwist">Twist 1:X (in)</label><span class="help-tip" data-tip="Barrel twist rate: one full rifling rotation per X inches (or mm) of travel. A lower number means faster/tighter twist - more spin for a given velocity, needed to stabilize longer/heavier projectiles." onclick="showHelpTip(this,event)">?</span><input type="number" id="fTwist" value="16" min="4" max="36" step="0.5"/></div>
+        <div class="field"><label id="lblTwist">Twist 1:X (in)<span class="help-tip" data-tip="Barrel twist rate: one full rifling rotation per X inches (or mm) of travel. A lower number means faster/tighter twist - more spin for a given velocity, needed to stabilize longer/heavier projectiles." onclick="showHelpTip(this,event)">?</span></label><input type="number" id="fTwist" value="16" min="4" max="36" step="0.5"/></div>
       </div>
       <div class="field" style="margin-top:-2px;">
         <label>Twist Direction <span style="color:var(--muted);font-size:10px;">(for spin drift)</span></label>
@@ -234,7 +240,7 @@
         <div class="field"><label>Humidity (%)</label><input type="number" id="fHumid" value="50" min="0" max="100" step="5"/></div>
         <div class="field"><label id="lblPress">Pressure (inHg)</label><input type="number" id="fPress" value="29.92" min="10" max="1100" step="0.01"/></div>
       </div>
-      <div class="row2">
+      <div class="row2" style="align-items:start;">
         <div class="field"><label id="lblWind">Wind Speed (mph)</label><input type="number" id="fWind" value="10" min="0" max="200" step="1"/></div>
         <div class="field"><label>Wind Clock (hr)</label><input type="number" id="fWindDir" value="3" min="1" max="12" step="1"/><small style="color:var(--muted);font-size:10px;">3=full R, 9=full L</small></div>
       </div>
@@ -244,7 +250,7 @@
     <!-- Location -->
     <div class="section">
       <div class="section-title">Location (Coriolis)</div>
-      <div class="row2">
+      <div class="row2" style="align-items:start;">
         <div class="field"><label>Latitude (&deg;N)</label><input type="number" id="fLat" value="54" min="-90" max="90" step="0.5"/></div>
         <div class="field"><label>Azimuth (&deg;)<span class="help-tip" data-tip="The compass direction you are firing toward, in degrees (0=North, 90=East, 180=South, 270=West). Used with Latitude to calculate the Coriolis effect - the Earth's rotation deflecting the bullet slightly, which only matters at longer ranges. If you do not know it, 0 (North) is a reasonable default and the effect is small anyway." onclick="showHelpTip(this,event)">?</span></label><input type="number" id="fAzimuth" value="0" min="0" max="360" step="5"/><small style="color:var(--muted);font-size:10px;">0=N 90=E 180=S</small></div>
       </div>
