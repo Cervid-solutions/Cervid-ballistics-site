@@ -326,6 +326,41 @@
     <button onclick="window.print()" style="margin-top:20px;width:100%;padding:12px;background:var(--accent);color:#fff;border:none;border-radius:6px;font-weight:700;font-size:14px;cursor:pointer;touch-action:manipulation;">&#128424; Print</button>
   </div>
 </div>
+<div id="reticleModal" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:10000;overflow:auto;">
+  <div style="max-width:440px;margin:0 auto;padding:20px 18px 60px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:10px;">
+      <div>
+        <h2 style="margin:0;font-size:19px;">Reticle View</h2>
+        <div id="reticleSubtitle" style="color:var(--muted);font-size:12px;margin-top:2px;"></div>
+      </div>
+      <button onclick="hideReticleView()" style="background:var(--accent2);color:#fff;border:none;border-radius:6px;padding:8px 14px;font-weight:700;cursor:pointer;touch-action:manipulation;flex-shrink:0;">Close</button>
+    </div>
+    <div class="field">
+      <label>Range</label>
+      <select id="reticleRangeSelect" onchange="renderReticleView()"></select>
+    </div>
+    <div class="field">
+      <label>Reticle Pattern</label>
+      <select id="reticlePatternSelect" onchange="onReticlePatternChange()">
+        <option value="mildot">Mil-Dot (mil)</option>
+        <option value="moahash">MOA Hash (MOA)</option>
+        <option value="christmastree">Christmas Tree (mil)</option>
+      </select>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:10px;">
+      <label style="font-size:12px;color:var(--muted);margin:0;">Turret Dial (optional — what you've already dialed on the scope)</label>
+      <a href="#" onclick="resetTurretDial();return false;" style="font-size:11px;color:var(--accent2);">Reset</a>
+    </div>
+    <div class="row2" style="margin-top:4px;">
+      <div class="field"><label>Elevation <span id="turretElevUnit" style="color:var(--muted);font-weight:400;"></span></label><input type="number" id="turretElevInput" value="0" step="0.05" oninput="onTurretInputChange()"/></div>
+      <div class="field"><label>Windage <span id="turretWindUnit" style="color:var(--muted);font-weight:400;"></span></label><input type="number" id="turretWindInput" value="0" step="0.05" oninput="onTurretInputChange()"/></div>
+    </div>
+    <p style="color:var(--muted);font-size:11px;margin-top:4px;">Elevation: positive = dialed up. Windage: positive = dialed right. Leave both at 0 for the full hold with no turret input — the reticle below then shows what's left to hold after dialing.</p>
+    <div id="reticleSvgWrap" style="margin-top:8px;"></div>
+    <div id="reticleHoldText" style="margin-top:10px;font-size:14px;font-weight:600;text-align:center;"></div>
+    <p style="color:var(--muted);font-size:11px;margin-top:14px;">Generic reticle pattern, not a specific manufacturer's design — hash spacing may not exactly match your scope. Assumes the reticle is at its calibrated magnification (max power for second-focal-plane scopes, any power for first-focal-plane).</p>
+  </div>
+</div>
 <script>
 // ── App height (iOS safe area) ──────────────────────────────────────────────
 // Measures the header's actual rendered height (rather than assuming a fixed value) since it
@@ -1582,7 +1617,8 @@ function renderResults(results,params,stability){
     '<span class="help-tip" data-tip="mils (milliradians): 1 mil at 100m is about 10cm of drop or drift. MOA (Minutes of Angle): 1 MOA at 100yd is about 1.047in. clicks: scope adjustment clicks, converted using your selected click size below." onclick="showHelpTip(this,event)">?</span>'+
     (unitDrop==='clicks'?'<select onchange="setClickSize(this.value)" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 8px;font-size:12px;">'+clickSel+'</select>':'')+
     '<button class="btn btn-secondary" style="width:auto;padding:5px 14px;font-size:12px;" onclick="exportCSV()">Export CSV</button>'+
-    '<button class="btn btn-secondary" style="width:auto;padding:5px 14px;font-size:12px;" onclick="showRangeCard()">&#128203; Range Card</button></div></div>'+
+    '<button class="btn btn-secondary" style="width:auto;padding:5px 14px;font-size:12px;" onclick="showRangeCard()">&#128203; Range Card</button>'+
+    '<button class="btn btn-secondary" style="width:auto;padding:5px 14px;font-size:12px;" onclick="showReticleView()">&#127919; Reticle View</button></div></div>'+
     '<div class="stat-cards">'+
     '<div class="stat-card '+eSt+'"><div class="label">Muzzle Energy</div><div class="value">'+(met?r0.energyJ:muzzE.toFixed(0))+'</div><div class="unit">'+eAtMuzz+(eTag?'<br><strong>'+eTag+'</strong>':'')+'</div>'+(currentMode==='air'?'<div class="energy-bar"><div class="energy-fill" style="width:'+Math.min(100,muzzE)+'%;background:'+(muzzE>100?'var(--red)':muzzE>80?'var(--yellow)':'var(--green)')+'"></div></div>':'')+'</div>'+
     '<div class="stat-card"><div class="label">Muzzle Velocity</div><div class="value">'+muzzVel+'</div><div class="unit">'+muzzVelSub+'</div></div>'+
@@ -1678,6 +1714,171 @@ function showRangeCard(){
 function hideRangeCard(){
   var el=document.getElementById('rangeCardModal');
   if(el)el.style.display='none';
+}
+
+// ── Reticle View ─────────────────────────────────────────────────────────────
+// Generic (non-proprietary) reticle patterns only — not reproductions of any specific
+// manufacturer's design. 'span' is how many whole units the visible reticle frame covers in
+// each direction from center, matching roughly how far real holdover reticles actually reach
+// before you're out of usable reticle and have to dial the rest.
+var RETICLE_PATTERNS={
+  mildot:{unit:'mil',unitLabel:'mils',span:5},
+  moahash:{unit:'moa',unitLabel:'MOA',span:20},
+  // Generic long-range "Christmas tree" style, in the same broad family as reticles like
+  // Element Optics' APR-2D/MPR-1D (Theos) or Horus's tree patterns — a numbered vertical mil
+  // scale with a widening spread of wind-hold dots below center. Not a reproduction of any
+  // specific manufacturer's exact geometry, just the same general, long-established concept.
+  christmastree:{unit:'mil',unitLabel:'mils',span:12}
+};
+// Standard mil<->MOA conversion (1 mrad = 3.43775 MOA) — used only to keep the turret dial fields
+// showing a consistent physical value as the user switches between mil- and MOA-unit patterns.
+// Canonical storage for the turret dial is always in mils, converted for display/entry.
+var MIL_TO_MOA=3.43775;
+var turretElevMil=0, turretWindMil=0;
+function showReticleView(){
+  if(!lastResults)return;
+  var met=unitSystem==='metric';
+  var sel=document.getElementById('reticleRangeSelect');
+  sel.innerHTML=lastResults.results.map(function(r){
+    var rng=met?Math.round(r.yd*0.9144)+'m':r.yd+'yd';
+    var marker=r.isZero?' &#9733;':(r.isSpot?' &#9670;':'');
+    return '<option value="'+r.yd+'">'+rng+marker+'</option>';
+  }).join('');
+  sel.selectedIndex=sel.options.length-1; // default to the furthest calculated range
+  document.getElementById('reticleSubtitle').textContent=(document.getElementById('fCalibr').value||'Reticle')+' · orange ring marks the hold point';
+  turretElevMil=0; turretWindMil=0; // fresh turret dial each time the view is opened
+  refreshTurretUI();
+  renderReticleView();
+  document.getElementById('reticleModal').style.display='block';
+}
+function hideReticleView(){
+  var el=document.getElementById('reticleModal');
+  if(el)el.style.display='none';
+}
+// Keeps the turret input fields' unit labels and displayed values in sync with whichever
+// pattern is currently selected, converting the canonical mil value for display only.
+function refreshTurretUI(){
+  var pat=RETICLE_PATTERNS[document.getElementById('reticlePatternSelect').value];
+  var unitLabel='('+(pat.unit==='moa'?'MOA':'mil')+')';
+  document.getElementById('turretElevUnit').textContent=unitLabel;
+  document.getElementById('turretWindUnit').textContent=unitLabel;
+  var elevDisp=pat.unit==='moa'?turretElevMil*MIL_TO_MOA:turretElevMil;
+  var windDisp=pat.unit==='moa'?turretWindMil*MIL_TO_MOA:turretWindMil;
+  document.getElementById('turretElevInput').value=Math.round(elevDisp*100)/100;
+  document.getElementById('turretWindInput').value=Math.round(windDisp*100)/100;
+}
+function onReticlePatternChange(){
+  refreshTurretUI();
+  renderReticleView();
+}
+function onTurretInputChange(){
+  var pat=RETICLE_PATTERNS[document.getElementById('reticlePatternSelect').value];
+  var elevIn=parseFloat(document.getElementById('turretElevInput').value);
+  var windIn=parseFloat(document.getElementById('turretWindInput').value);
+  if(isNaN(elevIn))elevIn=0;
+  if(isNaN(windIn))windIn=0;
+  turretElevMil=pat.unit==='moa'?elevIn/MIL_TO_MOA:elevIn;
+  turretWindMil=pat.unit==='moa'?windIn/MIL_TO_MOA:windIn;
+  renderReticleView();
+}
+function resetTurretDial(){
+  turretElevMil=0; turretWindMil=0;
+  refreshTurretUI();
+  renderReticleView();
+}
+function renderReticleView(){
+  if(!lastResults)return;
+  var yd=parseInt(document.getElementById('reticleRangeSelect').value,10);
+  var row=lastResults.results.find(function(r){return r.yd===yd;});
+  if(!row)return;
+  var patternKey=document.getElementById('reticlePatternSelect').value;
+  var pat=RETICLE_PATTERNS[patternKey];
+  var elevVal=pat.unit==='mil'?parseFloat(row.mils):parseFloat(row.moa);
+  var windVal=pat.unit==='mil'?parseFloat(row.driftMils):parseFloat(row.driftMoa);
+  // Turret dial, converted from canonical mils into the pattern's current unit.
+  var turretElev=pat.unit==='moa'?turretElevMil*MIL_TO_MOA:turretElevMil;
+  var turretWind=pat.unit==='moa'?turretWindMil*MIL_TO_MOA:turretWindMil;
+  // elevVal is already a correction ('positive = dial up'), so dialing up directly uses up part
+  // of it — subtract. windVal is a drift *effect* ('positive = drifts right'); dialing right is
+  // the same kind of rightward push on point of aim, so it stacks with the wind rather than
+  // against it — add. Checked against worked examples (fully-compensating dial reduces the
+  // remainder to zero in both cases) before relying on it; see the project brief changelog.
+  var remElev=elevVal-turretElev;
+  var remWind=windVal+turretWind;
+  document.getElementById('reticleSvgWrap').innerHTML=buildReticleSvg(patternKey,remElev,remWind);
+  var met=unitSystem==='metric';
+  var rngLabel=met?Math.round(yd*0.9144)+'m':yd+'yd';
+  // Same sign convention as before (see the derivation above), just applied to the remaining
+  // (post-turret) values rather than the raw table values.
+  var elevDir=remElev>0.005?'down':remElev<-0.005?'up':'';
+  var windDir=remWind>0.005?'left':remWind<-0.005?'right':'';
+  var parts=[];
+  if(elevDir)parts.push(Math.abs(remElev).toFixed(2)+' '+pat.unitLabel+' '+elevDir);
+  if(windDir)parts.push(Math.abs(remWind).toFixed(2)+' '+pat.unitLabel+' '+windDir);
+  var holdLine=(parts.length?'Hold '+parts.join(' · '):'On center')+' at '+rngLabel;
+  var turretUsed=Math.abs(turretElev)>0.005||Math.abs(turretWind)>0.005;
+  if(turretUsed){
+    var tParts=[];
+    if(Math.abs(turretElev)>0.005)tParts.push(Math.abs(turretElev).toFixed(2)+' '+pat.unitLabel+' '+(turretElev>0?'up':'down'));
+    if(Math.abs(turretWind)>0.005)tParts.push(Math.abs(turretWind).toFixed(2)+' '+pat.unitLabel+' '+(turretWind>0?'right':'left'));
+    document.getElementById('reticleHoldText').innerHTML='Turret: '+tParts.join(' · ')+'<br>'+holdLine+' (remaining)';
+  } else {
+    document.getElementById('reticleHoldText').textContent=holdLine;
+  }
+}
+// Draws a self-contained SVG reticle with a marker at the calculated hold point. elevVal/windVal
+// are in the pattern's own unit (mil or MOA) using the app's existing sign conventions (see
+// renderReticleView above) — this function only handles turning those numbers into pixels.
+function buildReticleSvg(patternKey,elevVal,windVal){
+  var pat=RETICLE_PATTERNS[patternKey];
+  var size=280,center=size/2,frameR=size*0.42,gap=10;
+  var pxPerUnit=frameR/pat.span;
+  var stroke='#3ecf8e';
+  var svg='<circle cx="'+center+'" cy="'+center+'" r="'+frameR+'" fill="#0a0c11" stroke="#2e3348" stroke-width="1"/>';
+  for(var n=1;n<=pat.span;n++){
+    var d=n*pxPerUnit;
+    if(patternKey==='mildot'){
+      [center-d,center+d].forEach(function(cx){svg+='<circle cx="'+cx+'" cy="'+center+'" r="3.5" fill="'+stroke+'"/>';});
+      [center-d,center+d].forEach(function(cy){svg+='<circle cx="'+center+'" cy="'+cy+'" r="3.5" fill="'+stroke+'"/>';});
+    } else if(patternKey==='moahash'){
+      var isMajor=(n%5===0),tickLen=isMajor?9:5,w=isMajor?1.8:1;
+      [center-d,center+d].forEach(function(cx){svg+='<line x1="'+cx+'" y1="'+(center-tickLen)+'" x2="'+cx+'" y2="'+(center+tickLen)+'" stroke="'+stroke+'" stroke-width="'+w+'"/>';});
+      [center-d,center+d].forEach(function(cy){svg+='<line x1="'+(center-tickLen)+'" y1="'+cy+'" x2="'+(center+tickLen)+'" y2="'+cy+'" stroke="'+stroke+'" stroke-width="'+w+'"/>';});
+      if(isMajor)svg+='<text x="'+(center-d)+'" y="'+(center-tickLen-3)+'" fill="#7a7f99" font-size="8" text-anchor="middle">'+n+'</text>';
+    } else if(patternKey==='christmastree'){
+      // Holdover on this style is always downward (dropping bullet -> hold under, never above —
+      // real tree reticles don't bother with an upward tree), so this branch only builds the
+      // lower half: a numbered mil tick straight down the centerline, plus a row of wind-hold
+      // dots at that depth that gets wider the further down it is — the 'tree' shape.
+      var cy=center+d;
+      svg+='<line x1="'+(center-4)+'" y1="'+cy+'" x2="'+(center+4)+'" y2="'+cy+'" stroke="'+stroke+'" stroke-width="1.2"/>';
+      var halfWidthMil=n*0.5;
+      var dotCols=Math.floor(halfWidthMil);
+      // Label offset grows linearly with depth (the continuous half-width, not the floored dot
+      // count), so the numbers form a straight diagonal line alongside the tree that widens at
+      // the same steady rate the tree itself does — rather than a vertical column or a
+      // staggered stair-step. Using the continuous value (always >= the actual floored dot
+      // spread) guarantees the line clears every row's dots by construction, not just at the
+      // depths where a new dot column happens to appear.
+      svg+='<text x="'+(center+halfWidthMil*pxPerUnit+8)+'" y="'+(cy+3)+'" fill="#7a7f99" font-size="8" text-anchor="start">'+n+'</text>';
+      for(var w2=1;w2<=dotCols;w2++){
+        var wd=w2*pxPerUnit;
+        svg+='<circle cx="'+(center-wd)+'" cy="'+cy+'" r="2.2" fill="'+stroke+'"/><circle cx="'+(center+wd)+'" cy="'+cy+'" r="2.2" fill="'+stroke+'"/>';
+      }
+    }
+  }
+  svg+='<line x1="'+center+'" y1="0" x2="'+center+'" y2="'+(center-gap)+'" stroke="'+stroke+'" stroke-width="1.5"/>';
+  svg+='<line x1="'+center+'" y1="'+(center+gap)+'" x2="'+center+'" y2="'+size+'" stroke="'+stroke+'" stroke-width="1.5"/>';
+  svg+='<line x1="0" y1="'+center+'" x2="'+(center-gap)+'" y2="'+center+'" stroke="'+stroke+'" stroke-width="1.5"/>';
+  svg+='<line x1="'+(center+gap)+'" y1="'+center+'" x2="'+size+'" y2="'+center+'" stroke="'+stroke+'" stroke-width="1.5"/>';
+  // See renderReticleView for why elevation goes down-positive and windage flips sign.
+  var mx=center-(windVal*pxPerUnit),my=center+(elevVal*pxPerUnit);
+  var dist=Math.sqrt((mx-center)*(mx-center)+(my-center)*(my-center));
+  var offReticle=dist>frameR;
+  if(offReticle){var scale=frameR/dist;mx=center+(mx-center)*scale;my=center+(my-center)*scale;}
+  svg+='<circle cx="'+mx+'" cy="'+my+'" r="6" fill="none" stroke="#e06c3a" stroke-width="2.5"/><circle cx="'+mx+'" cy="'+my+'" r="1.5" fill="#e06c3a"/>';
+  if(offReticle)svg+='<text x="'+mx+'" y="'+(my<center?my-10:my+16)+'" fill="#e06c3a" font-size="9" text-anchor="middle" font-weight="700">OFF RETICLE</text>';
+  return '<svg viewBox="0 0 '+size+' '+size+'" width="100%" style="max-width:320px;display:block;margin:0 auto;border-radius:6px;">'+svg+'</svg>';
 }
 
 function clearLoadFields(){
