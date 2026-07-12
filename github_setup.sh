@@ -84,7 +84,7 @@ echo "=== Step 6: Reconciling with GitHub (in case the repo already has commits)
 git fetch origin
 if git show-ref --verify --quiet refs/remotes/origin/main; then
   echo "  origin/main exists - merging it in before pushing."
-  git pull origin main --allow-unrelated-histories --no-edit
+  git pull origin main --no-rebase --allow-unrelated-histories --no-edit
 else
   echo "  origin/main doesn't exist yet (empty repo) - nothing to merge."
 fi
