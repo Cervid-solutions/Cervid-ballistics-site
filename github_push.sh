@@ -20,7 +20,23 @@ if [ ! -d .git ]; then
   exit 1
 fi
 
-echo "=== Step 1: Staging changes ==="
+echo "=== Step 1: Syncing deployment copies ==="
+# The live site is served from index.html (site root) and Personal/index.html - separate
+# copies of CervidBallistics_GeneralRelease.html and CervidBallistics.html, not those files
+# themselves, since GitHub Pages only serves a file literally named index.html. Refreshing
+# both copies here every time means an edit to the source files can't silently go stale on
+# the live site just because someone forgot to re-copy it by hand before pushing.
+if [ -f CervidBallistics_GeneralRelease.html ] && [ -f index.html ]; then
+  cp CervidBallistics_GeneralRelease.html index.html
+  echo "  index.html <- CervidBallistics_GeneralRelease.html"
+fi
+if [ -f CervidBallistics.html ] && [ -f Personal/index.html ]; then
+  cp CervidBallistics.html Personal/index.html
+  echo "  Personal/index.html <- CervidBallistics.html"
+fi
+echo ""
+
+echo "=== Step 2: Staging changes ==="
 git add -A
 if git diff --cached --quiet; then
   echo "Nothing to commit - all files already match the last commit."
@@ -29,7 +45,7 @@ fi
 git status --short
 echo ""
 
-echo "=== Step 2: Committing ==="
+echo "=== Step 3: Committing ==="
 if [ -n "$1" ]; then
   MSG="$1"
 else
@@ -39,11 +55,11 @@ git commit -m "$MSG"
 echo "  Committed: $MSG"
 echo ""
 
-echo "=== Step 3: Pulling any changes made on GitHub since your last push ==="
+echo "=== Step 4: Pulling any changes made on GitHub since your last push ==="
 git pull --rebase origin main
 echo ""
 
-echo "=== Step 4: Pushing to GitHub ==="
+echo "=== Step 5: Pushing to GitHub ==="
 git push origin main
 echo ""
 echo "Done. Changes are live on GitHub."
