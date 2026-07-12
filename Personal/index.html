@@ -20,7 +20,7 @@
   .mode-toggle{display:flex;background:var(--bg);border:1px solid var(--border);border-radius:6px;overflow:hidden;margin-left:auto;}
   .mode-toggle button{padding:6px 18px;border:none;background:transparent;color:var(--muted);cursor:pointer;font-size:13px;font-weight:600;transition:all .2s;touch-action:manipulation;}
   .mode-toggle button.active{background:var(--accent);color:#fff;}
-  .layout{display:grid;grid-template-columns:340px 1fr;gap:0;height:calc(var(--app-height,100vh) - 57px);}
+  .layout{display:grid;grid-template-columns:340px 1fr;gap:0;height:calc(var(--app-height,100vh) - var(--header-height,57px));}
   .sidebar{background:var(--surface);border-right:1px solid var(--border);overflow-y:auto;padding:20px 16px;padding-bottom:max(20px,env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:16px;}
   .main{overflow-y:auto;padding:20px;background:var(--bg);}
   .section{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:14px;}
@@ -109,10 +109,15 @@
   .mob-tab .ti{font-size:22px;line-height:1;}
   .pane-hidden{display:none!important;}
   @media(max-width:900px){
-    .layout{grid-template-columns:1fr;height:calc(var(--app-height,100vh) - 57px - 54px);overflow:hidden;}
+    .layout{grid-template-columns:1fr;height:calc(var(--app-height,100vh) - var(--header-height,57px) - 54px);overflow:hidden;}
     .sidebar{border-right:none;height:100%;overflow-y:auto;}
     .main{height:100%;overflow-y:auto;}
     .mobile-tab-bar{display:flex;}
+    /* Mode toggle wraps to its own full-width row instead of clipping next to the title
+       (three labeled buttons no longer fit on one line with the title on narrow phones). */
+    header{flex-wrap:wrap;}
+    .mode-toggle{width:100%;margin-left:0;}
+    .mode-toggle button{flex:1;}
   }
 </style>
 </head>
@@ -319,7 +324,14 @@
 </div>
 <script>
 // ── App height (iOS safe area) ──────────────────────────────────────────────
-function setAppHeight(){document.documentElement.style.setProperty('--app-height',window.innerHeight+'px');}
+// Measures the header's actual rendered height (rather than assuming a fixed value) since it
+// grows an extra row on narrow screens once the mode toggle wraps below the title — keeps the
+// layout's height calc() correct in both the one-row (desktop) and two-row (mobile) cases.
+function setAppHeight(){
+  document.documentElement.style.setProperty('--app-height',window.innerHeight+'px');
+  var hdr=document.querySelector('header');
+  if(hdr)document.documentElement.style.setProperty('--header-height',hdr.offsetHeight+'px');
+}
 window.addEventListener('resize',setAppHeight);
 window.addEventListener('orientationchange',function(){setTimeout(setAppHeight,200);});
 setAppHeight();
