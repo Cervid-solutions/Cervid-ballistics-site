@@ -358,10 +358,23 @@
       <a href="#" onclick="resetTurretDial();return false;" style="font-size:11px;color:var(--accent2);">Reset</a>
     </div>
     <div class="row2" style="margin-top:4px;">
-      <div class="field"><label>Elevation <span id="turretElevUnit" style="color:var(--muted);font-weight:400;"></span></label><input type="number" id="turretElevInput" value="0" step="0.05" oninput="onTurretInputChange()"/></div>
-      <div class="field"><label>Windage <span id="turretWindUnit" style="color:var(--muted);font-weight:400;"></span></label><input type="number" id="turretWindInput" value="0" step="0.05" oninput="onTurretInputChange()"/></div>
+      <div class="field"><label>Elevation <span id="turretElevUnit" style="color:var(--muted);font-weight:400;"></span></label>
+        <div style="display:flex;gap:4px;align-items:center;">
+          <button type="button" onclick="stepTurretInput('elev',-1)" style="width:26px;height:26px;flex:none;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:16px;line-height:1;cursor:pointer;touch-action:manipulation;">&minus;</button>
+          <input type="number" id="turretElevInput" value="0" step="0.05" oninput="onTurretInputChange()" style="text-align:center;"/>
+          <button type="button" onclick="stepTurretInput('elev',1)" style="width:26px;height:26px;flex:none;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:16px;line-height:1;cursor:pointer;touch-action:manipulation;">+</button>
+        </div>
+      </div>
+      <div class="field"><label>Windage <span id="turretWindUnit" style="color:var(--muted);font-weight:400;"></span></label>
+        <div style="display:flex;gap:4px;align-items:center;">
+          <button type="button" onclick="stepTurretInput('wind',-1)" style="width:26px;height:26px;flex:none;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:16px;line-height:1;cursor:pointer;touch-action:manipulation;">&minus;</button>
+          <input type="number" id="turretWindInput" value="0" step="0.05" oninput="onTurretInputChange()" style="text-align:center;"/>
+          <button type="button" onclick="stepTurretInput('wind',1)" style="width:26px;height:26px;flex:none;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:16px;line-height:1;cursor:pointer;touch-action:manipulation;">+</button>
+        </div>
+      </div>
     </div>
-    <p style="color:var(--muted);font-size:11px;margin-top:4px;">Elevation: positive = dialed up. Windage: positive = dialed right. Leave both at 0 for the full hold with no turret input — the reticle below then shows what's left to hold after dialing.</p>
+    <p style="color:var(--muted);font-size:11px;margin-top:4px;">Elevation: positive = dialed up. Windage: positive = dialed right. +/- steps by one click at your configured click size. Leave both at 0 for the full hold with no turret input — the reticle below then shows what's left to hold after dialing.</p>
+    <div id="turretStripWrap"></div>
     <div id="reticleSvgWrap" style="margin-top:8px;"></div>
     <div id="reticleHoldText" style="margin-top:10px;font-size:14px;font-weight:600;text-align:center;"></div>
     <p style="color:var(--muted);font-size:11px;margin-top:14px;">Generic reticle pattern, not a specific manufacturer's design — hash spacing may not exactly match your scope. Assumes the reticle is at its calibrated magnification (max power for second-focal-plane scopes, any power for first-focal-plane).</p>
@@ -1760,6 +1773,27 @@ var RETICLE_PATTERNS={
 // Canonical storage for the turret dial is always in mils, converted for display/entry.
 var MIL_TO_MOA=3.43775;
 var turretElevMil=0, turretWindMil=0;
+// Click size used for the turret strip's tick spacing and the +/- stepper buttons, per unit.
+// MOA reuses the app's existing configurable click size (clickSizeMoa, set from the results
+// table's "clicks" unit) since real MOA turrets commonly vary between 1/4, 1/2, and 1 MOA per
+// click. Mil turrets don't get an equivalent selector because they're near-universally 0.1
+// mil/click in practice, so a fixed constant is a reasonable default without adding a control
+// for something that rarely varies.
+var MIL_CLICK_SIZE=0.1;
+function turretClickSize(unit){return unit==='moa'?clickSizeMoa:MIL_CLICK_SIZE;}
+// Steps one turret input by exactly one click in whichever unit the current reticle pattern
+// displays, then runs it through the same onTurretInputChange() path a manual edit would -
+// keeps the stepper buttons and free-text entry always in agreement about what a "click" is.
+function stepTurretInput(which,dir){
+  var pat=RETICLE_PATTERNS[document.getElementById('reticlePatternSelect').value];
+  var click=turretClickSize(pat.unit);
+  var id=which==='elev'?'turretElevInput':'turretWindInput';
+  var el=document.getElementById(id);
+  var v=(parseFloat(el.value)||0)+dir*click;
+  v=Math.round(v/click)*click; // re-snap to the click grid to avoid float drift (e.g. 0.1+0.2)
+  el.value=Math.round(v*100)/100;
+  onTurretInputChange();
+}
 function showReticleView(){
   if(!lastResults)return;
   var met=unitSystem==='metric';
@@ -1811,6 +1845,67 @@ function resetTurretDial(){
   refreshTurretUI();
   renderReticleView();
 }
+// Candidate "nice" total ranges the strip can auto-scale to, per unit - picked from, not tied
+// to, click size. An early version set the visible range directly from click size (10 clicks *
+// 0.1 mil = only +/-1 mil total), which meant almost any real elevation correction pegged the
+// marker at MAX; ranges and click size are unrelated in practice (a 0.1mil-click turret can
+// easily need 10+ mils of total travel), so they're kept as two separate concerns here.
+var MIL_STRIP_RANGES=[1,2,5,10,20,40];
+var MOA_STRIP_RANGES=[5,10,20,50,100,200];
+// Picks the smallest candidate range that fits the current value with some headroom (so the
+// marker isn't pinned right at the edge even when comfortably in range), falling back to the
+// largest candidate - and letting the MAX clamp below handle it - for genuinely extreme values.
+function turretStripRange(unit,value){
+  var candidates=unit==='moa'?MOA_STRIP_RANGES:MIL_STRIP_RANGES;
+  var absVal=Math.abs(value);
+  for(var i=0;i<candidates.length;i++){if(absVal<=candidates[i]*0.9)return candidates[i];}
+  return candidates[candidates.length-1];
+}
+// Builds one horizontal ruler-strip SVG showing where a turret is currently dialed to, as a
+// live readout only - not a drag target. (Considered making it draggable to directly set the
+// value, but a precise touch-drag gesture snapped to an exact click increment is easy to get
+// wrong on mobile, for a number that's meant to represent something dialed by hand on a real
+// turret; the numeric field + stepper buttons above stay the actual input, and this strip just
+// visualises whatever they're currently set to. Can revisit if this turns out too static.)
+// value/range are both in the pattern's currently displayed unit. posLabel/negLabel are the
+// end-of-strip direction labels; positive values render toward posLabel (right), matching the
+// sign convention already used by the numeric input above it. Always draws a fixed 20 evenly-
+// spaced divisions regardless of range, so tick density looks the same at any scale.
+function buildTurretStripSvg(value,range,posLabel,negLabel){
+  var w=260,h=40,cx=w/2,divisions=20;
+  var px=function(v){return cx+(v/range)*(cx-20);}; // 20px margin each end
+  var svg='<svg viewBox="0 0 '+w+' '+h+'" width="100%" style="max-width:280px;display:block;margin:0 auto;">';
+  svg+='<line x1="20" y1="22" x2="'+(w-20)+'" y2="22" stroke="#3a3f55" stroke-width="2"/>';
+  for(var i=-divisions/2;i<=divisions/2;i++){
+    var tv=(i/(divisions/2))*range,tx=px(tv),major=(i%5===0);
+    svg+='<line x1="'+tx+'" y1="'+(major?14:18)+'" x2="'+tx+'" y2="'+(major?30:26)+'" stroke="'+(major?'#7a7f99':'#4a4f65')+'" stroke-width="'+(major?1.5:1)+'"/>';
+  }
+  svg+='<text x="8" y="26" fill="#7a7f99" font-size="11" text-anchor="start">'+negLabel+'</text>';
+  svg+='<text x="'+(w-8)+'" y="26" fill="#7a7f99" font-size="11" text-anchor="end">'+posLabel+'</text>';
+  var offRange=Math.abs(value)>range;
+  var clamped=Math.max(-range,Math.min(range,value));
+  var mx=px(clamped);
+  svg+='<polygon points="'+mx+',10 '+(mx-5)+',2 '+(mx+5)+',2" fill="'+(offRange?'#e06c3a':'#4a90d9')+'"/>';
+  if(offRange)svg+='<text x="'+mx+'" y="38" fill="#e06c3a" font-size="9" text-anchor="middle" font-weight="700">MAX</text>';
+  svg+='</svg>';
+  return svg;
+}
+// Combines both strips (elevation, windage) with a value/click-count/scale readout above each.
+// Takes the same pattern-unit turretElev/turretWind values renderReticleView() already
+// computes, so it doesn't need to re-derive them from the canonical mil state itself. Each
+// strip picks its own range independently, since elevation and windage magnitudes commonly
+// differ a lot (e.g. several mils of elevation vs under a mil of windage at modest ranges).
+function buildTurretStripsSvg(pat,turretElev,turretWind){
+  var click=turretClickSize(pat.unit);
+  var elevClicks=Math.round(turretElev/click),windClicks=Math.round(turretWind/click);
+  var elevRange=turretStripRange(pat.unit,turretElev),windRange=turretStripRange(pat.unit,turretWind);
+  return '<div style="margin-top:6px;">'+
+    '<div style="font-size:10px;color:var(--muted);text-align:center;">Elevation: '+turretElev.toFixed(2)+' '+pat.unitLabel+' ('+(elevClicks>=0?'+':'')+elevClicks+' clicks) &middot; scale &plusmn;'+elevRange+' '+pat.unitLabel+'</div>'+
+    buildTurretStripSvg(turretElev,elevRange,'U','D')+
+    '<div style="font-size:10px;color:var(--muted);text-align:center;margin-top:2px;">Windage: '+turretWind.toFixed(2)+' '+pat.unitLabel+' ('+(windClicks>=0?'+':'')+windClicks+' clicks) &middot; scale &plusmn;'+windRange+' '+pat.unitLabel+'</div>'+
+    buildTurretStripSvg(turretWind,windRange,'R','L')+
+    '</div>';
+}
 function renderReticleView(){
   if(!lastResults)return;
   var yd=parseInt(document.getElementById('reticleRangeSelect').value,10);
@@ -1823,6 +1918,7 @@ function renderReticleView(){
   // Turret dial, converted from canonical mils into the pattern's current unit.
   var turretElev=pat.unit==='moa'?turretElevMil*MIL_TO_MOA:turretElevMil;
   var turretWind=pat.unit==='moa'?turretWindMil*MIL_TO_MOA:turretWindMil;
+  document.getElementById('turretStripWrap').innerHTML=buildTurretStripsSvg(pat,turretElev,turretWind);
   // elevVal is already a correction ('positive = dial up'), so dialing up directly uses up part
   // of it — subtract. windVal is a drift *effect* ('positive = drifts right'); dialing right is
   // the same kind of rightward push on point of aim, so it stacks with the wind rather than
