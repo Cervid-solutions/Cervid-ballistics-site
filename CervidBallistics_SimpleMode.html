@@ -127,6 +127,13 @@
     .mode-toggle{width:100%;margin-left:0;}
     .mode-toggle button{flex:1;}
   }
+  /* Phones in landscape have very little vertical space, so the banner strip is shortened
+     and its focus point pushed further down the source image - this crops away more of the
+     mountain/sky band at the top while keeping the bullet (which sits lower in the artwork)
+     fully in frame. */
+  @media(max-height:500px) and (orientation:landscape){
+    header{min-height:56px;padding:8px 24px;background-position:center 62%;}
+  }
 </style>
 </head>
 <body>
