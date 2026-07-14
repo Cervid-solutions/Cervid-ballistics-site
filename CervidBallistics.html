@@ -125,12 +125,15 @@
     .mode-toggle{width:100%;margin-left:0;}
     .mode-toggle button{flex:1;}
   }
-  /* Phones in landscape have very little vertical space, so the banner strip is shortened
-     and its focus point pushed further down the source image - this crops away more of the
-     mountain/sky band at the top while keeping the bullet (which sits lower in the artwork)
-     fully in frame. */
+  /* Phones in landscape have very little vertical space, so the banner strip is shortened.
+     Measured the bullet's actual position in cervid-banner-crop.jpg: it spans roughly y=170
+     to y=340 of the 451px-tall source (37-75%). A moderate height cut (92px to 74px) paired
+     with a small downward nudge of the focus point (45% to 47%) keeps the visible window
+     entirely within the bullet's own band, so the crop comes out of the mountain/sky above
+     it rather than slicing into the bullet itself - a more aggressive first attempt (56px,
+     62%) shrank the window too far and pushed the anchor low enough to cut the bullet's top. */
   @media(max-height:500px) and (orientation:landscape){
-    header{min-height:56px;padding:8px 24px;background-position:center 62%;}
+    header{min-height:74px;padding:8px 24px;background-position:center 47%;}
   }
 </style>
 </head>
