@@ -21,6 +21,7 @@ DOC_DIR="$HOME/Documents/Cervid Ballistics"
 APP_DIR="$HOME/Applications/$APP_NAME.app"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SOURCE_HTML="$SCRIPT_DIR/CervidBallistics.html"
+SOURCE_BANNER="$SCRIPT_DIR/cervid-banner-crop.jpg"
 
 if [ ! -f "$SOURCE_HTML" ]; then
   echo "Error: CervidBallistics.html not found next to this script ($SCRIPT_DIR)."
@@ -91,6 +92,13 @@ echo ""
 mkdir -p "$DOC_DIR"
 cp "$SOURCE_HTML" "$DOC_DIR/CervidBallistics.html"
 echo "  Copied app file to: $DOC_DIR/CervidBallistics.html"
+
+# The header banner image is a separate file the HTML references by relative path,
+# so it has to travel alongside CervidBallistics.html wherever that gets installed.
+if [ -f "$SOURCE_BANNER" ]; then
+  cp "$SOURCE_BANNER" "$DOC_DIR/cervid-banner-crop.jpg"
+  echo "  Copied header banner to: $DOC_DIR/cervid-banner-crop.jpg"
+fi
 
 # Build a minimal .app bundle whose only job is to open that file in Safari.
 mkdir -p "$HOME/Applications"

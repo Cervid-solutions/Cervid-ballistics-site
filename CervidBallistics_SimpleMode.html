@@ -14,9 +14,9 @@
   :root{--bg:#0f1117;--surface:#1a1d27;--surface2:#222639;--border:#2e3348;--accent:#4f8ef7;--accent2:#e06c3a;--text:#e8eaf0;--muted:#7a7f99;--green:#3ecf8e;--yellow:#f5c542;--red:#e05252;--radius:8px;}
   *{box-sizing:border-box;margin:0;padding:0;}
   body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;font-size:14px;min-height:100vh;padding-top:env(safe-area-inset-top,0px);}
-  header{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;gap:16px;}
-  header h1{font-size:19.8px;font-weight:700;}
-  header span{font-size:12px;color:var(--muted);}
+  header{background:linear-gradient(rgba(10,12,18,.45),rgba(10,12,18,.72)),url('cervid-banner-crop.jpg') center 45%/cover no-repeat,var(--surface);border-bottom:1px solid var(--border);padding:22px 24px;min-height:92px;display:flex;align-items:center;gap:16px;}
+  header h1{font-size:19.8px;font-weight:700;text-shadow:0 1px 4px rgba(0,0,0,.95),0 0 10px rgba(0,0,0,.8);}
+  header span{font-size:12px;color:var(--text);text-shadow:0 1px 4px rgba(0,0,0,.95),0 0 8px rgba(0,0,0,.8);}
   .mode-toggle{display:flex;background:var(--bg);border:1px solid var(--border);border-radius:6px;overflow:hidden;margin-left:auto;}
   .mode-toggle button{padding:6px 18px;border:none;background:transparent;color:var(--muted);cursor:pointer;font-size:13px;font-weight:600;transition:all .2s;touch-action:manipulation;}
   .mode-toggle button.active{background:var(--accent);color:#fff;}
@@ -130,8 +130,18 @@
 </style>
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute;overflow:hidden;" aria-hidden="true">
+  <defs>
+    <linearGradient id="cervidMetalGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#3a4258"/>
+      <stop offset="35%" stop-color="#eef1f8"/>
+      <stop offset="60%" stop-color="#9aa2ba"/>
+      <stop offset="100%" stop-color="#262b3b"/>
+    </linearGradient>
+  </defs>
+</svg>
 <header>
-  <div><h1>&#127919; Cervid Ballistics</h1><span>Air Rifle, Rimfire &amp; Centrefire</span></div>
+  <div><h1><svg width="20" height="20" viewBox="0 0 100 100" style="vertical-align:-4px;" aria-hidden="true"><line x1="50" y1="6" x2="50" y2="94" stroke="#9aa0bf" stroke-width="5" stroke-linecap="round"/><line x1="6" y1="50" x2="94" y2="50" stroke="#9aa0bf" stroke-width="5" stroke-linecap="round"/><line x1="44" y1="25" x2="56" y2="25" stroke="#9aa0bf" stroke-width="5" stroke-linecap="round"/><line x1="44" y1="75" x2="56" y2="75" stroke="#9aa0bf" stroke-width="5" stroke-linecap="round"/><line x1="25" y1="44" x2="25" y2="56" stroke="#9aa0bf" stroke-width="5" stroke-linecap="round"/><path d="M15,38 L55,38 Q78,38 88,50 Q78,62 55,62 L15,62 Z" fill="url(#cervidMetalGrad)" stroke="#12141f" stroke-width="1.5"/><line x1="27" y1="39" x2="27" y2="61" stroke="#12141f" stroke-width="2"/><line x1="36" y1="39" x2="36" y2="61" stroke="#12141f" stroke-width="2"/></svg> Cervid Ballistics</h1><span>Air Rifle, Rimfire &amp; Centrefire</span></div>
   <div class="mode-toggle">
     <button class="active" id="btnAir" onclick="setMode('air')">Air Rifle</button>
     <button id="btnRF" onclick="setMode('rf')">Rimfire</button>
@@ -277,7 +287,7 @@
     <!-- Trajectory Truing -->
     <div class="section" style="border-color:rgba(224,108,58,.35);">
       <div class="preset-section-hdr">
-        <div class="section-title" style="color:var(--accent2);">&#127919; Trajectory Truing</div>
+        <div class="section-title" style="color:var(--accent2);"><svg width="12" height="12" viewBox="0 0 100 100" style="vertical-align:-1.5px;" aria-hidden="true"><line x1="50" y1="6" x2="50" y2="94" stroke="#9aa0bf" stroke-width="5" stroke-linecap="round"/><line x1="6" y1="50" x2="94" y2="50" stroke="#9aa0bf" stroke-width="5" stroke-linecap="round"/><line x1="44" y1="25" x2="56" y2="25" stroke="#9aa0bf" stroke-width="5" stroke-linecap="round"/><line x1="44" y1="75" x2="56" y2="75" stroke="#9aa0bf" stroke-width="5" stroke-linecap="round"/><line x1="25" y1="44" x2="25" y2="56" stroke="#9aa0bf" stroke-width="5" stroke-linecap="round"/><path d="M15,38 L55,38 Q78,38 88,50 Q78,62 55,62 L15,62 Z" fill="url(#cervidMetalGrad)" stroke="#12141f" stroke-width="1.5"/><line x1="27" y1="39" x2="27" y2="61" stroke="#12141f" stroke-width="2"/><line x1="36" y1="39" x2="36" y2="61" stroke="#12141f" stroke-width="2"/></svg> Trajectory Truing</div>
         <button id="btnResetTruing" onclick="resetTruing()" style="display:none;padding:3px 8px;background:transparent;border:1px solid var(--border);border-radius:5px;color:var(--muted);font-size:11px;cursor:pointer;touch-action:manipulation;">Reset</button>
       </div>
       <p style="font-size:11px;color:var(--muted);margin-bottom:10px;line-height:1.5;">Fire at a known distance, enter the actual holdover required, and the app will tune the BC to match real-world conditions.</p>
@@ -311,7 +321,7 @@
   </div>
 
   <div class="main" id="mainArea">
-    <div class="empty-state"><div class="icon">&#127919;</div><p>Configure your load and tap <strong>Calculate Trajectory</strong></p></div>
+    <div class="empty-state"><div class="icon"><svg width="48" height="48" viewBox="0 0 100 100" aria-hidden="true"><line x1="50" y1="6" x2="50" y2="94" stroke="#9aa0bf" stroke-width="5" stroke-linecap="round"/><line x1="6" y1="50" x2="94" y2="50" stroke="#9aa0bf" stroke-width="5" stroke-linecap="round"/><line x1="44" y1="25" x2="56" y2="25" stroke="#9aa0bf" stroke-width="5" stroke-linecap="round"/><line x1="44" y1="75" x2="56" y2="75" stroke="#9aa0bf" stroke-width="5" stroke-linecap="round"/><line x1="25" y1="44" x2="25" y2="56" stroke="#9aa0bf" stroke-width="5" stroke-linecap="round"/><path d="M15,38 L55,38 Q78,38 88,50 Q78,62 55,62 L15,62 Z" fill="url(#cervidMetalGrad)" stroke="#12141f" stroke-width="1.5"/><line x1="27" y1="39" x2="27" y2="61" stroke="#12141f" stroke-width="2"/><line x1="36" y1="39" x2="36" y2="61" stroke="#12141f" stroke-width="2"/></svg></div><p>Configure your load and tap <strong>Calculate Trajectory</strong></p></div>
   </div>
 </div>
 <div class="mobile-tab-bar" id="mobileTabBar">
@@ -381,6 +391,21 @@
   </div>
 </div>
 <script>
+// ── Cervid icon (bullet + scope crosshair) ──────────────────────────────────
+// Returns an inline SVG string at the given pixel size, reusing the shared
+// cervidMetalGrad gradient defined once near the top of <body>.
+function bulletIcon(px){
+  return '<svg width="'+px+'" height="'+px+'" viewBox="0 0 100 100" style="vertical-align:middle;" aria-hidden="true">'+
+    '<line x1="50" y1="6" x2="50" y2="94" stroke="#9aa0bf" stroke-width="5" stroke-linecap="round"/>'+
+    '<line x1="6" y1="50" x2="94" y2="50" stroke="#9aa0bf" stroke-width="5" stroke-linecap="round"/>'+
+    '<line x1="44" y1="25" x2="56" y2="25" stroke="#9aa0bf" stroke-width="5" stroke-linecap="round"/>'+
+    '<line x1="44" y1="75" x2="56" y2="75" stroke="#9aa0bf" stroke-width="5" stroke-linecap="round"/>'+
+    '<line x1="25" y1="44" x2="25" y2="56" stroke="#9aa0bf" stroke-width="5" stroke-linecap="round"/>'+
+    '<path d="M15,38 L55,38 Q78,38 88,50 Q78,62 55,62 L15,62 Z" fill="url(#cervidMetalGrad)" stroke="#12141f" stroke-width="1.5"/>'+
+    '<line x1="27" y1="39" x2="27" y2="61" stroke="#12141f" stroke-width="2"/>'+
+    '<line x1="36" y1="39" x2="36" y2="61" stroke="#12141f" stroke-width="2"/>'+
+    '</svg>';
+}
 // ── App height (iOS safe area) ──────────────────────────────────────────────
 // Measures the header's actual rendered height (rather than assuming a fixed value) since it
 // grows an extra row on narrow screens once the mode toggle wraps below the title — keeps the
@@ -1162,7 +1187,7 @@ function setMode(m){
   loadedPresetRef=null;
   lastResults=null; // old trajectory no longer describes anything meaningful — clear it rather
   // than leaving a stale chart/table on screen computed from the load that just got wiped above.
-  document.getElementById('mainArea').innerHTML='<div class="empty-state"><div class="icon">&#127919;</div><p>Configure your load and tap <strong>Calculate Trajectory</strong></p></div>';
+  document.getElementById('mainArea').innerHTML='<div class="empty-state"><div class="icon">'+bulletIcon(48)+'</div><p>Configure your load and tap <strong>Calculate Trajectory</strong></p></div>';
   savePrefs({mode:m});
 }
 
@@ -1627,7 +1652,7 @@ function renderResults(results,params,stability){
     '<div class="stat-card"><div class="label">Spin Drift</div><div class="value" style="font-size:14px;color:var(--muted);">Enter dia &amp; len</div></div>';
   var windSpeedDisp=met?(params.windMph*1.60934).toFixed(1)+'km/h':params.windMph+'mph';
 
-  var truingBadge=Math.abs(bcMultiplier-1)>0.001?'<span style="background:rgba(224,108,58,.15);border:1px solid rgba(224,108,58,.4);color:var(--accent2);border-radius:4px;padding:2px 8px;font-size:11px;font-weight:700;">&#127919; Trued &times;'+bcMultiplier.toFixed(3)+'</span>':'';
+  var truingBadge=Math.abs(bcMultiplier-1)>0.001?'<span style="background:rgba(224,108,58,.15);border:1px solid rgba(224,108,58,.4);color:var(--accent2);border-radius:4px;padding:2px 8px;font-size:11px;font-weight:700;">'+bulletIcon(11)+' Trued &times;'+bcMultiplier.toFixed(3)+'</span>':'';
   var bcDisp=(params.bc).toFixed(4);
   var bcSrcNote=params.bcEstimated?', estimated from G1':'';
   var html='<div class="results-header"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;"><h2>'+calibr+'</h2>'+modeTag+truingBadge+'<span style="color:var(--muted);font-size:12px;">'+params.weightGr+'gr &middot; '+(met?(params.mvFps*0.3048).toFixed(0)+'m/s':params.mvFps+'fps')+' &middot; BC '+bcDisp+' ('+params.dragModel.toUpperCase()+bcSrcNote+')</span></div>'+
@@ -1641,7 +1666,7 @@ function renderResults(results,params,stability){
     (unitDrop==='clicks'?'<select onchange="setClickSize(this.value)" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 8px;font-size:12px;">'+clickSel+'</select>':'')+
     '<button class="btn btn-secondary" style="width:auto;padding:5px 14px;font-size:12px;" onclick="exportCSV()">Export CSV</button>'+
     '<button class="btn btn-secondary" style="width:auto;padding:5px 14px;font-size:12px;" onclick="showRangeCard()">&#128203; Range Card</button>'+
-    '<button class="btn btn-secondary" style="width:auto;padding:5px 14px;font-size:12px;" onclick="showReticleView()">&#127919; Reticle View</button></div></div>'+
+    '<button class="btn btn-secondary" style="width:auto;padding:5px 14px;font-size:12px;" onclick="showReticleView()">'+bulletIcon(12)+' Reticle View</button></div></div>'+
     '<div class="stat-cards">'+
     '<div class="stat-card '+eSt+'"><div class="label">Muzzle Energy</div><div class="value">'+(met?r0.energyJ:muzzE.toFixed(0))+'</div><div class="unit">'+eAtMuzz+(eTag?'<br><strong>'+eTag+'</strong>':'')+'</div>'+(currentMode==='air'?'<div class="energy-bar"><div class="energy-fill" style="width:'+Math.min(100,muzzE)+'%;background:'+(muzzE>100?'var(--red)':muzzE>80?'var(--yellow)':'var(--green)')+'"></div></div>':'')+'</div>'+
     '<div class="stat-card"><div class="label">Muzzle Velocity</div><div class="value">'+muzzVel+'</div><div class="unit">'+muzzVelSub+'</div></div>'+
@@ -1650,7 +1675,7 @@ function renderResults(results,params,stability){
     '<div class="stat-card"><div class="label">Drop at '+rLRange+'</div><div class="value" style="font-size:16px;">'+dropAtMax+'</div></div>'+
     '<div class="stat-card"><div class="label">Wind at '+rLRange+'</div><div class="value" style="font-size:16px;">'+windAtMax+'</div><div class="unit">'+windSpeedDisp+" @ "+params.windClock+"o'clock</div></div>"+
     spinCard+
-    (Math.abs(bcMultiplier-1)>0.001?'<div class="stat-card" style="border-color:rgba(224,108,58,.4);"><div class="label" style="color:var(--accent2);">&#127919; BC Truing</div><div class="value" style="font-size:16px;color:var(--accent2);">&times;'+bcMultiplier.toFixed(3)+'</div><div class="unit">'+params.baseBc.toFixed(4)+' &rarr; '+params.bc.toFixed(4)+'</div></div>':'')+
+    (Math.abs(bcMultiplier-1)>0.001?'<div class="stat-card" style="border-color:rgba(224,108,58,.4);"><div class="label" style="color:var(--accent2);">'+bulletIcon(11)+' BC Truing</div><div class="value" style="font-size:16px;color:var(--accent2);">&times;'+bcMultiplier.toFixed(3)+'</div><div class="unit">'+params.baseBc.toFixed(4)+' &rarr; '+params.bc.toFixed(4)+'</div></div>':'')+
     '<div class="stat-card"><div class="label">Subsonic at</div><div class="value" style="font-size:16px;">'+subTxt+'</div><div class="unit">Sound: '+(met?(speedOfSound(params.tempC)*0.3048).toFixed(0)+' m/s':speedOfSound(params.tempC).toFixed(0)+' fps')+'</div></div>'+
     '<div class="stat-card"><div class="label">Air Density</div><div class="value" style="font-size:16px;">'+(airDensityRatio(params.altFt,params.tempC,params.humidPct,params.presHPa)*100).toFixed(1)+'%</div><div class="unit">of std atmosphere</div></div>'+
     sgCard+'</div>'+

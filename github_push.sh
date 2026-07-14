@@ -34,6 +34,12 @@ if [ -f CervidBallistics.html ] && [ -f Personal/index.html ]; then
   cp CervidBallistics.html Personal/index.html
   echo "  Personal/index.html <- CervidBallistics.html"
 fi
+# The header banner image is a separate file the HTML references by relative path, so a copy
+# needs to live next to every deployed index.html (root and Personal/) or the banner breaks.
+if [ -f cervid-banner-crop.jpg ] && [ -f Personal/index.html ]; then
+  cp cervid-banner-crop.jpg Personal/cervid-banner-crop.jpg
+  echo "  Personal/cervid-banner-crop.jpg <- cervid-banner-crop.jpg"
+fi
 echo ""
 
 echo "=== Step 2: Staging changes ==="
