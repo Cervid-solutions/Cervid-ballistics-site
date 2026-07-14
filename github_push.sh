@@ -40,6 +40,15 @@ if [ -f cervid-banner-crop.jpg ] && [ -f Personal/index.html ]; then
   cp cervid-banner-crop.jpg Personal/cervid-banner-crop.jpg
   echo "  Personal/cervid-banner-crop.jpg <- cervid-banner-crop.jpg"
 fi
+# Side Image Header comparison variant, live at /SideImageHeader/ for mobile testing.
+if [ -f CervidBallistics_SideImageHeader.html ] && [ -f SideImageHeader/index.html ]; then
+  cp CervidBallistics_SideImageHeader.html SideImageHeader/index.html
+  echo "  SideImageHeader/index.html <- CervidBallistics_SideImageHeader.html"
+fi
+if [ -f cervid-icon-square.jpg ] && [ -f SideImageHeader/index.html ]; then
+  cp cervid-icon-square.jpg SideImageHeader/cervid-icon-square.jpg
+  echo "  SideImageHeader/cervid-icon-square.jpg <- cervid-icon-square.jpg"
+fi
 echo ""
 
 echo "=== Step 2: Staging changes ==="
