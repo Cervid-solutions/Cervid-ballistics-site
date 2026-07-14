@@ -14,9 +14,12 @@
   :root{--bg:#0f1117;--surface:#1a1d27;--surface2:#222639;--border:#2e3348;--accent:#4f8ef7;--accent2:#e06c3a;--text:#e8eaf0;--muted:#7a7f99;--green:#3ecf8e;--yellow:#f5c542;--red:#e05252;--radius:8px;}
   *{box-sizing:border-box;margin:0;padding:0;}
   body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;font-size:14px;min-height:100vh;padding-top:env(safe-area-inset-top,0px);}
-  header{background:linear-gradient(rgba(10,12,18,.45),rgba(10,12,18,.72)),url('cervid-banner-crop.jpg') center 45%/cover no-repeat,var(--surface);border-bottom:1px solid var(--border);padding:22px 24px;min-height:92px;display:flex;align-items:center;gap:16px;}
-  header h1{font-size:19.8px;font-weight:700;text-shadow:0 1px 4px rgba(0,0,0,.95),0 0 10px rgba(0,0,0,.8);}
-  header span{font-size:12px;color:var(--text);text-shadow:0 1px 4px rgba(0,0,0,.95),0 0 8px rgba(0,0,0,.8);}
+  header{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;gap:16px;}
+  header .titleWrap{display:flex;align-items:center;gap:12px;}
+  header .headerImg{width:64px;height:64px;object-fit:cover;border-radius:6px;flex-shrink:0;}
+  header h1{font-size:19.8px;font-weight:700;}
+  header span{font-size:12px;color:var(--muted);}
+  @media(max-width:900px){header .headerImg{width:48px;height:48px;}}
   .mode-toggle{display:flex;background:var(--bg);border:1px solid var(--border);border-radius:6px;overflow:hidden;margin-left:auto;}
   .mode-toggle button{padding:6px 18px;border:none;background:transparent;color:var(--muted);cursor:pointer;font-size:13px;font-weight:600;transition:all .2s;touch-action:manipulation;}
   .mode-toggle button.active{background:var(--accent);color:#fff;}
@@ -127,16 +130,9 @@
     .mode-toggle{width:100%;margin-left:0;}
     .mode-toggle button{flex:1;}
   }
-  /* Phones in landscape have very little vertical space, so the banner strip is shortened.
-     Measured the bullet's actual position in cervid-banner-crop.jpg: it spans roughly y=170
-     to y=340 of the 451px-tall source (37-75%). A moderate height cut (92px to 74px) paired
-     with a small downward nudge of the focus point (45% to 47%) keeps the visible window
-     entirely within the bullet's own band, so the crop comes out of the mountain/sky above
-     it rather than slicing into the bullet itself - a more aggressive first attempt (56px,
-     62%) shrank the window too far and pushed the anchor low enough to cut the bullet's top. */
-  @media(max-height:500px) and (orientation:landscape){
-    header{min-height:74px;padding:8px 24px;background-position:center 47%;}
-  }
+  /* Unlike the earlier full-width banner-behind-title header, a small side-by-side thumbnail
+     sizes itself naturally with the header's normal padding, so no landscape-specific
+     cropping/height override is needed here. */
 </style>
 </head>
 <body>
@@ -151,7 +147,10 @@
   </defs>
 </svg>
 <header>
-  <div><h1><svg width="20" height="20" viewBox="0 0 100 100" style="vertical-align:-4px;" aria-hidden="true"><line x1="50" y1="6" x2="50" y2="94" stroke="#9aa0bf" stroke-width="5" stroke-linecap="round"/><line x1="6" y1="50" x2="94" y2="50" stroke="#9aa0bf" stroke-width="5" stroke-linecap="round"/><line x1="44" y1="25" x2="56" y2="25" stroke="#9aa0bf" stroke-width="5" stroke-linecap="round"/><line x1="44" y1="75" x2="56" y2="75" stroke="#9aa0bf" stroke-width="5" stroke-linecap="round"/><line x1="25" y1="44" x2="25" y2="56" stroke="#9aa0bf" stroke-width="5" stroke-linecap="round"/><path d="M15,38 L55,38 Q78,38 88,50 Q78,62 55,62 L15,62 Z" fill="url(#cervidMetalGrad)" stroke="#12141f" stroke-width="1.5"/><line x1="27" y1="39" x2="27" y2="61" stroke="#12141f" stroke-width="2"/><line x1="36" y1="39" x2="36" y2="61" stroke="#12141f" stroke-width="2"/></svg> Cervid Ballistics</h1><span>Air Rifle, Rimfire &amp; Centrefire</span></div>
+  <div class="titleWrap">
+    <img class="headerImg" src="cervid-icon-square.jpg" alt="" />
+    <div><h1>Cervid Ballistics</h1><span>Air Rifle, Rimfire &amp; Centrefire</span></div>
+  </div>
   <div class="mode-toggle">
     <button class="active" id="btnAir" onclick="setMode('air')">Air Rifle</button>
     <button id="btnRF" onclick="setMode('rf')">Rimfire</button>
@@ -331,7 +330,7 @@
   </div>
 
   <div class="main" id="mainArea">
-    <div class="empty-state"><div class="icon"><svg width="48" height="48" viewBox="0 0 100 100" aria-hidden="true"><line x1="50" y1="6" x2="50" y2="94" stroke="#9aa0bf" stroke-width="5" stroke-linecap="round"/><line x1="6" y1="50" x2="94" y2="50" stroke="#9aa0bf" stroke-width="5" stroke-linecap="round"/><line x1="44" y1="25" x2="56" y2="25" stroke="#9aa0bf" stroke-width="5" stroke-linecap="round"/><line x1="44" y1="75" x2="56" y2="75" stroke="#9aa0bf" stroke-width="5" stroke-linecap="round"/><line x1="25" y1="44" x2="25" y2="56" stroke="#9aa0bf" stroke-width="5" stroke-linecap="round"/><path d="M15,38 L55,38 Q78,38 88,50 Q78,62 55,62 L15,62 Z" fill="url(#cervidMetalGrad)" stroke="#12141f" stroke-width="1.5"/><line x1="27" y1="39" x2="27" y2="61" stroke="#12141f" stroke-width="2"/><line x1="36" y1="39" x2="36" y2="61" stroke="#12141f" stroke-width="2"/></svg></div><p>Configure your load and tap <strong>Calculate Trajectory</strong></p></div>
+    <div class="empty-state"><div class="icon"><img src="cervid-icon-square.jpg" alt="" style="width:96px;height:96px;object-fit:cover;border-radius:12px;"></div><p>Configure your load and tap <strong>Calculate Trajectory</strong></p></div>
   </div>
 </div>
 <div class="mobile-tab-bar" id="mobileTabBar">
@@ -1194,7 +1193,7 @@ function setMode(m){
   loadedPresetRef=null;
   lastResults=null; // old trajectory no longer describes anything meaningful — clear it rather
   // than leaving a stale chart/table on screen computed from the load that just got wiped above.
-  document.getElementById('mainArea').innerHTML='<div class="empty-state"><div class="icon">'+bulletIcon(48)+'</div><p>Configure your load and tap <strong>Calculate Trajectory</strong></p></div>';
+  document.getElementById('mainArea').innerHTML='<div class="empty-state"><div class="icon"><img src="cervid-icon-square.jpg" alt="" style="width:96px;height:96px;object-fit:cover;border-radius:12px;"></div><p>Configure your load and tap <strong>Calculate Trajectory</strong></p></div>';
   savePrefs({mode:m});
 }
 

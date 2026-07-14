@@ -34,20 +34,11 @@ if [ -f CervidBallistics.html ] && [ -f Personal/index.html ]; then
   cp CervidBallistics.html Personal/index.html
   echo "  Personal/index.html <- CervidBallistics.html"
 fi
-# The header banner image is a separate file the HTML references by relative path, so a copy
-# needs to live next to every deployed index.html (root and Personal/) or the banner breaks.
-if [ -f cervid-banner-crop.jpg ] && [ -f Personal/index.html ]; then
-  cp cervid-banner-crop.jpg Personal/cervid-banner-crop.jpg
-  echo "  Personal/cervid-banner-crop.jpg <- cervid-banner-crop.jpg"
-fi
-# Side Image Header comparison variant, live at /SideImageHeader/ for mobile testing.
-if [ -f CervidBallistics_SideImageHeader.html ] && [ -f SideImageHeader/index.html ]; then
-  cp CervidBallistics_SideImageHeader.html SideImageHeader/index.html
-  echo "  SideImageHeader/index.html <- CervidBallistics_SideImageHeader.html"
-fi
-if [ -f cervid-icon-square.jpg ] && [ -f SideImageHeader/index.html ]; then
-  cp cervid-icon-square.jpg SideImageHeader/cervid-icon-square.jpg
-  echo "  SideImageHeader/cervid-icon-square.jpg <- cervid-icon-square.jpg"
+# The header icon image is a separate file the HTML references by relative path, so a copy
+# needs to live next to every deployed index.html (root and Personal/) or the icon breaks.
+if [ -f cervid-icon-square.jpg ] && [ -f Personal/index.html ]; then
+  cp cervid-icon-square.jpg Personal/cervid-icon-square.jpg
+  echo "  Personal/cervid-icon-square.jpg <- cervid-icon-square.jpg"
 fi
 echo ""
 
