@@ -90,9 +90,15 @@
   .preset-btn.custom{border-color:rgba(224,108,58,.35);}
   .preset-btn.drag-over{border-color:var(--accent);box-shadow:0 0 0 2px rgba(96,160,255,.35);}
   .preset-btn[draggable]{cursor:grab;}
-  .preset-del{position:absolute;top:3px;right:3px;width:18px;height:18px;background:rgba(224,82,82,.15);border:1px solid rgba(224,82,82,.3);border-radius:3px;color:var(--red);font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation;}
-  .preset-restore{position:absolute;top:3px;left:3px;width:18px;height:18px;background:rgba(62,207,142,.12);border:1px solid rgba(62,207,142,.35);border-radius:3px;color:var(--green);font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation;}
-  .preset-edit{position:absolute;top:3px;right:23px;width:18px;height:18px;background:rgba(96,160,255,.12);border:1px solid rgba(96,160,255,.3);border-radius:3px;color:var(--accent);font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation;}
+  /* Enlarged from an original 18x18 (with only ~2px between them) after users found the pencil
+     button unreliable to tap, especially on iPhone — under Apple's own 44pt-minimum touch-target
+     guidance, an imprecise tap could land just outside the button and hit the tile underneath
+     instead, which (since the tile itself handles drag-to-reorder) could swallow the tap as the
+     start of a drag rather than a click on the button. 28px with a 4px gap is a middle ground
+     that's meaningfully easier to hit without visually dominating a small preset tile. */
+  .preset-del{position:absolute;top:4px;right:4px;width:28px;height:28px;background:rgba(224,82,82,.15);border:1px solid rgba(224,82,82,.3);border-radius:5px;color:var(--red);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation;}
+  .preset-restore{position:absolute;top:4px;left:4px;width:28px;height:28px;background:rgba(62,207,142,.12);border:1px solid rgba(62,207,142,.35);border-radius:5px;color:var(--green);font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation;}
+  .preset-edit{position:absolute;top:4px;right:36px;width:28px;height:28px;background:rgba(96,160,255,.12);border:1px solid rgba(96,160,255,.3);border-radius:5px;color:var(--accent);cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation;}
   .save-preset-row{display:flex;gap:5px;margin-top:8px;align-items:center;}
   .save-preset-row input{flex:1;min-width:0;background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:5px 8px;font-size:12px;outline:none;}
   .save-preset-row button{padding:5px 10px;background:var(--accent2);color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;touch-action:manipulation;}
@@ -413,6 +419,14 @@ function bulletIcon(px){
     '<line x1="27" y1="39" x2="27" y2="61" stroke="#12141f" stroke-width="2"/>'+
     '<line x1="36" y1="39" x2="36" y2="61" stroke="#12141f" stroke-width="2"/>'+
     '</svg>';
+}
+// Small inline pencil-edit icon, replacing the ✏ emoji character that used to be used for the
+// preset edit button. Emoji color presentation isn't consistent across platforms — iOS drew a
+// full-color yellow pencil while the Mac fell back to a plain glyph tinted by the button's own
+// CSS color (a hard-to-see blue) — so this renders the same way everywhere via currentColor,
+// the same reasoning that already replaced the app's old target/dart emoji with bulletIcon().
+function pencilIcon(px){
+  return '<svg width="'+px+'" height="'+px+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;" aria-hidden="true"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>';
 }
 // ── App height (iOS safe area) ──────────────────────────────────────────────
 // Measures the header's actual rendered height (rather than assuming a fixed value) since it
@@ -845,7 +859,7 @@ function renderPresets(){
       touchDragging=false;touchOverPos=null;_dragSrcPos=null;
     });
     // Edit button
-    var ed=document.createElement('button');ed.className='preset-edit';ed.textContent='✏';
+    var ed=document.createElement('button');ed.className='preset-edit';ed.innerHTML=pencilIcon(15);
     if(isC){
       ed.title='Edit preset';
       ed.onclick=function(e){e.stopPropagation();editingCustomIdx=ci;loadPreset(p,{type:'c',idx:ci,name:p.name});document.getElementById('presetNameInput').value=p.name;document.getElementById('presetSaveBtn').textContent='✓ Update';document.getElementById('cancelEditLink').style.display='';setPresetEditStatus('Editing your preset "'+p.name+'" — Save will update it.');};
