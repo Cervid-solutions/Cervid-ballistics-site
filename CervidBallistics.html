@@ -789,6 +789,12 @@ function renderPresets(){
     var touchTimer=null,touchDragging=false,touchStartX=0,touchStartY=0,touchOverPos=null;
     btn.addEventListener('touchstart',function(e){
       if(!btn.draggable)return;
+      // A tap on one of the small overlaid pencil/delete/restore buttons still bubbles up to
+      // this listener — without this guard, a careful tap on a tiny target that lingers past
+      // the long-press threshold below would get hijacked as a drag on the whole tile,
+      // swallowing the click those buttons need. Only arm dragging when the touch actually
+      // started on the tile itself, not one of its nested action buttons.
+      if(e.target&&e.target.tagName==='BUTTON'&&e.target!==btn)return;
       var t=e.touches[0];touchStartX=t.clientX;touchStartY=t.clientY;touchDragging=false;touchOverPos=null;
       touchTimer=setTimeout(function(){
         touchDragging=true;_dragSrcPos=pos;btn.style.opacity='0.4';
