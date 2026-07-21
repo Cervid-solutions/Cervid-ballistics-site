@@ -1858,25 +1858,41 @@ function drawChart(results,params){
   var dropVal=function(r){return met?parseFloat(r.dropCm):parseFloat(r.dropIn);};
   var energyVal=function(r){return met?parseFloat(r.energyJ):parseFloat(r.energyFtLb);};
   var drops=results.map(dropVal);
-  var minD=Math.min.apply(null,drops),maxD=Math.max.apply(null,drops),pad=32,rng=maxD-minD||1;
-  function tx(yd){return pad+(yd/params.maxYd)*(W-pad*2);}
+  // Separate left/right horizontal margins: the left keeps its original 32px (just enough for
+  // the drop-axis numbers), while the right is widened to 40px to make room for a new energy-axis
+  // column of numbers mirroring the drop numbers on the left (energy values run larger, e.g.
+  // 4-digit ft-lb figures, so it needs a bit more room than the left side does).
+  var minD=Math.min.apply(null,drops),maxD=Math.max.apply(null,drops),pad=32,padL=32,padR=40,rng=maxD-minD||1;
+  function tx(yd){return padL+(yd/params.maxYd)*(W-padL-padR);}
   function ty(d){return H-pad-((d-minD)/rng)*(H-pad*2);}
   ctx.lineWidth=1;ctx.font='10px system-ui';
   for(var i=0;i<=4;i++){
     var yy=pad+(i/4)*(H-pad*2);
-    ctx.strokeStyle='#2e3348';ctx.beginPath();ctx.moveTo(pad,yy);ctx.lineTo(W-pad,yy);ctx.stroke();
+    ctx.strokeStyle='#2e3348';ctx.beginPath();ctx.moveTo(padL,yy);ctx.lineTo(W-padR,yy);ctx.stroke();
     var dVal=minD+rng*(1-i/4);
     var dRounded=met?Math.round(dVal):Math.round(dVal*10)/10;
     if(dRounded===0)dRounded=0; // avoid rendering "-0"
-    ctx.fillStyle='#7a7f99';ctx.textAlign='right';ctx.fillText(String(dRounded),pad-4,yy+3);ctx.textAlign='left';
+    ctx.fillStyle='#7a7f99';ctx.textAlign='right';ctx.fillText(String(dRounded),padL-4,yy+3);ctx.textAlign='left';
   }
-  ctx.strokeStyle='rgba(79,142,247,0.4)';ctx.setLineDash([4,4]);ctx.beginPath();ctx.moveTo(pad,ty(0));ctx.lineTo(W-pad,ty(0));ctx.stroke();ctx.setLineDash([]);
+  ctx.strokeStyle='rgba(79,142,247,0.4)';ctx.setLineDash([4,4]);ctx.beginPath();ctx.moveTo(padL,ty(0));ctx.lineTo(W-padR,ty(0));ctx.stroke();ctx.setLineDash([]);
   ctx.beginPath();results.forEach(function(r,i){var x=tx(r.yd),y=ty(dropVal(r));i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);});ctx.strokeStyle='#4f8ef7';ctx.lineWidth=2.5;ctx.stroke();
   ctx.beginPath();results.forEach(function(r,i){var x=tx(r.yd),y=ty(dropVal(r));i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);});ctx.lineTo(tx(results[results.length-1].yd),H);ctx.lineTo(tx(results[0].yd),H);ctx.closePath();ctx.fillStyle='rgba(79,142,247,0.08)';ctx.fill();
   var maxE=Math.max.apply(null,results.map(energyVal));
   ctx.beginPath();results.forEach(function(r,i){var x=tx(r.yd),y=H-pad-(energyVal(r)/maxE)*(H-pad*2)*0.8;i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);});ctx.strokeStyle='#3ecf8e';ctx.lineWidth=1.5;ctx.setLineDash([3,3]);ctx.stroke();ctx.setLineDash([]);
+  // Right-side energy axis, mirroring the drop axis on the left: same 5 horizontal gridline
+  // heights, but each one labeled with the energy value that maps to that height under the
+  // energy line's own scale (which is deliberately compressed to 80% of the plot height so the
+  // green line has headroom and doesn't collide with the top labels) — found by inverting
+  // that line's own y=H-pad-(e/maxE)*(H-pad*2)*0.8 mapping back to e.
+  ctx.fillStyle='#3ecf8e';ctx.textAlign='left';
+  for(var j=0;j<=4;j++){
+    var yyE=pad+(j/4)*(H-pad*2);
+    var eVal=maxE*(1-j/4)/0.8;
+    ctx.fillText(String(Math.round(eVal)),W-padR+4,yyE+3);
+  }
   ctx.fillStyle='#7a7f99';ctx.font='11px system-ui';
-  ctx.fillText('Drop('+(met?'cm':'in')+')',pad+4,14);ctx.fillStyle='#3ecf8e';ctx.fillText('Energy',W-60,14);
+  ctx.fillText('Drop('+(met?'cm':'in')+')',padL+4,14);
+  ctx.fillStyle='#3ecf8e';ctx.textAlign='right';ctx.fillText('Energy('+(met?'J':'ft-lb')+')',W-4,14);ctx.textAlign='left';
   ctx.fillStyle='#7a7f99';
   // Gridline spacing computed in the units actually shown, so metric gets clean 50/100/200m steps
   // instead of yard-derived values converted after the fact (e.g. "46m").
