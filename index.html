@@ -815,6 +815,12 @@ function renderPresets(){
         document.getElementById('presetSaveBtn').textContent='✓ Update';
         document.getElementById('cancelEditLink').style.display='';
         setPresetEditStatus('Editing your preset "'+p.name+'" — Save will update it. Tap "cancel" to save changes as a new preset instead.');
+        // loadPreset() above always calls calculate(), which on narrow screens auto-switches
+        // the mobile view to the Results tab — fine for an ordinary "load and view" tap, but
+        // wrong here: the name field and Save/Update button this just armed live on the Inputs
+        // tab, so without this the edit controls would be invisible until the user manually
+        // switched tabs, which looked exactly like the button doing nothing.
+        if(window.innerWidth<=900)setMobileTab('inputs');
       } else {
         setPresetEditStatus('Built-in preset — tap ✏ to edit it, or type a name and Save to create your own copy.');
       }
@@ -909,10 +915,10 @@ function renderPresets(){
     var ed=document.createElement('button');ed.className='preset-edit';ed.innerHTML=pencilIcon(13);
     if(isC){
       ed.title='Edit preset';
-      ed.onclick=function(e){e.stopPropagation();editingCustomIdx=ci;loadPreset(p,{type:'c',idx:ci,name:p.name});document.getElementById('presetNameInput').value=p.name;document.getElementById('presetSaveBtn').textContent='✓ Update';document.getElementById('cancelEditLink').style.display='';setPresetEditStatus('Editing your preset "'+p.name+'" — Save will update it.');};
+      ed.onclick=function(e){e.stopPropagation();editingCustomIdx=ci;loadPreset(p,{type:'c',idx:ci,name:p.name});document.getElementById('presetNameInput').value=p.name;document.getElementById('presetSaveBtn').textContent='✓ Update';document.getElementById('cancelEditLink').style.display='';setPresetEditStatus('Editing your preset "'+p.name+'" — Save will update it.');if(window.innerWidth<=900)setMobileTab('inputs');};
     } else {
       ed.title='Edit this preset';
-      ed.onclick=function(e){e.stopPropagation();cancelPresetEdit();editingBuiltinIdx=bi;loadPreset(p,{type:'b',idx:bi,name:p.name});document.getElementById('presetNameInput').value=p.name;document.getElementById('presetSaveBtn').textContent='✓ Save';document.getElementById('cancelEditLink').style.display='';document.getElementById('presetNameInput').focus();setPresetEditStatus('Editing built-in "'+p.name+'" — Save will create your own copy and hide the original stock preset.');};
+      ed.onclick=function(e){e.stopPropagation();cancelPresetEdit();editingBuiltinIdx=bi;loadPreset(p,{type:'b',idx:bi,name:p.name});document.getElementById('presetNameInput').value=p.name;document.getElementById('presetSaveBtn').textContent='✓ Save';document.getElementById('cancelEditLink').style.display='';document.getElementById('presetNameInput').focus();setPresetEditStatus('Editing built-in "'+p.name+'" — Save will create your own copy and hide the original stock preset.');if(window.innerWidth<=900)setMobileTab('inputs');};
     }
     // Delete/hide button
     var del=document.createElement('button');del.className='preset-del';del.textContent='x';
