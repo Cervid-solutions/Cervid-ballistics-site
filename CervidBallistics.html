@@ -1363,6 +1363,13 @@ function computeTrajectory(p,dense){
       dropIn:dIn.toFixed(2),dropCm:(dIn*2.54).toFixed(1),
       moa:moa.toFixed(2),mils:mils.toFixed(2),clicks:(moa/clickSizeMoa).toFixed(0),
       energyFtLb:eKE.toFixed(1),energyJ:eJ.toFixed(0),
+      // Full-precision (unrounded) energy, alongside the display-rounded strings above. The
+      // table/CSV only ever need 1dp (ft-lb) or whole Joules, but that rounding is coarse enough
+      // relative to how gradually energy actually falls off downrange that plotting the rounded
+      // strings on the chart produced visible flat "steps" (several consecutive yards sharing an
+      // identical rounded value, then a sudden jump) — the same kind of stair-stepping the drop
+      // line had before it got its own dense per-yard sampling. The chart now reads these instead.
+      energyFtLbRaw:eKE,energyJRaw:eJ,
       driftIn:drift.toFixed(2),driftCm:(drift*2.54).toFixed(1),
       driftMoa:driftMoa.toFixed(2),driftMils:driftMils.toFixed(2),
       spinIn:sdIn.toFixed(2),spinCm:(sdIn*2.54).toFixed(1),
@@ -1739,7 +1746,10 @@ function drawChart(results,params){
   var W=canvas.offsetWidth||600,H=180;canvas.width=W;canvas.height=H;
   var ctx=canvas.getContext('2d');ctx.fillStyle='#1a1d27';ctx.fillRect(0,0,W,H);
   var dropVal=function(r){return met?parseFloat(r.dropCm):parseFloat(r.dropIn);};
-  var energyVal=function(r){return met?parseFloat(r.energyJ):parseFloat(r.energyFtLb);};
+  // Use the unrounded energy fields for plotting (falls back to the rounded display strings if
+  // for some reason they're missing) — see the note beside energyFtLbRaw/energyJRaw in
+  // computeTrajectory() for why the rounded fields alone produced a visibly stepped chart line.
+  var energyVal=function(r){return met?(r.energyJRaw!==undefined?r.energyJRaw:parseFloat(r.energyJ)):(r.energyFtLbRaw!==undefined?r.energyFtLbRaw:parseFloat(r.energyFtLb));};
   var drops=results.map(dropVal);
   // Separate left/right horizontal margins: the left keeps its original 32px (just enough for
   // the drop-axis numbers), while the right is widened to 40px to make room for a new energy-axis
@@ -1761,7 +1771,25 @@ function drawChart(results,params){
   ctx.beginPath();results.forEach(function(r,i){var x=tx(r.yd),y=ty(dropVal(r));i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);});ctx.strokeStyle='#4f8ef7';ctx.lineWidth=2.5;ctx.stroke();
   ctx.beginPath();results.forEach(function(r,i){var x=tx(r.yd),y=ty(dropVal(r));i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);});ctx.lineTo(tx(results[results.length-1].yd),H);ctx.lineTo(tx(results[0].yd),H);ctx.closePath();ctx.fillStyle='rgba(79,142,247,0.08)';ctx.fill();
   var maxE=Math.max.apply(null,results.map(energyVal));
-  ctx.beginPath();results.forEach(function(r,i){var x=tx(r.yd),y=H-pad-(energyVal(r)/maxE)*(H-pad*2)*0.8;i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);});ctx.strokeStyle='#3ecf8e';ctx.lineWidth=1.5;ctx.setLineDash([3,3]);ctx.stroke();ctx.setLineDash([]);
+  // The dense per-yard point set (added for the drop line's own smoothing fix) packs far more
+  // points than there are horizontal pixels once maxYd gets into the hundreds - e.g. 1000 points
+  // across a ~600px-wide plot area is sub-pixel spacing between vertices. That's invisible for a
+  // solid stroke (the drop line above), but a *dashed* stroke has to decide, pixel by pixel, where
+  // each on/off dash segment falls - with vertices closer together than a device pixel, that
+  // rounding interacts badly with the repeating [3,3] pattern and renders as a broken, uneven,
+  // almost "stepped" dashed line instead of a smooth one. Thinning to roughly one point per pixel
+  // (never coarser than that) before building the dashed path fixes this without touching the
+  // real data - the underlying curve is already smooth at that resolution, so nothing about the
+  // actual shape is lost, only redundant sub-pixel vertices the dash renderer was tripping over.
+  var plotW=Math.max(1,W-padL-padR);
+  var energyPathPts=results;
+  if(results.length>plotW){
+    var stride=Math.ceil(results.length/plotW);
+    energyPathPts=results.filter(function(r,i){return i%stride===0;});
+    var lastPt=results[results.length-1];
+    if(energyPathPts[energyPathPts.length-1]!==lastPt)energyPathPts.push(lastPt);
+  }
+  ctx.beginPath();energyPathPts.forEach(function(r,i){var x=tx(r.yd),y=H-pad-(energyVal(r)/maxE)*(H-pad*2)*0.8;i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);});ctx.strokeStyle='#3ecf8e';ctx.lineWidth=1.5;ctx.lineJoin='round';ctx.lineCap='round';ctx.setLineDash([3,3]);ctx.stroke();ctx.setLineDash([]);ctx.lineJoin='miter';ctx.lineCap='butt';
   // Right-side energy axis, mirroring the drop axis on the left: same 5 horizontal gridline
   // heights, but each one labeled with the energy value that maps to that height under the
   // energy line's own scale (which is deliberately compressed to 80% of the plot height so the
