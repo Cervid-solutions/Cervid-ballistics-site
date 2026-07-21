@@ -825,8 +825,11 @@ function renderPresets(){
       // this listener — without this guard, a careful tap on a tiny target that lingers past
       // the long-press threshold below would get hijacked as a drag on the whole tile,
       // swallowing the click those buttons need. Only arm dragging when the touch actually
-      // started on the tile itself, not one of its nested action buttons.
-      if(e.target&&e.target.tagName==='BUTTON'&&e.target!==btn)return;
+      // started on the tile itself, not one of its nested action buttons. Uses closest('button')
+      // rather than checking e.target's own tagName, since the pencil icon is an inline SVG —
+      // a tap that lands on the <svg> or <path> inside the button has a target whose tagName
+      // isn't BUTTON at all, which silently defeated a same-tagName check here previously.
+      if(e.target&&e.target.closest&&e.target.closest('button')!==btn)return;
       var t=e.touches[0];touchStartX=t.clientX;touchStartY=t.clientY;touchDragging=false;touchOverPos=null;
       touchTimer=setTimeout(function(){
         touchDragging=true;_dragSrcPos=pos;btn.style.opacity='0.4';
