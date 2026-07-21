@@ -84,10 +84,15 @@
   .sys-toggle button{flex:1;padding:7px 10px;border:none;background:transparent;color:var(--muted);cursor:pointer;font-size:12px;font-weight:600;touch-action:manipulation;}
   .sys-toggle button.active{background:var(--accent2);color:#fff;}
   .preset-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
-  /* Top padding reserves room for the absolutely-positioned edit/delete/restore buttons (now
-     28px, top:4px — see .preset-edit etc. below), so the preset name/weight/velocity text flows
-     in below them instead of being covered. Side/bottom padding unchanged. */
-  .preset-btn{position:relative;padding:36px 8px 7px 8px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);cursor:pointer;font-size:11px;text-align:left;line-height:1.4;touch-action:manipulation;}
+  /* Top padding reserves room for the absolutely-positioned edit/delete/restore buttons (28px,
+     top:4px, so their footprint runs to y=32 — see .preset-edit etc. below), so the preset
+     name/weight/velocity text flows in below them instead of being covered. Trimmed to 30px
+     (was 36px) to pull the text up and shrink the tile a little now that the buttons are
+     icon-only — kept a couple of px of buffer past the buttons' actual 32px footprint rather
+     than shrinking flush with it, since their tap area is still full-size even though it's
+     invisible at rest, and text sitting right at that edge could still steal the odd tap.
+     Side/bottom padding unchanged. */
+  .preset-btn{position:relative;padding:30px 8px 7px 8px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);cursor:pointer;font-size:11px;text-align:left;line-height:1.4;touch-action:manipulation;}
   .preset-btn:active{border-color:var(--accent);color:var(--accent);}
   .preset-btn strong{display:block;font-size:12px;}
   .preset-btn.custom{border-color:rgba(224,108,58,.35);}
@@ -99,9 +104,15 @@
      instead, which (since the tile itself handles drag-to-reorder) could swallow the tap as the
      start of a drag rather than a click on the button. 28px with a 4px gap is a middle ground
      that's meaningfully easier to hit without visually dominating a small preset tile. */
-  .preset-del{position:absolute;top:4px;right:4px;width:28px;height:28px;background:rgba(224,82,82,.15);border:1px solid rgba(224,82,82,.3);border-radius:5px;color:var(--red);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation;}
-  .preset-restore{position:absolute;top:4px;left:4px;width:28px;height:28px;background:rgba(62,207,142,.12);border:1px solid rgba(62,207,142,.35);border-radius:5px;color:var(--green);font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation;}
-  .preset-edit{position:absolute;top:4px;right:36px;width:28px;height:28px;background:rgba(96,160,255,.12);border:1px solid rgba(96,160,255,.3);border-radius:5px;color:var(--accent);cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation;}
+  /* Icon-only style: the 28px tap area (needed for reliable iPhone hits) stays, but there's no
+     persistent colored box anymore — just a small icon, with a faint background tint that only
+     appears on press/:active as feedback, so the tile itself reads as clean/uncluttered at rest. */
+  .preset-del{position:absolute;top:4px;right:4px;width:28px;height:28px;background:transparent;border:none;border-radius:6px;color:var(--red);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation;}
+  .preset-del:active{background:rgba(224,82,82,.15);}
+  .preset-restore{position:absolute;top:4px;left:4px;width:28px;height:28px;background:transparent;border:none;border-radius:6px;color:var(--green);font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation;}
+  .preset-restore:active{background:rgba(62,207,142,.15);}
+  .preset-edit{position:absolute;top:4px;right:36px;width:28px;height:28px;background:transparent;border:none;border-radius:6px;color:var(--accent);cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation;}
+  .preset-edit:active{background:rgba(96,160,255,.15);}
   .save-preset-row{display:flex;gap:5px;margin-top:8px;align-items:center;}
   .save-preset-row input{flex:1;min-width:0;background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:5px 8px;font-size:12px;outline:none;}
   .save-preset-row button{padding:5px 10px;background:var(--accent2);color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;touch-action:manipulation;}
@@ -892,7 +903,7 @@ function renderPresets(){
       touchDragging=false;touchOverPos=null;_dragSrcPos=null;
     });
     // Edit button
-    var ed=document.createElement('button');ed.className='preset-edit';ed.innerHTML=pencilIcon(15);
+    var ed=document.createElement('button');ed.className='preset-edit';ed.innerHTML=pencilIcon(13);
     if(isC){
       ed.title='Edit preset';
       ed.onclick=function(e){e.stopPropagation();editingCustomIdx=ci;loadPreset(p,{type:'c',idx:ci,name:p.name});document.getElementById('presetNameInput').value=p.name;document.getElementById('presetSaveBtn').textContent='✓ Update';document.getElementById('cancelEditLink').style.display='';setPresetEditStatus('Editing your preset "'+p.name+'" — Save will update it.');};
