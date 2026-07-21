@@ -84,7 +84,10 @@
   .sys-toggle button{flex:1;padding:7px 10px;border:none;background:transparent;color:var(--muted);cursor:pointer;font-size:12px;font-weight:600;touch-action:manipulation;}
   .sys-toggle button.active{background:var(--accent2);color:#fff;}
   .preset-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
-  .preset-btn{position:relative;padding:7px 8px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);cursor:pointer;font-size:11px;text-align:left;line-height:1.4;touch-action:manipulation;}
+  /* Top padding reserves room for the absolutely-positioned edit/delete/restore buttons (now
+     28px, top:4px — see .preset-edit etc. below), so the preset name/weight/velocity text flows
+     in below them instead of being covered. Side/bottom padding unchanged. */
+  .preset-btn{position:relative;padding:36px 8px 7px 8px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);cursor:pointer;font-size:11px;text-align:left;line-height:1.4;touch-action:manipulation;}
   .preset-btn:active{border-color:var(--accent);color:var(--accent);}
   .preset-btn strong{display:block;font-size:12px;}
   .preset-btn.custom{border-color:rgba(224,108,58,.35);}
