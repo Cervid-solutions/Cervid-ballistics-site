@@ -188,6 +188,7 @@
         <button id="presetSaveBtn" onclick="saveCurrentAsPreset()">+ Save</button>
         <span class="cancel-edit-link" id="cancelEditLink" onclick="cancelPresetEdit()">cancel</span>
       </div>
+      <div id="presetEditStatus" style="font-size:11px;color:var(--muted);margin-top:4px;min-height:14px;"></div>
       <div style="display:flex;gap:10px;align-items:center;margin-top:8px;">
         <span class="restore-link" onclick="exportPresets()">&#11015; Export presets</span>
         <span class="restore-link" onclick="document.getElementById('importPresetsFile').click()">&#11014; Import presets</span>
@@ -755,6 +756,9 @@ function renderPresets(){
         document.getElementById('presetNameInput').value=p.name;
         document.getElementById('presetSaveBtn').textContent='✓ Update';
         document.getElementById('cancelEditLink').style.display='';
+        setPresetEditStatus('Editing your preset "'+p.name+'" — Save will update it. Tap "cancel" to save changes as a new preset instead.');
+      } else {
+        setPresetEditStatus('Built-in preset — tap ✏ to edit it, or type a name and Save to create your own copy.');
       }
     };
     // Drag-and-drop (mouse/trackpad — works on the Mac)
@@ -844,10 +848,10 @@ function renderPresets(){
     var ed=document.createElement('button');ed.className='preset-edit';ed.textContent='✏';
     if(isC){
       ed.title='Edit preset';
-      ed.onclick=function(e){e.stopPropagation();editingCustomIdx=ci;loadPreset(p,{type:'c',idx:ci,name:p.name});document.getElementById('presetNameInput').value=p.name;document.getElementById('presetSaveBtn').textContent='✓ Update';document.getElementById('cancelEditLink').style.display='';};
+      ed.onclick=function(e){e.stopPropagation();editingCustomIdx=ci;loadPreset(p,{type:'c',idx:ci,name:p.name});document.getElementById('presetNameInput').value=p.name;document.getElementById('presetSaveBtn').textContent='✓ Update';document.getElementById('cancelEditLink').style.display='';setPresetEditStatus('Editing your preset "'+p.name+'" — Save will update it.');};
     } else {
       ed.title='Edit this preset';
-      ed.onclick=function(e){e.stopPropagation();cancelPresetEdit();editingBuiltinIdx=bi;loadPreset(p,{type:'b',idx:bi,name:p.name});document.getElementById('presetNameInput').value=p.name;document.getElementById('presetSaveBtn').textContent='✓ Save';document.getElementById('cancelEditLink').style.display='';document.getElementById('presetNameInput').focus();};
+      ed.onclick=function(e){e.stopPropagation();cancelPresetEdit();editingBuiltinIdx=bi;loadPreset(p,{type:'b',idx:bi,name:p.name});document.getElementById('presetNameInput').value=p.name;document.getElementById('presetSaveBtn').textContent='✓ Save';document.getElementById('cancelEditLink').style.display='';document.getElementById('presetNameInput').focus();setPresetEditStatus('Editing built-in "'+p.name+'" — Save will create your own copy and hide the original stock preset.');};
     }
     // Delete/hide button
     var del=document.createElement('button');del.className='preset-del';del.textContent='x';
@@ -882,11 +886,17 @@ function renderPresets(){
     grid.appendChild(btn);
   });
 }
+// Small status line under the save row so it's obvious at a glance whether the loaded preset
+// is one of your own (editable in place) or a built-in (browse-only until the pencil is used).
+function setPresetEditStatus(msg){
+  document.getElementById('presetEditStatus').textContent=msg||'';
+}
 function cancelPresetEdit(){
   editingCustomIdx=null;editingBuiltinIdx=null;
   document.getElementById('presetNameInput').value='';
   document.getElementById('presetSaveBtn').textContent='+ Save';
   document.getElementById('cancelEditLink').style.display='none';
+  setPresetEditStatus('');
   renderPresets();
 }
 // Bakes any active truing into the appropriate BC field (fBC for G1, fBC7 for G7) so the
@@ -2012,7 +2022,11 @@ function clearLoadFields(){
   lastDragModel=document.getElementById('fDrag').value;dismissBcWarning();syncBcPrimaryLabel();
   clearTruingState(); // a blank new load starts untrued
   loadedPresetRef=null;
+  editingCustomIdx=null;editingBuiltinIdx=null;
   document.getElementById('presetNameInput').value='';
+  document.getElementById('presetSaveBtn').textContent='+ Save';
+  document.getElementById('cancelEditLink').style.display='none';
+  setPresetEditStatus('');
   document.getElementById('fCalibr').focus();
 }
 
