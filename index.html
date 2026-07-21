@@ -769,12 +769,25 @@ function renderPresets(){
     // Dragging only makes sense in manual order — it's inert while viewing the computed
     // calibre sort, so a drop can't silently clobber the real manual arrangement underneath.
     btn.draggable=(presetSortMode[currentMode]!=='calibre');
+    btn.dataset.pos=pos;
     // Click to load
     btn.onclick=function(){
       if(isC&&editingCustomIdx===ci)return;
       cancelPresetEdit();loadPreset(p,{type:isC?'c':'b',idx:isC?ci:bi,name:p.name});
+      // Loading one of your own saved presets goes straight into "update" mode, the same state
+      // the pencil-edit button sets up — so tweaking a value afterwards (e.g. after Trajectory
+      // Truing) and hitting Save amends this same preset instead of creating a duplicate. Hit
+      // "cancel" first if you want to save your changes as a brand-new preset instead. Built-ins
+      // are left browse-only until the pencil is tapped, since overwriting one also hides the
+      // original stock entry — a bigger, less-reversible step than updating your own preset.
+      if(isC){
+        editingCustomIdx=ci;
+        document.getElementById('presetNameInput').value=p.name;
+        document.getElementById('presetSaveBtn').textContent='✓ Update';
+        document.getElementById('cancelEditLink').style.display='';
+      }
     };
-    // Drag-and-drop
+    // Drag-and-drop (mouse/trackpad — works on the Mac)
     btn.addEventListener('dragstart',function(e){
       _dragSrcPos=pos;e.dataTransfer.effectAllowed='move';
       setTimeout(function(){btn.style.opacity='0.4';},0);
@@ -795,6 +808,61 @@ function renderPresets(){
       ord.splice(pos,0,moved);
       persistOrder(ord,currentMode);
       _dragSrcPos=null;renderPresets();
+    });
+    // Touch-based reordering — iOS Safari never fires the native HTML5 drag events above
+    // (dragstart/dragover/drop) for ordinary elements like these buttons; that API only really
+    // works there for links, images, and text selections, so manual sort silently did nothing on
+    // iPhone/iPad even though it worked fine with a mouse on the Mac. This replicates the same
+    // reorder over touch instead, using a brief press-and-hold to start dragging (the same
+    // pattern as iOS's own home-screen icon rearrangement), so an ordinary scroll or tap that
+    // starts on a preset button still behaves normally rather than being hijacked as a drag.
+    var touchTimer=null,touchDragging=false,touchStartX=0,touchStartY=0,touchOverPos=null;
+    btn.addEventListener('touchstart',function(e){
+      if(!btn.draggable)return;
+      var t=e.touches[0];touchStartX=t.clientX;touchStartY=t.clientY;touchDragging=false;touchOverPos=null;
+      touchTimer=setTimeout(function(){
+        touchDragging=true;_dragSrcPos=pos;btn.style.opacity='0.4';
+      },350);
+    },{passive:true});
+    btn.addEventListener('touchmove',function(e){
+      if(touchTimer===null&&!touchDragging)return;
+      var t=e.touches[0];
+      if(!touchDragging){
+        if(Math.abs(t.clientX-touchStartX)>8||Math.abs(t.clientY-touchStartY)>8){
+          clearTimeout(touchTimer);touchTimer=null;
+        }
+        return;
+      }
+      e.preventDefault();
+      grid.querySelectorAll('.preset-btn').forEach(function(b){b.classList.remove('drag-over');});
+      var el=document.elementFromPoint(t.clientX,t.clientY);
+      var target=el&&el.closest&&el.closest('.preset-btn');
+      if(target&&grid.contains(target)){
+        target.classList.add('drag-over');
+        touchOverPos=parseInt(target.dataset.pos,10);
+      }
+    },{passive:false});
+    btn.addEventListener('touchend',function(){
+      if(touchTimer!==null){clearTimeout(touchTimer);touchTimer=null;}
+      if(touchDragging){
+        btn.style.opacity='';
+        grid.querySelectorAll('.preset-btn').forEach(function(b){b.classList.remove('drag-over');});
+        if(touchOverPos!==null&&touchOverPos!==_dragSrcPos){
+          var ord=getOrderedPresets(currentMode);
+          var moved=ord.splice(_dragSrcPos,1)[0];
+          ord.splice(touchOverPos,0,moved);
+          persistOrder(ord,currentMode);
+          _dragSrcPos=null;renderPresets();
+        } else {
+          _dragSrcPos=null;
+        }
+      }
+      touchDragging=false;touchOverPos=null;
+    });
+    btn.addEventListener('touchcancel',function(){
+      if(touchTimer!==null){clearTimeout(touchTimer);touchTimer=null;}
+      if(touchDragging){btn.style.opacity='';grid.querySelectorAll('.preset-btn').forEach(function(b){b.classList.remove('drag-over');});}
+      touchDragging=false;touchOverPos=null;_dragSrcPos=null;
     });
     // Edit button
     var ed=document.createElement('button');ed.className='preset-edit';ed.textContent='✏';
