@@ -342,7 +342,7 @@
   </div>
 
   <div class="main" id="mainArea">
-    <div class="empty-state"><div class="icon"><img src="cervid-icon-square.jpg" alt="" style="width:96px;height:96px;object-fit:cover;border-radius:12px;"></div><p>Configure your load and tap <strong>Calculate Trajectory</strong></p></div>
+    <div class="empty-state"><div class="icon"><img src="cervid-icon-square.jpg" alt="" style="width:192px;height:192px;object-fit:cover;border-radius:12px;"></div><p>Configure your load and tap <strong>Calculate Trajectory</strong></p></div>
   </div>
 </div>
 <div class="mobile-tab-bar" id="mobileTabBar">
@@ -1228,7 +1228,7 @@ function setMode(m){
   loadedPresetRef=null;
   lastResults=null; // old trajectory no longer describes anything meaningful — clear it rather
   // than leaving a stale chart/table on screen computed from the load that just got wiped above.
-  document.getElementById('mainArea').innerHTML='<div class="empty-state"><div class="icon"><img src="cervid-icon-square.jpg" alt="" style="width:96px;height:96px;object-fit:cover;border-radius:12px;"></div><p>Configure your load and tap <strong>Calculate Trajectory</strong></p></div>';
+  document.getElementById('mainArea').innerHTML='<div class="empty-state"><div class="icon"><img src="cervid-icon-square.jpg" alt="" style="width:192px;height:192px;object-fit:cover;border-radius:12px;"></div><p>Configure your load and tap <strong>Calculate Trajectory</strong></p></div>';
   savePrefs({mode:m});
 }
 
