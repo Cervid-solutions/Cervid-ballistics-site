@@ -1374,10 +1374,12 @@ function loadPreset(p,ref){
   document.getElementById('fZero').value=met?Math.round(p.zero*0.9144):p.zero;
   var defMax=p.max||(MODE_DEFAULT_RANGE[currentMode]||MODE_DEFAULT_RANGE.cf).max;
   document.getElementById('fMax').value=met?Math.round(defMax*0.9144):defMax;
-  // Older presets saved before interval was captured have no p.interval at all — leave the field
-  // as-is rather than blanking it, so loading one of those doesn't clobber whatever the shooter
-  // currently has set.
-  if(p.interval)document.getElementById('fInterval').value=met?Math.round(p.interval*0.9144):p.interval;
+  // Every preset load must land on a value that actually belongs to THIS preset — either its own
+  // saved interval, or a blank "auto" field (matching computeTrajectory()'s own range-based
+  // auto-interval), never whatever happened to be typed in for the previously loaded preset.
+  // Leaving stale text in the field here was exactly what made interval look like it was
+  // "propagating" between presets that don't carry their own value yet.
+  document.getElementById('fInterval').value=p.interval?(met?Math.round(p.interval*0.9144):p.interval):'';
   if(p.dia)document.getElementById('fDia').value=met?(p.dia*25.4).toFixed(2):p.dia;
   if(p.len)document.getElementById('fLen').value=met?(p.len*25.4).toFixed(2):p.len;
   clearTruingState(); // a new load starts untrued — truing from a previous load must not carry over

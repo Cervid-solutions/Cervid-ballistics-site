@@ -674,10 +674,10 @@ var PRESETS={
     {name:'ZAN .25 45gr',                 calibr:'.25 ZAN',     wt:45.0,  bc:0.138,mv:900, sh:3.0, zero:50,dia:0.250, len:0.421,twist:16,  drag:'g1',max:200}
   ],
   cf:[
-    {name:'.243 Win 100gr',      calibr:'.243 Win',      wt:100,bc:0.257,mv:2938,sh:2.0,zero:100,dia:0.243,len:1.008,twist:10},
-    {name:'.264 CM 130gr',       calibr:'6.5 Creedmoor', wt:130,bc:0.469,mv:2718,sh:2.0,zero:100,dia:0.264,len:1.126,twist:8},
-    {name:'.264 CM 129gr',       calibr:'6.5 Creedmoor', wt:129,bc:0.265,mv:2950,sh:2.0,zero:100,dia:0.264,len:1.335,twist:8},
-    {name:'.264 CM ABLR 129gr',  calibr:'6.5 CM ABLR',   wt:129,bc:0.440,mv:2707,sh:2.0,zero:100,dia:0.264,len:1.350,twist:8},
+    {name:'.243 Win 100gr',      calibr:'.243 Win',      wt:100,bc:0.257,mv:2938,sh:2.0,zero:100,dia:0.243,len:1.008,twist:10,max:500},
+    {name:'.264 CM 130gr',       calibr:'6.5 Creedmoor', wt:130,bc:0.469,mv:2718,sh:2.0,zero:100,dia:0.264,len:1.126,twist:8,max:1000},
+    {name:'.264 CM 129gr',       calibr:'6.5 Creedmoor', wt:129,bc:0.265,mv:2950,sh:2.0,zero:100,dia:0.264,len:1.335,twist:8,max:1000},
+    {name:'.264 CM ABLR 129gr',  calibr:'6.5 CM ABLR',   wt:129,bc:0.440,mv:2707,sh:2.0,zero:100,dia:0.264,len:1.350,twist:8,max:1000},
     {name:'.308 Win 150gr',      calibr:'.308 Win',      wt:150,bc:0.397,mv:2843,sh:2.0,zero:100,dia:0.308,len:1.228,twist:10}
   ],
   // Starts empty — no built-in rimfire loads shipped yet. Rather than guess at plausible-looking
@@ -1275,10 +1275,12 @@ function loadPreset(p,ref){
   document.getElementById('fZero').value=met?Math.round(p.zero*0.9144):p.zero;
   var defMax=p.max||(MODE_DEFAULT_RANGE[currentMode]||MODE_DEFAULT_RANGE.cf).max;
   document.getElementById('fMax').value=met?Math.round(defMax*0.9144):defMax;
-  // Older presets saved before interval was captured have no p.interval at all — leave the field
-  // as-is rather than blanking it, so loading one of those doesn't clobber whatever the shooter
-  // currently has set.
-  if(p.interval)document.getElementById('fInterval').value=met?Math.round(p.interval*0.9144):p.interval;
+  // Every preset load must land on a value that actually belongs to THIS preset — either its own
+  // saved interval, or a blank "auto" field (matching computeTrajectory()'s own range-based
+  // auto-interval), never whatever happened to be typed in for the previously loaded preset.
+  // Leaving stale text in the field here was exactly what made interval look like it was
+  // "propagating" between presets that don't carry their own value yet.
+  document.getElementById('fInterval').value=p.interval?(met?Math.round(p.interval*0.9144):p.interval):'';
   if(p.dia)document.getElementById('fDia').value=met?(p.dia*25.4).toFixed(2):p.dia;
   if(p.len)document.getElementById('fLen').value=met?(p.len*25.4).toFixed(2):p.len;
   clearTruingState(); // a new load starts untrued — truing from a previous load must not carry over
