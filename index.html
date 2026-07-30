@@ -1238,7 +1238,15 @@ function undoDelete(){
 // Exports only custom presets (not hidden built-ins or drag-order, which are per-device view
 // preferences rather than data worth carrying between machines/browsers).
 function exportPresets(){
-  var payload={version:1,exportedAt:new Date().toISOString(),custom:loadCustom()};
+  // Amending a built-in preset (pencil-edit / overflow "Edit") saves the amended values as a
+  // custom copy under the same name — already captured by loadCustom() below — but ALSO hides
+  // the original stock entry via a separate HIDDEN_KEY set so it doesn't sit duplicated next to
+  // its own edited replacement. That hidden-state was previously never exported, so importing
+  // this file on another install (or after a fresh reload) brought back the untouched built-in
+  // alongside the amended copy — the amendment looked like it hadn't actually replaced anything.
+  // Including it here lets import restore the same "this built-in has been superseded" state.
+  var hidden=loadHidden();
+  var payload={version:1,exportedAt:new Date().toISOString(),custom:loadCustom(),hidden:{air:[...hidden.air],cf:[...hidden.cf],rf:[...hidden.rf]}};
   var blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
   var a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
@@ -1262,6 +1270,15 @@ function mergeImportedPresets(existing,imported){
   });
   return{merged:merged,added:added,skipped:skipped};
 }
+// Union merge for hidden-built-in indices — a set already hidden locally stays hidden regardless
+// of what the imported file says; only adds newly-hidden indices, never un-hides anything.
+function mergeImportedHidden(existing,imported){
+  var merged={air:new Set(existing.air),cf:new Set(existing.cf),rf:new Set(existing.rf)};
+  ['air','cf','rf'].forEach(function(mode){
+    (imported&&imported[mode]||[]).forEach(function(idx){merged[mode].add(idx);});
+  });
+  return merged;
+}
 function importPresetsFile(fileInput){
   var file=fileInput.files&&fileInput.files[0];
   if(!file)return;
@@ -1272,6 +1289,9 @@ function importPresetsFile(fileInput){
     if(!parsed||!parsed.custom||!parsed.custom.air||!parsed.custom.cf){alert('That file does not look like a Cervid Ballistics preset export.');fileInput.value='';return;}
     var result=mergeImportedPresets(loadCustom(),parsed.custom);
     saveCustom(result.merged);
+    // Older exports (saved before this fix) simply have no `hidden` key — mergeImportedHidden()
+    // treats that as "nothing new to hide," leaving today's hidden state untouched.
+    if(parsed.hidden)saveHidden(mergeImportedHidden(loadHidden(),parsed.hidden));
     renderPresets();
     fileInput.value='';
     alert('Imported '+result.added+' preset'+(result.added===1?'':'s')+(result.skipped>0?('. Skipped '+result.skipped+' with a name that already exists.'):'.'));
