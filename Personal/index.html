@@ -793,6 +793,7 @@ function renderPresets(){
         // tab, so without this the edit controls would be invisible until the user manually
         // switched tabs, which looked exactly like the button doing nothing.
         if(window.innerWidth<=900)setMobileTab('inputs');
+        scrollSaveRowIntoView();
       } else {
         setPresetEditStatus('Built-in preset — tap ✏ to edit it, or type a name and Save to create your own copy.');
       }
@@ -921,7 +922,7 @@ function renderPresets(){
         }
       } else {
         var editRow=document.createElement('button');editRow.textContent='Edit';
-        editRow.onclick=function(e){e.stopPropagation();openMenuKey=null;cancelPresetEdit();editingBuiltinIdx=bi;loadPreset(p,{type:'b',idx:bi,name:p.name});document.getElementById('presetNameInput').value=p.name;document.getElementById('presetSaveBtn').textContent='✓ Save';document.getElementById('cancelEditLink').style.display='';document.getElementById('presetNameInput').focus();setPresetEditStatus('Editing built-in "'+p.name+'" — Save will create your own copy and hide the original stock preset.');if(window.innerWidth<=900)setMobileTab('inputs');renderPresets();};
+        editRow.onclick=function(e){e.stopPropagation();openMenuKey=null;cancelPresetEdit();editingBuiltinIdx=bi;loadPreset(p,{type:'b',idx:bi,name:p.name});document.getElementById('presetNameInput').value=p.name;document.getElementById('presetSaveBtn').textContent='✓ Save';document.getElementById('cancelEditLink').style.display='';document.getElementById('presetNameInput').focus();setPresetEditStatus('Editing built-in "'+p.name+'" — Save will create your own copy and hide the original stock preset.');if(window.innerWidth<=900)setMobileTab('inputs');scrollSaveRowIntoView();renderPresets();};
         menu.appendChild(editRow);
         var hideRow=document.createElement('button');hideRow.className='danger';hideRow.textContent='Hide';
         hideRow.onclick=function(e){e.stopPropagation();openMenuKey=null;var h=loadHidden();h[currentMode].add(bi);saveHidden(h);
@@ -938,6 +939,17 @@ function renderPresets(){
 // is one of your own (editable in place) or a built-in (browse-only until the pencil is used).
 function setPresetEditStatus(msg){
   document.getElementById('presetEditStatus').textContent=msg||'';
+}
+// The sidebar scrolls independently of the rest of the page (see .sidebar's own overflow-y), and
+// the Save/Update button + "cancel" link sit in a fixed row directly below the preset grid. With
+// enough custom presets to make that grid a few rows tall, entering edit mode could leave the
+// actual Save button scrolled just out of view with no cue that it existed at all — the edit
+// looked armed (the status line changed) but there was nothing visible to tap, so the change
+// never made it to Save and was silently lost on the next reload. Called from every edit-entry
+// point so the control you need is always brought on-screen the moment it becomes relevant.
+function scrollSaveRowIntoView(){
+  var btn=document.getElementById('presetSaveBtn');
+  if(btn&&btn.scrollIntoView)btn.scrollIntoView({block:'nearest',behavior:'smooth'});
 }
 function cancelPresetEdit(){
   editingCustomIdx=null;editingBuiltinIdx=null;
