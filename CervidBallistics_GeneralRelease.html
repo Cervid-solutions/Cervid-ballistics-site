@@ -1067,6 +1067,7 @@ function buildPresetEntryFromForm(name){
   var zeroRaw=parseFloat(document.getElementById('fZero').value)||0;
   var mvRaw=parseFloat(document.getElementById('fMV').value)||0;
   var shRaw=parseFloat(document.getElementById('fSH').value)||0;
+  var intervalRaw=parseFloat(document.getElementById('fInterval').value)||0;
   var entry={
     name:name,calibr:document.getElementById('fCalibr').value,
     wt:parseFloat(document.getElementById('fWeight').value),
@@ -1076,6 +1077,11 @@ function buildPresetEntryFromForm(name){
     sh:met?parseFloat((shRaw/2.54).toFixed(2)):shRaw,
     zero:met?Math.round(zeroRaw/0.9144):zeroRaw,
     max:met?Math.round(maxRaw/0.9144):maxRaw,
+    // Interval is blank/0 whenever the field is left on "auto" — only stamp a value onto the
+    // preset when the shooter actually typed one, so old presets (and a deliberately blank field)
+    // keep falling back to computeTrajectory()'s own range-based auto-interval instead of being
+    // pinned to a stray 0.
+    interval:intervalRaw>0?(met?Math.round(intervalRaw/0.9144):intervalRaw):undefined,
     drag:document.getElementById('fDrag').value,
     shape:document.getElementById('fShape').value||'flatbase',
     twistDir:twistDir,
@@ -1368,6 +1374,10 @@ function loadPreset(p,ref){
   document.getElementById('fZero').value=met?Math.round(p.zero*0.9144):p.zero;
   var defMax=p.max||(MODE_DEFAULT_RANGE[currentMode]||MODE_DEFAULT_RANGE.cf).max;
   document.getElementById('fMax').value=met?Math.round(defMax*0.9144):defMax;
+  // Older presets saved before interval was captured have no p.interval at all — leave the field
+  // as-is rather than blanking it, so loading one of those doesn't clobber whatever the shooter
+  // currently has set.
+  if(p.interval)document.getElementById('fInterval').value=met?Math.round(p.interval*0.9144):p.interval;
   if(p.dia)document.getElementById('fDia').value=met?(p.dia*25.4).toFixed(2):p.dia;
   if(p.len)document.getElementById('fLen').value=met?(p.len*25.4).toFixed(2):p.len;
   clearTruingState(); // a new load starts untrued — truing from a previous load must not carry over
