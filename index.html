@@ -234,6 +234,16 @@
         <div class="field"><label id="lblMax">Max Range (yd)</label><input type="number" id="fMax" value="100" min="10" max="2000" step="25"/></div>
         <div class="field"><label id="lblInterval">Interval (yd)</label><input type="number" id="fInterval" value="10" min="1" max="500" step="5" placeholder="auto"/></div>
       </div>
+      <div class="field">
+        <label>Zero Offset (optional) <span class="help-tip" data-tip="If this projectile is known to hold over or under point of aim at your zero range - for example after switching loads without re-zeroing the scope - enter that known amount here. Positive = hold up. This shifts the whole table by a constant angular amount; it does not adjust BC like Trajectory Truing does. Leave blank for a normal zero." onclick="showHelpTip(this,event)">?</span></label>
+        <div style="display:flex;gap:6px;">
+          <input type="number" id="fZeroOffset" value="" placeholder="e.g. 0.3" step="0.01" style="flex:1;min-width:0;"/>
+          <div class="unit-toggle" style="flex-shrink:0;">
+            <button id="btnZeroOffsetUnitMils" class="active" onclick="setZeroOffsetUnit('mils')">mils</button>
+            <button id="btnZeroOffsetUnitMoa" onclick="setZeroOffsetUnit('moa')">MOA</button>
+          </div>
+        </div>
+      </div>
       <div class="field"><label>Spot Range (<span id="lblSpotUnit">yd</span>) <span style="color:var(--accent2);font-size:10px;">&#9670; single extra row</span></label><input type="number" id="fSpot" value="" min="1" max="2000" step="1" placeholder="optional"/></div>
       <div class="field"><label>Drag Model<span class="help-tip" data-tip="Which drag reference standard your BC number is calibrated against. G1 suits flat-base bullets and slugs; G7 suits boat-tail long-range bullets; GA is shaped specifically for diabolo airgun pellets (the wasp-waisted, hollow-skirt shape most pellets use) and fits their transonic drag rise far better than G1 does. Picking the wrong one changes how accurate the trajectory prediction is." onclick="showHelpTip(this,event)">?</span></label><select id="fDrag" onchange="onDragModelChange()"><option value="g1">G1 (flat-base / pellets)</option><option value="ga">GA (diabolo pellet)</option><option value="g7">G7 (boat-tail / long-range)</option></select></div>
       <div id="bcWarning" style="display:none;background:rgba(245,197,66,.10);border:1px solid rgba(245,197,66,.35);border-radius:6px;padding:8px 10px;margin-bottom:10px;font-size:11px;color:var(--yellow);line-height:1.5;">
@@ -1082,6 +1092,12 @@ function buildPresetEntryFromForm(name){
     // keep falling back to computeTrajectory()'s own range-based auto-interval instead of being
     // pinned to a stray 0.
     interval:intervalRaw>0?(met?Math.round(intervalRaw/0.9144):intervalRaw):undefined,
+    // Zero Offset is an angular value (mils/MOA) — unlike zero/max/interval it needs no
+    // imperial/metric conversion at all, and unlike interval it's captured even if the raw entry
+    // is negative (a legitimate "hold under" case), so the presence check is "field non-blank",
+    // not "value greater than zero".
+    zeroOffsetVal:document.getElementById('fZeroOffset').value!==''?(parseFloat(document.getElementById('fZeroOffset').value)||0):undefined,
+    zeroOffsetUnit:document.getElementById('fZeroOffset').value!==''?zeroOffsetUnit:undefined,
     drag:document.getElementById('fDrag').value,
     shape:document.getElementById('fShape').value||'flatbase',
     twistDir:twistDir,
@@ -1361,6 +1377,8 @@ function setMode(m){
   var modeDef=MODE_DEFAULT_RANGE[m]||MODE_DEFAULT_RANGE.cf,defMax=modeDef.max,defZero=modeDef.zero;
   document.getElementById('fMax').value=unitSystem==='metric'?Math.round(defMax*0.9144):defMax;
   document.getElementById('fZero').value=unitSystem==='metric'?Math.round(defZero*0.9144):defZero;
+  document.getElementById('fZeroOffset').value='';setZeroOffsetUnit('mils'); // a new category is a
+  // different load entirely — any known holdover was specific to the previous projectile.
   clearTruingState(); // switching category (air/rimfire/centrefire) always means a different load
   loadedPresetRef=null;
   lastResults=null; // old trajectory no longer describes anything meaningful — clear it rather
@@ -1400,6 +1418,17 @@ function loadPreset(p,ref){
   // Leaving stale text in the field here was exactly what made interval look like it was
   // "propagating" between presets that don't carry their own value yet.
   document.getElementById('fInterval').value=p.interval?(met?Math.round(p.interval*0.9144):p.interval):'';
+  // Zero Offset must also land on a definite, preset-specific state on every load — either its
+  // own saved value+unit, or a fully blank/default state — never a leftover from whatever preset
+  // was loaded immediately before it. A "holdover I know for THIS load" is exactly the kind of
+  // thing that must never silently carry over onto an unrelated projectile.
+  if(p.zeroOffsetVal!==undefined){
+    document.getElementById('fZeroOffset').value=p.zeroOffsetVal;
+    setZeroOffsetUnit(p.zeroOffsetUnit||'mils');
+  } else {
+    document.getElementById('fZeroOffset').value='';
+    setZeroOffsetUnit('mils');
+  }
   if(p.dia)document.getElementById('fDia').value=met?(p.dia*25.4).toFixed(2):p.dia;
   if(p.len)document.getElementById('fLen').value=met?(p.len*25.4).toFixed(2):p.len;
   clearTruingState(); // a new load starts untrued — truing from a previous load must not carry over
@@ -1492,6 +1521,17 @@ function computeTrajectory(p,dense){
   var zr=raw.find(function(r){return r.xYd===p.zeroYd;}),zoff=zr?zr.y:0,zxft=zr?zr.xFt:zeroFt,zLOS=zoff-zxft*tanA,cosA2=cosA*cosA;
   return raw.map(function(r){
     var dIn=(r.y-r.xFt*tanA-zLOS)*12,eKE=r.v*r.v*(p.weightGr/7000)/(2*32.174),eJ=eKE*1.35582;
+    // Zero Offset: shifts the whole table by a constant angular amount (mils), entered by the
+    // shooter as a known holdover at the zero range. Without this, dIn is *always* exactly 0 at
+    // the zero yard by construction (zLOS is defined as whatever height was reached there, so it
+    // self-cancels) — this term is what actually lets the zero row read a real, nonzero value
+    // when the shooter says "I know this load holds over/under at my zero." The correction scales
+    // linearly with range (r.xYd*0.036) rather than being a flat inches shift, because mils/MOA
+    // are angular units — a constant *angular* holdover corresponds to a growing linear one
+    // downrange, not a fixed number of inches. Dividing by cosA2 here exactly cancels the cosA2
+    // multiplication in the moa/mils formulas below, so the requested mils value comes out exactly
+    // right regardless of any shot incline angle. Zero (the default) leaves dIn untouched.
+    if(p.zeroOffsetMils)dIn-=p.zeroOffsetMils*r.xYd*0.036/cosA2;
     var moa=r.xYd>0?-dIn*cosA2/(r.xYd/100*1.0472):0;
     var mils=r.xYd>0?-dIn*cosA2/(r.xYd*0.036):0;
     var drift=windFps*(r.t-r.xFt/p.mvFps)*12;
@@ -1524,8 +1564,13 @@ function computeTrajectory(p,dense){
 }
 
 // ── Calculate ───────────────────────────────────────────────────────────────
-var lastResults=null,unitDrop='mils',clickSizeMoa=0.25,twistDir=1,bcMultiplier=1.0,trueUnit='mils';
+var lastResults=null,unitDrop='mils',clickSizeMoa=0.25,twistDir=1,bcMultiplier=1.0,trueUnit='mils',zeroOffsetUnit='mils';
 function setTwistDir(d){twistDir=d;document.getElementById('btnRH').classList.toggle('active',d===1);document.getElementById('btnLH').classList.toggle('active',d===-1);}
+// Independent of unitDrop (the results-table display toggle, which the shooter can freely flip
+// between mils/MOA/clicks/in/cm after calculating) — Zero Offset needs its own fixed unit at the
+// moment it's entered, since re-interpreting an already-entered number under a different unit
+// later would silently change what it means. Defaults to mils, matching the app's general default.
+function setZeroOffsetUnit(u){zeroOffsetUnit=u;document.getElementById('btnZeroOffsetUnitMils').classList.toggle('active',u==='mils');document.getElementById('btnZeroOffsetUnitMoa').classList.toggle('active',u==='moa');}
 function setClickSize(v){clickSizeMoa=parseFloat(v)||0.25;if(lastResults)renderResults(lastResults.results,lastResults.params,lastResults.stability);}
 function setDropUnit(u){unitDrop=u;if(lastResults)renderResults(lastResults.results,lastResults.params,lastResults.stability);}
 function setTrueUnit(u){trueUnit=u;['Mils','Moa','In','Cm'].forEach(function(k){var el=document.getElementById('btnTrueUnit'+k);if(el)el.classList.toggle('active',u===k.toLowerCase());});}
@@ -1733,6 +1778,15 @@ function calculate(){
     var stepYd=intervalRaw>0?(met?intervalRaw/0.9144:intervalRaw):null;
     var spotRaw=parseFloat(document.getElementById('fSpot').value)||0;
     var spotYd=spotRaw>0?Math.round(met?spotRaw/0.9144:spotRaw):null;
+    // Zero Offset: a known holdover at the zero range for THIS projectile (e.g. it's known to
+    // land off point-of-aim there because the scope is still dialed for a different load). Unlike
+    // Trajectory Truing, this never touches BC/drag — it's converted once here into a single
+    // canonical "mils at any range" constant (MOA and mils are both scale-invariant angular units,
+    // so no distance-dependent conversion is needed) and applied as a constant angular shift to
+    // the whole table in computeTrajectory(). 1 MOA = 1.0472in/100yd; 1 mil = 3.6in/100yd, so
+    // MOA->mils is a fixed ratio of those two constants.
+    var zeroOffsetRaw=parseFloat(document.getElementById('fZeroOffset').value)||0;
+    var zeroOffsetMils=zeroOffsetUnit==='moa'?zeroOffsetRaw*(1.0472/3.6):zeroOffsetRaw;
 
     var effBc=effectiveBc();
     var rawBc=effBc.bc;
@@ -1740,6 +1794,7 @@ function calculate(){
       weightGr:parseFloat(document.getElementById('fWeight').value)||40,
       bc:rawBc*bcMultiplier,baseBc:rawBc,bcEstimated:effBc.estimated,
       mvFps:mvFps,scopeInch:scopeIn,zeroYd:Math.round(zeroYd),maxYd:Math.round(maxYd),
+      zeroOffsetMils:zeroOffsetMils,
       altFt:altFt,tempC:parseFloat(document.getElementById('fTemp').value)||15,
       humidPct:parseFloat(document.getElementById('fHumid').value)||50,
       presHPa:presHPa,
@@ -1862,9 +1917,13 @@ function renderResults(results,params,stability){
   var windSpeedDisp=met?(params.windMph*1.60934).toFixed(1)+'km/h':params.windMph+'mph';
 
   var truingBadge=Math.abs(bcMultiplier-1)>0.001?'<span style="background:rgba(224,108,58,.15);border:1px solid rgba(224,108,58,.4);color:var(--accent2);border-radius:4px;padding:2px 8px;font-size:11px;font-weight:700;">'+bulletIcon(11)+' Trued &times;'+bcMultiplier.toFixed(3)+'</span>':'';
+  // Distinct from the Trued badge above — this doesn't mean the BC/drag model was touched at all,
+  // just that the table is deliberately shifted by a known holdover at the zero range. Shown
+  // whenever it's actually in effect so it's never a silent, invisible correction.
+  var zeroOffsetBadge=params.zeroOffsetMils?'<span style="background:rgba(79,142,247,.15);border:1px solid rgba(79,142,247,.4);color:var(--accent);border-radius:4px;padding:2px 8px;font-size:11px;font-weight:700;">Zero Offset '+(params.zeroOffsetMils>0?'+':'')+params.zeroOffsetMils.toFixed(2)+' mil</span>':'';
   var bcDisp=(params.bc).toFixed(4);
   var bcSrcNote=params.bcEstimated?', estimated from G1':'';
-  var html='<div class="results-header"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;"><h2>'+calibr+'</h2>'+modeTag+truingBadge+'<span style="color:var(--muted);font-size:12px;">'+params.weightGr+'gr &middot; '+(met?(params.mvFps*0.3048).toFixed(0)+'m/s':params.mvFps+'fps')+' &middot; BC '+bcDisp+' ('+params.dragModel.toUpperCase()+bcSrcNote+')</span></div>'+
+  var html='<div class="results-header"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;"><h2>'+calibr+'</h2>'+modeTag+truingBadge+zeroOffsetBadge+'<span style="color:var(--muted);font-size:12px;">'+params.weightGr+'gr &middot; '+(met?(params.mvFps*0.3048).toFixed(0)+'m/s':params.mvFps+'fps')+' &middot; BC '+bcDisp+' ('+params.dragModel.toUpperCase()+bcSrcNote+')</span></div>'+
     '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;"><div class="unit-toggle">'+
     '<button class="'+(unitDrop==='mils'?'active':'')+'" onclick="setDropUnit(\'mils\')">mils</button>'+
     '<button class="'+(unitDrop==='moa'?'active':'')+'" onclick="setDropUnit(\'moa\')">MOA</button>'+
@@ -2267,6 +2326,7 @@ function clearLoadFields(){
   document.getElementById('fSH').value='';
   document.getElementById('fZero').value='';
   document.getElementById('fMax').value='';
+  document.getElementById('fZeroOffset').value='';setZeroOffsetUnit('mils');
   document.getElementById('fDia').value='';
   document.getElementById('fLen').value='';
   document.getElementById('fTwist').value='';
