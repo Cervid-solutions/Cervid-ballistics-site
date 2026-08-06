@@ -45,20 +45,30 @@ echo ""
 echo "=== Step 2: Staging changes ==="
 git add -A
 if git diff --cached --quiet; then
-  echo "Nothing to commit - all files already match the last commit."
-  exit 0
-fi
-git status --short
-echo ""
-
-echo "=== Step 3: Committing ==="
-if [ -n "$1" ]; then
-  MSG="$1"
+  # NOTE: this only means there's nothing NEW to commit right now - it does NOT mean
+  # everything has already reached GitHub. If a previous run committed successfully but
+  # then failed to push (auth hiccup, network blip, etc.), the working tree will look
+  # perfectly clean on the next run even though a commit is still sitting here unpushed.
+  # Exiting early in that case used to silently strand that commit forever, since every
+  # later run would hit this exact same branch and quit before ever reaching Step 4/5.
+  # Falling through to the pull/push steps instead means any backlog gets flushed too -
+  # and if there's truly nothing to push either, `git push` below just reports
+  # "Everything up-to-date" and exits cleanly on its own.
+  echo "Nothing new to commit - working tree already matches the last commit."
+  echo "Checking whether an earlier commit is still waiting to be pushed..."
 else
-  MSG="Update Cervid Ballistics files - $(date '+%Y-%m-%d %H:%M')"
+  git status --short
+  echo ""
+
+  echo "=== Step 3: Committing ==="
+  if [ -n "$1" ]; then
+    MSG="$1"
+  else
+    MSG="Update Cervid Ballistics files - $(date '+%Y-%m-%d %H:%M')"
+  fi
+  git commit -m "$MSG"
+  echo "  Committed: $MSG"
 fi
-git commit -m "$MSG"
-echo "  Committed: $MSG"
 echo ""
 
 echo "=== Step 4: Pulling any changes made on GitHub since your last push ==="
