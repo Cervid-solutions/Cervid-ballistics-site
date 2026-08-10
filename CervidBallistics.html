@@ -1804,9 +1804,29 @@ function renderResults(results,params,stability){
   // just that the table is deliberately shifted by a known holdover at the zero range. Shown
   // whenever it's actually in effect so it's never a silent, invisible correction.
   var zeroOffsetBadge=params.zeroOffsetMils?'<span style="background:rgba(79,142,247,.15);border:1px solid rgba(79,142,247,.4);color:var(--accent);border-radius:4px;padding:2px 8px;font-size:11px;font-weight:700;">Zero Offset '+(params.zeroOffsetMils>0?'+':'')+params.zeroOffsetMils.toFixed(2)+' mil</span>':'';
+  // Distinct again from both badges above. truingBadge reflects a LIVE, in-session bcMultiplier —
+  // it disappears the moment truing gets saved to a preset, since baking folds the correction into
+  // the BC number itself and resets the multiplier to 1. This badge instead reads the currently
+  // loaded preset's own _preTruingBackup marker (already stored for the "Restore pre-truing BC"
+  // menu action, just never surfaced here before) — so it keeps showing, permanently, that THIS
+  // preset's saved BC isn't its original number, even in a fresh session with no live multiplier
+  // active. Only ever set on custom presets (built-ins can't carry it), and only when it still
+  // matches the tracked preset by name, so a stale/moved/renamed slot can't show a wrong badge.
+  var bakedTruingBadge='';
+  if(loadedPresetRef&&loadedPresetRef.type==='c'){
+    var _btd=loadCustom();
+    var _btPreset=_btd[currentMode]&&_btd[currentMode][loadedPresetRef.idx];
+    if(_btPreset&&_btPreset.name===loadedPresetRef.name&&_btPreset._preTruingBackup){
+      var _btBackup=_btPreset._preTruingBackup;
+      var _btBefore=parseFloat(_btBackup.value).toFixed(4);
+      var _btAfterRaw=_btPreset[_btBackup.field];
+      var _btAfter=(_btAfterRaw!==undefined&&_btAfterRaw!==null)?parseFloat(_btAfterRaw).toFixed(4):'?';
+      bakedTruingBadge='<span style="background:rgba(122,127,153,.15);border:1px solid rgba(122,127,153,.4);color:var(--muted);border-radius:4px;padding:2px 8px;font-size:11px;font-weight:700;">BC baked from Truing: '+_btBefore+' &rarr; '+_btAfter+'</span>';
+    }
+  }
   var bcDisp=(params.bc).toFixed(4);
   var bcSrcNote=params.bcEstimated?', estimated from G1':'';
-  var html='<div class="results-header"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;"><h2>'+calibr+'</h2>'+modeTag+truingBadge+zeroOffsetBadge+'<span style="color:var(--muted);font-size:12px;">'+params.weightGr+'gr &middot; '+(met?(params.mvFps*0.3048).toFixed(0)+'m/s':params.mvFps+'fps')+' &middot; BC '+bcDisp+' ('+params.dragModel.toUpperCase()+bcSrcNote+')</span></div>'+
+  var html='<div class="results-header"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;"><h2>'+calibr+'</h2>'+modeTag+truingBadge+zeroOffsetBadge+bakedTruingBadge+'<span style="color:var(--muted);font-size:12px;">'+params.weightGr+'gr &middot; '+(met?(params.mvFps*0.3048).toFixed(0)+'m/s':params.mvFps+'fps')+' &middot; BC '+bcDisp+' ('+params.dragModel.toUpperCase()+bcSrcNote+')</span></div>'+
     '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;"><div class="unit-toggle">'+
     '<button class="'+(unitDrop==='mils'?'active':'')+'" onclick="setDropUnit(\'mils\')">mils</button>'+
     '<button class="'+(unitDrop==='moa'?'active':'')+'" onclick="setDropUnit(\'moa\')">MOA</button>'+
