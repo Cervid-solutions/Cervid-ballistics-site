@@ -1541,6 +1541,12 @@ function computeTrajectory(p,dense){
     var sdIn=p.Sg!==null&&p.Sg!==undefined?(p.twistDir||1)*1.25*(p.Sg+1.2)*r.t*r.t:0;
     var sdMoa=r.xYd>0?sdIn*cosA2/(r.xYd/100*1.0472):0;
     var sdMils=r.xYd>0?sdIn*cosA2/(r.xYd*0.036):0;
+    // Coriolis, converted to angular units the same way wind drift and spin drift are, so the
+    // results table can show Coriolis in whichever unit (mils/MOA) the user has selected instead
+    // of always falling back to raw linear inches/cm.
+    var corIn=r.wc*12;
+    var corMoa=r.xYd>0?corIn*cosA2/(r.xYd/100*1.0472):0;
+    var corMils=r.xYd>0?corIn*cosA2/(r.xYd*0.036):0;
     return{
       yd:r.xYd,fps:Math.round(r.v),mach:r.mach.toFixed(2),
       dropIn:dIn.toFixed(2),dropCm:(dIn*2.54).toFixed(1),
@@ -1557,7 +1563,8 @@ function computeTrajectory(p,dense){
       driftMoa:driftMoa.toFixed(2),driftMils:driftMils.toFixed(2),
       spinIn:sdIn.toFixed(2),spinCm:(sdIn*2.54).toFixed(1),
       spinMoa:sdMoa.toFixed(2),spinMils:sdMils.toFixed(2),
-      coriolisIn:(r.wc*12).toFixed(2),coriolisCm:(r.wc*12*2.54).toFixed(1),
+      coriolisIn:corIn.toFixed(2),coriolisCm:(corIn*2.54).toFixed(1),
+      coriolisMoa:corMoa.toFixed(2),coriolisMils:corMils.toFixed(2),
       tof:r.t.toFixed(3),isZero:r.xYd===p.zeroYd,isSpot:p.spotYd&&r.xYd===p.spotYd,isSubsonic:r.mach<1
     };
   });
@@ -1871,20 +1878,21 @@ function renderResults(results,params,stability){
   var windHdr=unitDrop==='moa'?'Wind(MOA)':unitDrop==='mils'?'Wind(mil)':(met?'Wind(cm)':'Wind(in)');
   var spinCol=unitDrop==='moa'?'spinMoa':unitDrop==='mils'?'spinMils':(met?'spinCm':'spinIn');
   var spinHdr=unitDrop==='moa'?'Spin(MOA)':unitDrop==='mils'?'Spin(mil)':(met?'Spin(cm)':'Spin(in)');
+  var corCol=unitDrop==='moa'?'coriolisMoa':unitDrop==='mils'?'coriolisMils':(met?'coriolisCm':'coriolisIn');
 
   // Range & velocity columns
   var rngHdr=met?'Range(m)':'Range(yd)';
   var velHdr=met?'Vel(m/s)':'Vel(fps)';
   var eHdrA=met?'E(J)':'E(ft-lb)';
   var eHdrB=met?'E(ft-lb)':'E(J)';
-  var corHdr=met?'Cor(cm)':'Cor(in)';
+  var corHdr=unitDrop==='moa'?'Cor(MOA)':unitDrop==='mils'?'Cor(mil)':(met?'Cor(cm)':'Cor(in)');
 
   var rows=results.map(function(r){
     var rng=met?Math.round(r.yd*0.9144):r.yd;
     var vel=met?Math.round(r.fps*0.3048):r.fps;
     var eA=met?r.energyJ:r.energyFtLb;
     var eB=met?r.energyFtLb:r.energyJ;
-    var cor=met?r.coriolisCm:r.coriolisIn;
+    var cor=r[corCol];
     var drop=unitDrop==='in'?r.dropIn:unitDrop==='cm'?r.dropCm:unitDrop==='moa'?r.moa:unitDrop==='clicks'?r.clicks:r.mils;
     var dn=parseFloat(drop),isMM=unitDrop==='moa'||unitDrop==='mils'||unitDrop==='clicks';
     var dc=isMM?(dn>0?'pos':dn<0?'neg':''):(dn<0?'neg':dn>0?'pos':'');
