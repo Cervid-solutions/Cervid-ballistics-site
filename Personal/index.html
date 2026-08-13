@@ -1686,15 +1686,18 @@ function runCompare(){
       params=buildParamsFromPreset(x.p,x.ref.mode,refYd);
     }
     var results=computeTrajectory(params,true); // dense: every yard, for a smooth overlay line
-    // Soft warning, not a hard cap: the physics will happily extrapolate to any distance typed
+    // Soft warnings, not a hard cap: the physics will happily extrapolate to any distance typed
     // in, but going past a load's own saved (or, for a live load, currently configured) max is
     // where the drag model gets progressively less trustworthy — worth flagging, not blocking.
-    // (A separate subsonic-crossing warning used to live here too, but was removed: subsonic
-    // flight is the norm rather than the exception for airgun pellets/slugs and much rimfire
-    // ammunition, so it fired on a large share of comparisons in those modes and was more noise
-    // than signal. The per-row subsonic marker in the single-load results table is unaffected.)
+    // The subsonic-crossing warning is centrefire-only: it's the one mode where a subsonic result
+    // usually signals something deliberate and worth a second look (e.g. a purpose-built subsonic
+    // .300 BLK load for a suppressed rifle), rather than the ordinary case. Airgun pellets/slugs
+    // and standard-velocity rimfire are subsonic as a matter of course, so the same warning there
+    // fired on a large share of comparisons and was more noise than signal — left off for those
+    // modes. The per-row subsonic marker in the single-load results table is unaffected either way.
     var extrapolated=refYd>ownMaxYd;
-    return{name:x.p.name,color:COMPARE_COLORS[i],results:results,params:params,ownMaxYd:ownMaxYd,extrapolated:extrapolated,isLive:isLive};
+    var wentSubsonic=x.ref.mode==='cf'&&results.some(function(r){return r.isSubsonic;});
+    return{name:x.p.name,color:COMPARE_COLORS[i],results:results,params:params,ownMaxYd:ownMaxYd,extrapolated:extrapolated,wentSubsonic:wentSubsonic,isLive:isLive};
   });
   renderCompareResults(list,refYd);
 }
@@ -1709,6 +1712,7 @@ function renderCompareResults(list,refYd){
       var ownDesc=x.isLive?'its currently configured max range':'its own saved max range';
       warnItems.push(x.name+' is shown beyond '+ownDesc+' ('+ownLabel+') — figures out this far are extrapolated.');
     }
+    if(x.wentSubsonic)warnItems.push(x.name+' goes subsonic before '+rngLabel+' — the drag model is less reliable past that point.');
   });
   var warnHtml=warnItems.length?'<div style="background:rgba(245,197,66,.10);border:1px solid rgba(245,197,66,.35);border-radius:6px;padding:8px 10px;margin-bottom:12px;font-size:11px;color:var(--yellow);line-height:1.5;">'+warnItems.map(function(w){return '&#9888;&#65039; '+w;}).join('<br>')+'</div>':'';
   var rows=[
