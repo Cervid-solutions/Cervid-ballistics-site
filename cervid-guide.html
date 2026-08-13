@@ -24,6 +24,8 @@ code{background:var(--surface2);border:1px solid var(--border);border-radius:4px
 .menu-toggle{display:none;background:var(--accent);color:#fff;border:none;border-radius:6px;padding:8px 14px;font-weight:700;font-size:13px;cursor:pointer;}
 .print-btn{background:transparent;border:1px solid var(--border);color:var(--text);border-radius:6px;padding:8px 14px;font-weight:600;font-size:13px;cursor:pointer;}
 .print-btn:hover{border-color:var(--accent);color:var(--accent);}
+.close-btn{background:transparent;border:1px solid var(--border);color:var(--text);border-radius:6px;padding:8px 14px;font-weight:600;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;text-decoration:none;}
+.close-btn:hover{border-color:var(--red);color:var(--red);}
 .header-actions{display:flex;gap:10px;flex-wrap:wrap;}
 
 /* ---------- Legend ---------- */
@@ -117,6 +119,7 @@ footer{border-top:1px solid var(--border);padding:24px;text-align:center;color:v
     <div class="header-actions">
       <button class="menu-toggle" onclick="document.getElementById('sidebar').classList.toggle('open')">&#9776; Menu</button>
       <button class="print-btn" onclick="window.print()">&#128424; Print / Save PDF</button>
+      <button class="close-btn" onclick="closeGuide()" aria-label="Close guide and return to app">&#10005; Close</button>
     </div>
   </div>
 </header>
@@ -468,6 +471,18 @@ Cervid Ballistics User Guide &middot; matches the application as of August 13, 2
 </div>
 
 <script>
+function closeGuide(){
+  // The guide is opened via a link with target="_blank" from whichever of the
+  // four app files the shooter is running. Some mobile browsers navigate
+  // in-place instead of honouring target="_blank" (that's the "swipe right"
+  // case), so try, in order: go back in this tab's own history; failing
+  // that, jump to the referring app page (rel="noopener" is set on the
+  // link, not rel="noreferrer", so document.referrer is still available);
+  // failing that, attempt to close the tab outright.
+  if(window.history.length>1){window.history.back();return;}
+  if(document.referrer){window.location.href=document.referrer;return;}
+  window.close();
+}
 document.addEventListener('click',function(e){
   var sb=document.getElementById('sidebar');
   if(sb.classList.contains('open') && !sb.contains(e.target) && e.target.id!=='navToggleBtn' && !e.target.closest('.menu-toggle')){
