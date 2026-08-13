@@ -1443,9 +1443,16 @@ var SHAPE_SG_FACTOR={flatbase:1.0,boattail:1.08,diabolo:1.20};
 // Lets a shooter pick up to three saved presets (any mode, any mix of built-in/custom) and
 // see their headline stats and trajectory shapes side by side — e.g. deciding which of three
 // rifle/load combinations to bring to a competition. Reuses the exact same physics engine
-// (computeTrajectory) as the single-load view, but the params for each compared load are built
-// directly from its stored preset entry rather than from the live form fields, so opening
-// Compare never disturbs whatever the shooter currently has loaded on the Inputs tab.
+// (computeTrajectory) as the single-load view. By default the params for each compared load are
+// built directly from its stored preset entry, so opening Compare never disturbs whatever the
+// shooter currently has loaded on the Inputs tab. The one exception: if a selected load IS the
+// exact preset currently loaded on the Inputs tab, Compare uses whatever is actually shown on
+// the Results/outputs page for it (lastResults.params) instead of re-reading the saved preset —
+// so a live, not-yet-saved tweak (a weight change, a fresh Trajectory Truing, an edited Zero
+// Offset, anything) is reflected in the comparison rather than silently ignored. This is a pure
+// read of already-computed state; it never writes back to the form or the saved preset. If
+// nothing has been amended, the live values and the saved preset are identical anyway, so this
+// falls back to behaving exactly like the saved-preset path with no visible difference.
 var COMPARE_COLORS=['#4f8ef7','#e06c3a','#9d6fe0'];
 var compareMode=false;
 // Up to 3 entries: {mode:'air'|'cf'|'rf', type:'b'|'c', idx, name}
@@ -1491,7 +1498,7 @@ function updateCompareRangeSuggestion(){
   var loaded=compareSelection.map(function(ref){return{ref:ref,p:presetFromRef(ref)};}).filter(function(x){return!!x.p;});
   if(!loaded.length)return;
   var suggested=Math.min.apply(null,loaded.map(function(x){
-    return x.p.max||(MODE_DEFAULT_RANGE[x.ref.mode]||MODE_DEFAULT_RANGE.cf).max;
+    return compareSlotOwnMaxYd(x.ref,x.p);
   }));
   writeCompareRangeYd(suggested);
 }
@@ -1500,6 +1507,24 @@ function presetFromRef(ref){
   if(ref.type==='b')return(PRESETS[ref.mode]||[])[ref.idx];
   var custom=loadCustom()[ref.mode]||[];
   return custom[ref.idx];
+}
+
+// True when a Compare slot's selected preset is the exact same preset currently loaded on the
+// Inputs tab — matched by mode+type+name against loadedPresetRef, the same identity-matching
+// pattern the baked-truing badge already uses, rather than trusting array index alone (indices
+// can drift if presets are reordered). Requires lastResults too: if nothing has been calculated
+// since loading, there's no "live outputs page" yet to defer to.
+function isLiveMatchForRef(ref,p){
+  return!!(loadedPresetRef&&lastResults&&ref.mode===currentMode&&ref.type===loadedPresetRef.type&&p&&p.name===loadedPresetRef.name);
+}
+
+// The distance a compared load should be treated as "its own" — for the shortest-shared-max
+// default and for the extrapolation warning. Live-matched loads use whatever Max Range is
+// currently showing on the Inputs tab (since that's the range its live outputs actually cover),
+// everything else uses its saved preset value.
+function compareSlotOwnMaxYd(ref,p){
+  if(isLiveMatchForRef(ref,p))return lastResults.params.maxYd;
+  return p.max||(MODE_DEFAULT_RANGE[ref.mode]||MODE_DEFAULT_RANGE.cf).max;
 }
 
 // Same BC-selection logic as effectiveBc(), but reading from a stored preset object instead
@@ -1638,22 +1663,36 @@ function runCompare(){
   // never recomputes anything on its own; it only takes effect the next time this button (or
   // Compare again) is pressed, same as changing which loads are selected.
   var autoRefYd=Math.min.apply(null,loaded.map(function(x){
-    return x.p.max||(MODE_DEFAULT_RANGE[x.ref.mode]||MODE_DEFAULT_RANGE.cf).max;
+    return compareSlotOwnMaxYd(x.ref,x.p);
   }));
   var refYd=readCompareRangeYd()||autoRefYd;
   // Reflect back whatever distance actually ran (in case the field was blank and the auto
   // default was used), so the field never silently disagrees with what's on screen.
   writeCompareRangeYd(refYd);
   var list=loaded.map(function(x,i){
-    var ownMaxYd=x.p.max||(MODE_DEFAULT_RANGE[x.ref.mode]||MODE_DEFAULT_RANGE.cf).max;
-    var params=buildParamsFromPreset(x.p,x.ref.mode,refYd);
+    var ownMaxYd=compareSlotOwnMaxYd(x.ref,x.p);
+    var isLive=isLiveMatchForRef(x.ref,x.p);
+    var params;
+    if(isLive){
+      // This slot IS the preset currently loaded on the Inputs tab, and something has already
+      // been calculated for it — reuse that live params object (weight/BC/truing/zero offset/
+      // whatever is actually driving the Results page right now) rather than re-reading the
+      // saved preset, so an amendment that hasn't been saved yet still shows up in Compare.
+      // Cloned (not mutated) so the shooter's live single-load state is never touched, and the
+      // max range is overridden to the shared comparison distance like every other slot.
+      params=Object.assign({},lastResults.params,{maxYd:refYd,maxNative:refYd,intervalNative:null});
+      if(params.zeroYd>=params.maxYd)params.maxYd=params.zeroYd+20;
+    } else {
+      params=buildParamsFromPreset(x.p,x.ref.mode,refYd);
+    }
     var results=computeTrajectory(params,true); // dense: every yard, for a smooth overlay line
     // Soft warnings, not a hard cap: the physics will happily extrapolate to any distance typed
-    // in, but going past a load's own saved max, or into the subsonic/transonic regime, is where
-    // the drag model gets progressively less trustworthy — worth flagging, not worth blocking.
+    // in, but going past a load's own saved (or, for a live load, currently configured) max, or
+    // into the subsonic/transonic regime, is where the drag model gets progressively less
+    // trustworthy — worth flagging, not worth blocking.
     var extrapolated=refYd>ownMaxYd;
     var wentSubsonic=results.some(function(r){return r.isSubsonic;});
-    return{name:x.p.name,color:COMPARE_COLORS[i],results:results,params:params,ownMaxYd:ownMaxYd,extrapolated:extrapolated,wentSubsonic:wentSubsonic};
+    return{name:x.p.name,color:COMPARE_COLORS[i],results:results,params:params,ownMaxYd:ownMaxYd,extrapolated:extrapolated,wentSubsonic:wentSubsonic,isLive:isLive};
   });
   renderCompareResults(list,refYd);
 }
@@ -1665,7 +1704,8 @@ function renderCompareResults(list,refYd){
   list.forEach(function(x){
     if(x.extrapolated){
       var ownLabel=met?Math.round(x.ownMaxYd*0.9144)+'m':x.ownMaxYd+'yd';
-      warnItems.push(x.name+' is shown beyond its own saved max range ('+ownLabel+') — figures out this far are extrapolated.');
+      var ownDesc=x.isLive?'its currently configured max range':'its own saved max range';
+      warnItems.push(x.name+' is shown beyond '+ownDesc+' ('+ownLabel+') — figures out this far are extrapolated.');
     }
     if(x.wentSubsonic)warnItems.push(x.name+' goes subsonic before '+rngLabel+' — the drag model is less reliable past that point.');
   });
@@ -1680,7 +1720,7 @@ function renderCompareResults(list,refYd){
     {label:'Gyro Stability (Sg)',get:function(x){return(x.params.Sg!==null&&x.params.Sg!==undefined)?x.params.Sg.toFixed(2):'&mdash;';}}
   ];
   var tableHtml='<table class="compare-table"><thead><tr><th></th>'+list.map(function(x){
-    return '<th><span class="swatch" style="background:'+x.color+';display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;"></span>'+x.name+'</th>';
+    return '<th><span class="swatch" style="background:'+x.color+';display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;"></span>'+x.name+(x.isLive?' <span style="color:var(--accent2);font-weight:700;" title="Using the live, not-yet-saved values currently shown on the Results page for this load, not the saved preset.">(live)</span>':'')+'</th>';
   }).join('')+'</tr></thead><tbody>'+
     rows.map(function(row){return '<tr><td class="metric-label">'+row.label+'</td>'+list.map(function(x){return '<td>'+row.get(x)+'</td>';}).join('')+'</tr>';}).join('')+
     '</tbody></table>';
@@ -1718,10 +1758,11 @@ function drawCompareChart(list,refYd){
   var lx=padL,ly=14;
   ctx.font='11px system-ui';
   list.forEach(function(x){
+    var label=x.name+(x.isLive?' (live)':'');
     ctx.fillStyle=x.color;ctx.fillRect(lx,ly-7,10,10);
     ctx.fillStyle='#e8eaf0';ctx.textAlign='left';
-    ctx.fillText(x.name,lx+14,ly+2);
-    lx+=14+ctx.measureText(x.name).width+16;
+    ctx.fillText(label,lx+14,ly+2);
+    lx+=14+ctx.measureText(label).width+16;
   });
   ctx.fillStyle='#7a7f99';ctx.font='10px system-ui';ctx.textAlign='left';ctx.fillText('0',padL,H-6);
   var endLabel=met?Math.round(refYd*0.9144)+'m':refYd+'yd';
