@@ -96,6 +96,9 @@
   .compare-close:hover{color:var(--text);}
   .compare-sub{font-size:12px;color:var(--muted);margin-bottom:14px;line-height:1.5;}
   .compare-strip{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;min-height:26px;}
+  .compare-range-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:18px;}
+  .compare-range-label{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);}
+  .compare-range-label input{width:70px;padding:5px 8px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;}
   .compare-chip{display:flex;align-items:center;gap:6px;padding:4px 10px;border-radius:14px;background:var(--surface2);border:1px solid var(--border);font-size:12px;}
   .compare-chip .swatch{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
   .compare-chip .remove{cursor:pointer;color:var(--muted);font-weight:700;touch-action:manipulation;}
@@ -209,7 +212,13 @@
     </div>
     <p class="compare-sub">Pick up to three saved presets — any mode, any mix of built-in and your own — to see their headline stats and trajectories side by side under today's conditions.</p>
     <div class="compare-strip" id="compareStrip"></div>
-    <button type="button" class="btn" id="btnRunCompare" onclick="runCompare()" disabled style="margin-bottom:18px;">Compare</button>
+    <div class="compare-range-row">
+      <button type="button" class="btn" id="btnRunCompare" onclick="runCompare()" disabled style="width:auto;">Compare</button>
+      <label class="compare-range-label">Compare to
+        <input type="number" id="fCompareRange" min="1" step="1" oninput="markCompareRangeCustomized()"/>
+        <span id="compareRangeUnitLbl">yd</span>
+      </label>
+    </div>
     <div id="comparePickerModes"></div>
     <div id="compareResultsArea"></div>
   </div>
@@ -631,6 +640,9 @@ function setUnitSystem(sys){
     if(vrv>0)document.getElementById('fVerifyRange').value=Math.round(vrv*0.9144);
     document.getElementById('lblVerifyRange').textContent='Verify At (m)';
     if(twist>0)document.getElementById('fTwist').value=(twist*25.4).toFixed(1);
+    var crv=parseFloat(document.getElementById('fCompareRange').value)||0;
+    if(crv>0)document.getElementById('fCompareRange').value=Math.round(crv*0.9144);
+    document.getElementById('compareRangeUnitLbl').textContent='m';
   } else {
     document.getElementById('fMV').value=Math.round(mv/0.3048);
     document.getElementById('fSH').value=(sh/2.54).toFixed(2);
@@ -652,6 +664,9 @@ function setUnitSystem(sys){
     if(vrv2>0)document.getElementById('fVerifyRange').value=Math.round(vrv2/0.9144);
     document.getElementById('lblVerifyRange').textContent='Verify At (yd)';
     if(twist>0)document.getElementById('fTwist').value=(twist/25.4).toFixed(2);
+    var crv2=parseFloat(document.getElementById('fCompareRange').value)||0;
+    if(crv2>0)document.getElementById('fCompareRange').value=Math.round(crv2/0.9144);
+    document.getElementById('compareRangeUnitLbl').textContent='yd';
   }
 
   applyBounds(sys);
@@ -1435,6 +1450,51 @@ var COMPARE_COLORS=['#4f8ef7','#e06c3a','#9d6fe0'];
 var compareMode=false;
 // Up to 3 entries: {mode:'air'|'cf'|'rf', type:'b'|'c', idx, name}
 var compareSelection=[];
+// The comparison distance defaults to the shortest of the selected loads' own max ranges, and
+// keeps re-suggesting that default as the selection changes — right up until the shooter types
+// their own value into the field, at which point compareDistanceCustomized latches true and the
+// typed value is left alone. It resets back to auto-suggesting once the selection is cleared to
+// zero (a genuinely fresh comparison), not just because a load was swapped out.
+var compareDistanceCustomized=false;
+
+function markCompareRangeCustomized(){compareDistanceCustomized=true;}
+
+// Reads the "Compare to" field, converting it from whatever unit is currently displayed back to
+// native yards (0 means "blank/invalid" — runCompare() falls back to the auto default in that
+// case rather than trying to compute a zero-range trajectory).
+function readCompareRangeYd(){
+  var el=document.getElementById('fCompareRange');
+  if(!el)return 0;
+  var raw=parseFloat(el.value)||0;
+  if(raw<=0)return 0;
+  return unitSystem==='metric'?Math.round(raw/0.9144):Math.round(raw);
+}
+
+// Writes a native-yards distance into the field, converted into whichever unit is currently
+// displayed, and keeps the unit label next to it in sync. Used both for auto-suggesting a
+// default and for reflecting back whatever distance a comparison actually just ran at.
+function writeCompareRangeYd(yd){
+  var el=document.getElementById('fCompareRange');
+  if(!el)return;
+  var met=unitSystem==='metric';
+  el.value=met?Math.round(yd*0.9144):yd;
+  var lbl=document.getElementById('compareRangeUnitLbl');
+  if(lbl)lbl.textContent=met?'m':'yd';
+}
+
+// Re-suggests the shortest-shared-max default whenever the selection changes, but only while
+// the shooter hasn't already typed their own distance in this comparison session.
+function updateCompareRangeSuggestion(){
+  if(compareDistanceCustomized)return;
+  var el=document.getElementById('fCompareRange');
+  if(!compareSelection.length){if(el)el.value='';return;}
+  var loaded=compareSelection.map(function(ref){return{ref:ref,p:presetFromRef(ref)};}).filter(function(x){return!!x.p;});
+  if(!loaded.length)return;
+  var suggested=Math.min.apply(null,loaded.map(function(x){
+    return x.p.max||(MODE_DEFAULT_RANGE[x.ref.mode]||MODE_DEFAULT_RANGE.cf).max;
+  }));
+  writeCompareRangeYd(suggested);
+}
 
 function presetFromRef(ref){
   if(ref.type==='b')return(PRESETS[ref.mode]||[])[ref.idx];
@@ -1517,6 +1577,10 @@ function toggleCompareSelect(mode,type,idx){
   var i=compareSelection.findIndex(function(s){return s.mode===mode&&s.type===type&&s.idx===idx;});
   if(i>=0){
     compareSelection.splice(i,1);
+    // Clearing back down to zero selected loads is treated as starting a fresh comparison, so
+    // the distance field goes back to auto-suggesting rather than keeping a stale custom value
+    // around for whatever gets picked next.
+    if(!compareSelection.length)compareDistanceCustomized=false;
   } else {
     if(compareSelection.length>=3)return;
     var p=presetFromRef({mode:mode,type:type,idx:idx});
@@ -1525,6 +1589,7 @@ function toggleCompareSelect(mode,type,idx){
   }
   renderComparePicker();
   renderCompareStrip();
+  updateCompareRangeSuggestion();
 }
 
 function renderComparePicker(){
@@ -1567,16 +1632,28 @@ function runCompare(){
   if(!compareSelection.length)return;
   var loaded=compareSelection.map(function(ref){return{ref:ref,p:presetFromRef(ref)};}).filter(function(x){return!!x.p;});
   if(!loaded.length)return;
-  // Shared reference range: the shortest of the selected loads' own max ranges, so every load
-  // has a genuine computed data point at the comparison range instead of an extrapolated or
-  // missing one, and the chart's lines all end together instead of at mismatched lengths.
-  var refYd=Math.min.apply(null,loaded.map(function(x){
+  // Comparison distance: whatever the shooter has typed into "Compare to", or — if that field is
+  // blank/invalid — the shortest of the selected loads' own max ranges, so every load still gets
+  // a genuine computed data point at the comparison range by default. Changing the field itself
+  // never recomputes anything on its own; it only takes effect the next time this button (or
+  // Compare again) is pressed, same as changing which loads are selected.
+  var autoRefYd=Math.min.apply(null,loaded.map(function(x){
     return x.p.max||(MODE_DEFAULT_RANGE[x.ref.mode]||MODE_DEFAULT_RANGE.cf).max;
   }));
+  var refYd=readCompareRangeYd()||autoRefYd;
+  // Reflect back whatever distance actually ran (in case the field was blank and the auto
+  // default was used), so the field never silently disagrees with what's on screen.
+  writeCompareRangeYd(refYd);
   var list=loaded.map(function(x,i){
+    var ownMaxYd=x.p.max||(MODE_DEFAULT_RANGE[x.ref.mode]||MODE_DEFAULT_RANGE.cf).max;
     var params=buildParamsFromPreset(x.p,x.ref.mode,refYd);
     var results=computeTrajectory(params,true); // dense: every yard, for a smooth overlay line
-    return{name:x.p.name,color:COMPARE_COLORS[i],results:results,params:params};
+    // Soft warnings, not a hard cap: the physics will happily extrapolate to any distance typed
+    // in, but going past a load's own saved max, or into the subsonic/transonic regime, is where
+    // the drag model gets progressively less trustworthy — worth flagging, not worth blocking.
+    var extrapolated=refYd>ownMaxYd;
+    var wentSubsonic=results.some(function(r){return r.isSubsonic;});
+    return{name:x.p.name,color:COMPARE_COLORS[i],results:results,params:params,ownMaxYd:ownMaxYd,extrapolated:extrapolated,wentSubsonic:wentSubsonic};
   });
   renderCompareResults(list,refYd);
 }
@@ -1584,6 +1661,15 @@ function runCompare(){
 function renderCompareResults(list,refYd){
   var met=unitSystem==='metric';
   var rngLabel=met?Math.round(refYd*0.9144)+'m':refYd+'yd';
+  var warnItems=[];
+  list.forEach(function(x){
+    if(x.extrapolated){
+      var ownLabel=met?Math.round(x.ownMaxYd*0.9144)+'m':x.ownMaxYd+'yd';
+      warnItems.push(x.name+' is shown beyond its own saved max range ('+ownLabel+') — figures out this far are extrapolated.');
+    }
+    if(x.wentSubsonic)warnItems.push(x.name+' goes subsonic before '+rngLabel+' — the drag model is less reliable past that point.');
+  });
+  var warnHtml=warnItems.length?'<div style="background:rgba(245,197,66,.10);border:1px solid rgba(245,197,66,.35);border-radius:6px;padding:8px 10px;margin-bottom:12px;font-size:11px;color:var(--yellow);line-height:1.5;">'+warnItems.map(function(w){return '&#9888;&#65039; '+w;}).join('<br>')+'</div>':'';
   var rows=[
     {label:'Muzzle Velocity',get:function(x){var r0=x.results[0];return met?Math.round(r0.fps*0.3048)+' m/s':r0.fps+' fps';}},
     {label:'Muzzle Energy',get:function(x){var r0=x.results[0];return met?r0.energyJ+' J':r0.energyFtLb+' ft-lb';}},
@@ -1600,7 +1686,7 @@ function renderCompareResults(list,refYd){
     '</tbody></table>';
   var area=document.getElementById('compareResultsArea');
   if(!area)return;
-  area.innerHTML='<div style="margin-bottom:12px;"><canvas id="compareCanvas" height="220"></canvas></div>'+tableHtml;
+  area.innerHTML='<div style="margin-bottom:12px;"><canvas id="compareCanvas" height="220"></canvas></div>'+warnHtml+tableHtml;
   drawCompareChart(list,refYd);
 }
 
