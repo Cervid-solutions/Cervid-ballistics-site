@@ -16,8 +16,8 @@ code{background:var(--surface2);border:1px solid var(--border);border-radius:4px
 
 /* ---------- Header ---------- */
 .gheader{position:relative;background:var(--surface);border-bottom:1px solid var(--border);}
-.gheader .banner-wrap{width:100%;max-height:220px;overflow:hidden;display:block;}
-.gheader .banner-wrap img{width:100%;display:block;object-fit:cover;}
+.gheader .banner-wrap{width:100%;display:flex;justify-content:center;align-items:center;background:var(--bg);padding:14px 0;}
+.gheader .banner-wrap img{display:block;max-width:min(100%,420px);height:auto;max-height:130px;object-fit:contain;}
 .gheader .htext{padding:18px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;}
 .gheader h1{margin:0;font-size:26px;}
 .gheader .subtitle{color:var(--muted);font-size:14px;margin-top:2px;}
@@ -407,6 +407,11 @@ footer{border-top:1px solid var(--border);padding:24px;text-align:center;color:v
 <h3>The comparison distance <span class="badge intermediate">Intermediate</span></h3>
 <p>All three loads are shown out to one shared distance, defaulting to the shortest of the selected loads' own max ranges. Type your own value into the distance field beside the Compare button to override it &mdash; your typed value sticks across further selection changes until you clear the selection back to zero.</p>
 <div class="callout note">The distance isn't capped &mdash; the engine will extrapolate as far as you type. A load shown beyond its own saved max range gets a dismissible warning rather than being blocked.</div>
+</div>
+
+<div class="topic">
+<h3>Drop &amp; Wind Drift units <span class="badge intermediate">Intermediate</span></h3>
+<p>The <span class="field-ref">Drop &amp; Wind units</span> dropdown above the comparison table switches those two rows between mils, MOA, inches, and cm &mdash; independent of whatever unit the single-load Results table happens to be showing. The row labels always state the unit directly, e.g. "Drop (mil) at 500yd", so there's never any doubt what's being read. Switching units is instant and doesn't re-run the comparison.</p>
 </div>
 
 <div class="topic">
