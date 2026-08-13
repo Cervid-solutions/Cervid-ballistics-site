@@ -83,6 +83,36 @@
   .sys-toggle{display:flex;background:var(--bg);border:1px solid var(--border);border-radius:6px;overflow:hidden;}
   .sys-toggle button{flex:1;padding:7px 10px;border:none;background:transparent;color:var(--muted);cursor:pointer;font-size:12px;font-weight:600;touch-action:manipulation;}
   .sys-toggle button.active{background:var(--accent2);color:#fff;}
+  /* Compare Loads: up to 3 saved presets, any mode, side by side. A full-screen overlay rather
+     than a third desktop column or mobile tab, since it works identically at any width without
+     needing to fit into the existing Inputs/Results split. */
+  .btn-compare-toggle{margin-left:10px;padding:7px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;font-weight:600;cursor:pointer;touch-action:manipulation;white-space:nowrap;}
+  .btn-compare-toggle.active{background:var(--accent2);color:#fff;border-color:var(--accent2);}
+  .compare-overlay{position:fixed;inset:0;background:rgba(15,17,23,.96);z-index:500;overflow-y:auto;padding:20px;}
+  .compare-overlay-inner{max-width:900px;margin:0 auto;padding-bottom:40px;}
+  .compare-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;}
+  .compare-header h2{font-size:18px;}
+  .compare-close{cursor:pointer;color:var(--muted);font-size:13px;white-space:nowrap;touch-action:manipulation;}
+  .compare-close:hover{color:var(--text);}
+  .compare-sub{font-size:12px;color:var(--muted);margin-bottom:14px;line-height:1.5;}
+  .compare-strip{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;min-height:26px;}
+  .compare-chip{display:flex;align-items:center;gap:6px;padding:4px 10px;border-radius:14px;background:var(--surface2);border:1px solid var(--border);font-size:12px;}
+  .compare-chip .swatch{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+  .compare-chip .remove{cursor:pointer;color:var(--muted);font-weight:700;touch-action:manipulation;}
+  .compare-chip .remove:hover{color:var(--red);}
+  .compare-mode-group{margin-bottom:16px;}
+  .compare-mode-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:8px;}
+  .compare-preset-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:6px;}
+  .compare-tile{position:relative;padding:8px 30px 8px 10px;background:var(--bg);border:2px solid var(--border);border-radius:6px;color:var(--text);cursor:pointer;font-size:11px;text-align:left;line-height:1.4;touch-action:manipulation;}
+  .compare-tile strong{display:block;font-size:12px;}
+  .compare-tile.selected{background:var(--surface2);}
+  .compare-tile.disabled{opacity:.35;cursor:default;}
+  .compare-tile .slot-badge{position:absolute;top:6px;right:6px;width:16px;height:16px;border-radius:50%;color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;}
+  .compare-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:4px;}
+  .compare-table th,.compare-table td{padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;}
+  .compare-table th{color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.04em;}
+  .compare-table td.metric-label{color:var(--muted);white-space:nowrap;}
+  @media(max-width:900px){.btn-compare-toggle{margin-left:0;margin-top:8px;width:100%;}}
   .preset-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
   /* Right padding (34px) reserves a column for the single overflow-menu toggle in the top-right
      corner (see .preset-menu-toggle below) — since that's now the only overlay button, reserving
@@ -171,7 +201,21 @@
     <button id="btnRF" onclick="setMode('rf')">Rimfire</button>
     <button id="btnCF" onclick="setMode('cf')">Centrefire</button>
   </div>
+  <button type="button" id="btnCompareToggle" class="btn-compare-toggle" onclick="toggleCompareMode()">&#9878;&#65039; Compare</button>
 </header>
+<div class="compare-overlay" id="compareOverlay" style="display:none;">
+  <div class="compare-overlay-inner">
+    <div class="compare-header">
+      <h2>Compare Loads</h2>
+      <span class="compare-close" onclick="toggleCompareMode()">&times; Close</span>
+    </div>
+    <p class="compare-sub">Pick up to three saved presets — any mode, any mix of built-in and your own — to see their headline stats and trajectories side by side under today's conditions.</p>
+    <div class="compare-strip" id="compareStrip"></div>
+    <button type="button" class="btn" id="btnRunCompare" onclick="runCompare()" disabled style="margin-bottom:18px;">Compare</button>
+    <div id="comparePickerModes"></div>
+    <div id="compareResultsArea"></div>
+  </div>
+</div>
 <div class="layout">
   <div class="sidebar" id="sidebarPane">
 
@@ -1478,6 +1522,224 @@ function stabStatus(Sg){if(Sg===null)return{label:'—',cls:''};if(Sg<1)return{l
 // from the reloading/airgun community — NOT a first-principles moment-of-inertia recalculation.
 // Sg scales up by the factor; twist requirement (in calibers) scales by sqrt(factor).
 var SHAPE_SG_FACTOR={flatbase:1.0,boattail:1.08,diabolo:1.20};
+
+// ── Compare Loads ────────────────────────────────────────────────────────────
+// Lets a shooter pick up to three saved presets (any mode, any mix of built-in/custom) and
+// see their headline stats and trajectory shapes side by side — e.g. deciding which of three
+// rifle/load combinations to bring to a competition. Reuses the exact same physics engine
+// (computeTrajectory) as the single-load view, but the params for each compared load are built
+// directly from its stored preset entry rather than from the live form fields, so opening
+// Compare never disturbs whatever the shooter currently has loaded on the Inputs tab.
+var COMPARE_COLORS=['#4f8ef7','#e06c3a','#9d6fe0'];
+var compareMode=false;
+// Up to 3 entries: {mode:'air'|'cf'|'rf', type:'b'|'c', idx, name}
+var compareSelection=[];
+
+function presetFromRef(ref){
+  if(ref.type==='b')return(PRESETS[ref.mode]||[])[ref.idx];
+  var custom=loadCustom()[ref.mode]||[];
+  return custom[ref.idx];
+}
+
+// Same BC-selection logic as effectiveBc(), but reading from a stored preset object instead
+// of the live BC(G1)/BC(G7) form fields.
+function presetEffectiveBc(p){
+  var model=p.drag||'g1';
+  var bc1=p.bc||0.045;
+  if(model!=='g7')return{bc:bc1,estimated:false};
+  var bc7=p.bc7||0;
+  if(bc7>0)return{bc:bc7,estimated:false};
+  return{bc:bc1/BC_STANDARD_RATIO,estimated:true};
+}
+
+// Builds a computeTrajectory()-ready params object for a single compared load. Preset entries
+// already store weight/velocity/scope-height/zero/max/dia/len/twist in canonical imperial units
+// regardless of what unit system was active when they were saved (see buildPresetEntryFromForm),
+// so no imperial/metric conversion is needed for those fields here. Environmental conditions
+// (altitude, temp, humidity, pressure, wind, latitude, azimuth, angle) are NOT part of a preset —
+// they're read from whatever is currently sitting in the live form, so all compared loads are
+// judged under the same "today's conditions" rather than whatever was on screen when each was
+// individually saved. forcedMaxYd, when given, overrides the preset's own max range — used to
+// bring all compared loads to a single shared comparison distance (see runCompare()).
+function buildParamsFromPreset(p,mode,forcedMaxYd){
+  var met=unitSystem==='metric';
+  var altRaw=parseFloat(document.getElementById('fAlt').value)||0;
+  var tempRaw=parseFloat(document.getElementById('fTemp').value);if(isNaN(tempRaw))tempRaw=15;
+  var humidRaw=parseFloat(document.getElementById('fHumid').value);if(isNaN(humidRaw))humidRaw=50;
+  var pressRaw=parseFloat(document.getElementById('fPress').value)||29.92;
+  var windRaw=parseFloat(document.getElementById('fWind').value)||0;
+  var windDirRaw=parseFloat(document.getElementById('fWindDir').value)||3;
+  var angleRaw=parseFloat(document.getElementById('fAngle').value)||0;
+  var latRaw=parseFloat(document.getElementById('fLat').value)||0;
+  var azRaw=parseFloat(document.getElementById('fAzimuth').value)||0;
+  var altFt=met?altRaw*3.28084:altRaw;
+  var presHPa=met?pressRaw:pressRaw*33.8639;
+  var windMph=met?windRaw/1.60934:windRaw;
+
+  var effBc=presetEffectiveBc(p);
+  var modeDef=MODE_DEFAULT_RANGE[mode]||MODE_DEFAULT_RANGE.cf;
+  var zeroYd=p.zero||modeDef.zero;
+  var maxYd=forcedMaxYd||p.max||modeDef.max;
+  var zeroOffsetMils=p.zeroOffsetVal!==undefined?(p.zeroOffsetUnit==='moa'?p.zeroOffsetVal*(1.0472/3.6):p.zeroOffsetVal):0;
+
+  var params={
+    weightGr:p.wt,bc:effBc.bc,baseBc:effBc.bc,bcEstimated:effBc.estimated,
+    mvFps:p.mv,scopeInch:p.sh,zeroYd:Math.round(zeroYd),maxYd:Math.round(maxYd),
+    zeroOffsetMils:zeroOffsetMils,
+    altFt:altFt,tempC:tempRaw,humidPct:humidRaw,presHPa:presHPa,
+    windMph:windMph,windClock:windDirRaw,
+    angleDeg:angleRaw,latDeg:latRaw,azimuthDeg:azRaw,
+    dragModel:p.drag||'g1',
+    diaIn:p.dia||null,lenIn:p.len||null,twistIn:p.twist||null,
+    // Preset zero/max are already canonical yards, so there's no metric interval-rounding pass
+    // to opt into here (that mechanism exists purely to avoid drift when a shooter types interval
+    // marks in native metric units on the live form) — Compare always samples densely instead.
+    stepYd:null,spotYd:null,twistDir:p.twistDir||1,
+    metric:false,intervalNative:null,maxNative:maxYd
+  };
+  if(params.zeroYd>=params.maxYd)params.maxYd=params.zeroYd+20;
+  var rho=airDensityRatio(params.altFt,params.tempC,params.humidPct,params.presHPa);
+  var shapeFactor=SHAPE_SG_FACTOR[p.shape||'flatbase']||1.0;
+  var rawSg=millerSg(params.weightGr,params.diaIn,params.lenIn,params.twistIn,rho);
+  params.Sg=rawSg!==null?rawSg*shapeFactor:null;
+  return params;
+}
+
+function toggleCompareMode(){
+  compareMode=!compareMode;
+  document.getElementById('compareOverlay').style.display=compareMode?'block':'none';
+  document.getElementById('btnCompareToggle').classList.toggle('active',compareMode);
+  if(compareMode){renderComparePicker();renderCompareStrip();}
+}
+
+function toggleCompareSelect(mode,type,idx){
+  var i=compareSelection.findIndex(function(s){return s.mode===mode&&s.type===type&&s.idx===idx;});
+  if(i>=0){
+    compareSelection.splice(i,1);
+  } else {
+    if(compareSelection.length>=3)return;
+    var p=presetFromRef({mode:mode,type:type,idx:idx});
+    if(!p)return;
+    compareSelection.push({mode:mode,type:type,idx:idx,name:p.name});
+  }
+  renderComparePicker();
+  renderCompareStrip();
+}
+
+function renderComparePicker(){
+  var container=document.getElementById('comparePickerModes');
+  if(!container)return;
+  var modes=[{key:'air',label:'Air Rifle'},{key:'rf',label:'Rimfire'},{key:'cf',label:'Centrefire'}];
+  var html='';
+  modes.forEach(function(m){
+    var ordered=getOrderedPresets(m.key);
+    if(!ordered.length)return;
+    html+='<div class="compare-mode-group"><div class="compare-mode-label">'+m.label+'</div><div class="compare-preset-grid">';
+    ordered.forEach(function(item){
+      var p=item.p,isC=(item.type==='c'),idx=isC?item.ci:item.bi;
+      var selIdx=compareSelection.findIndex(function(s){return s.mode===m.key&&s.type===item.type&&s.idx===idx;});
+      var selected=selIdx>=0;
+      var disabled=(!selected&&compareSelection.length>=3);
+      var wtDisp=unitSystem==='metric'?(p.wt*0.0647989).toFixed(1)+'g':p.wt+'gr';
+      var mvDisp=unitSystem==='metric'?Math.round(p.mv*0.3048)+'m/s':p.mv+'fps';
+      var borderStyle=selected?' style="border-color:'+COMPARE_COLORS[selIdx]+';"':'';
+      html+='<button type="button" class="compare-tile'+(selected?' selected':'')+(disabled?' disabled':'')+'"'+borderStyle+(disabled?' disabled':'')+' onclick="toggleCompareSelect(\''+m.key+'\',\''+item.type+'\','+idx+')">'+
+        (selected?'<span class="slot-badge" style="background:'+COMPARE_COLORS[selIdx]+';">'+(selIdx+1)+'</span>':'')+
+        '<strong>'+p.name+'</strong>'+wtDisp+' &middot; '+mvDisp+'</button>';
+    });
+    html+='</div></div>';
+  });
+  container.innerHTML=html||'<p style="color:var(--muted);font-size:12px;">No presets yet — add some from the Inputs tab first.</p>';
+}
+
+function renderCompareStrip(){
+  var strip=document.getElementById('compareStrip');
+  if(!strip)return;
+  strip.innerHTML=compareSelection.length?compareSelection.map(function(s,i){
+    return '<span class="compare-chip"><span class="swatch" style="background:'+COMPARE_COLORS[i]+';"></span>'+s.name+'<span class="remove" onclick="toggleCompareSelect(\''+s.mode+'\',\''+s.type+'\','+s.idx+')">&times;</span></span>';
+  }).join(''):'<span style="color:var(--muted);font-size:12px;">No loads selected yet — tap up to three presets below.</span>';
+  var btn=document.getElementById('btnRunCompare');
+  if(btn)btn.disabled=compareSelection.length===0;
+}
+
+function runCompare(){
+  if(!compareSelection.length)return;
+  var loaded=compareSelection.map(function(ref){return{ref:ref,p:presetFromRef(ref)};}).filter(function(x){return!!x.p;});
+  if(!loaded.length)return;
+  // Shared reference range: the shortest of the selected loads' own max ranges, so every load
+  // has a genuine computed data point at the comparison range instead of an extrapolated or
+  // missing one, and the chart's lines all end together instead of at mismatched lengths.
+  var refYd=Math.min.apply(null,loaded.map(function(x){
+    return x.p.max||(MODE_DEFAULT_RANGE[x.ref.mode]||MODE_DEFAULT_RANGE.cf).max;
+  }));
+  var list=loaded.map(function(x,i){
+    var params=buildParamsFromPreset(x.p,x.ref.mode,refYd);
+    var results=computeTrajectory(params,true); // dense: every yard, for a smooth overlay line
+    return{name:x.p.name,color:COMPARE_COLORS[i],results:results,params:params};
+  });
+  renderCompareResults(list,refYd);
+}
+
+function renderCompareResults(list,refYd){
+  var met=unitSystem==='metric';
+  var rngLabel=met?Math.round(refYd*0.9144)+'m':refYd+'yd';
+  var rows=[
+    {label:'Muzzle Velocity',get:function(x){var r0=x.results[0];return met?Math.round(r0.fps*0.3048)+' m/s':r0.fps+' fps';}},
+    {label:'Muzzle Energy',get:function(x){var r0=x.results[0];return met?r0.energyJ+' J':r0.energyFtLb+' ft-lb';}},
+    {label:'Velocity at '+rngLabel,get:function(x){var rL=x.results[x.results.length-1];return met?Math.round(rL.fps*0.3048)+' m/s':rL.fps+' fps';}},
+    {label:'Energy at '+rngLabel,get:function(x){var rL=x.results[x.results.length-1];return met?rL.energyJ+' J':rL.energyFtLb+' ft-lb';}},
+    {label:'Drop at '+rngLabel,get:function(x){var rL=x.results[x.results.length-1];return met?rL.dropCm+' cm':rL.dropIn+' in';}},
+    {label:'Wind Drift at '+rngLabel,get:function(x){var rL=x.results[x.results.length-1];return fmtDir(met?rL.driftCm:rL.driftIn);}},
+    {label:'Gyro Stability (Sg)',get:function(x){return(x.params.Sg!==null&&x.params.Sg!==undefined)?x.params.Sg.toFixed(2):'&mdash;';}}
+  ];
+  var tableHtml='<table class="compare-table"><thead><tr><th></th>'+list.map(function(x){
+    return '<th><span class="swatch" style="background:'+x.color+';display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;"></span>'+x.name+'</th>';
+  }).join('')+'</tr></thead><tbody>'+
+    rows.map(function(row){return '<tr><td class="metric-label">'+row.label+'</td>'+list.map(function(x){return '<td>'+row.get(x)+'</td>';}).join('')+'</tr>';}).join('')+
+    '</tbody></table>';
+  var area=document.getElementById('compareResultsArea');
+  if(!area)return;
+  area.innerHTML='<div style="margin-bottom:12px;"><canvas id="compareCanvas" height="220"></canvas></div>'+tableHtml;
+  drawCompareChart(list,refYd);
+}
+
+function drawCompareChart(list,refYd){
+  var canvas=document.getElementById('compareCanvas');if(!canvas)return;
+  var met=unitSystem==='metric';
+  var W=canvas.offsetWidth||600,H=220;canvas.width=W;canvas.height=H;
+  var ctx=canvas.getContext('2d');ctx.fillStyle='#1a1d27';ctx.fillRect(0,0,W,H);
+  var dropVal=function(r){return met?parseFloat(r.dropCm):parseFloat(r.dropIn);};
+  var allDrops=[];list.forEach(function(x){x.results.forEach(function(r){allDrops.push(dropVal(r));});});
+  var minD=Math.min.apply(null,allDrops),maxD=Math.max.apply(null,allDrops),pad=32,padL=32,padR=16,rng=(maxD-minD)||1;
+  function tx(yd){return padL+(yd/refYd)*(W-padL-padR);}
+  function ty(d){return H-pad-((d-minD)/rng)*(H-pad*2);}
+  ctx.lineWidth=1;ctx.font='10px system-ui';
+  for(var i=0;i<=4;i++){
+    var yy=pad+(i/4)*(H-pad*2);
+    ctx.strokeStyle='#2e3348';ctx.beginPath();ctx.moveTo(padL,yy);ctx.lineTo(W-padR,yy);ctx.stroke();
+    var dVal=minD+rng*(1-i/4);
+    var dRounded=met?Math.round(dVal):Math.round(dVal*10)/10;
+    if(dRounded===0)dRounded=0;
+    ctx.fillStyle='#7a7f99';ctx.textAlign='right';ctx.fillText(String(dRounded),padL-4,yy+3);ctx.textAlign='left';
+  }
+  ctx.strokeStyle='rgba(255,255,255,0.15)';ctx.setLineDash([4,4]);ctx.beginPath();ctx.moveTo(padL,ty(0));ctx.lineTo(W-padR,ty(0));ctx.stroke();ctx.setLineDash([]);
+  list.forEach(function(x){
+    ctx.beginPath();
+    x.results.forEach(function(r,i){var xx=tx(r.yd),yy2=ty(dropVal(r));i===0?ctx.moveTo(xx,yy2):ctx.lineTo(xx,yy2);});
+    ctx.strokeStyle=x.color;ctx.lineWidth=2.5;ctx.stroke();
+  });
+  var lx=padL,ly=14;
+  ctx.font='11px system-ui';
+  list.forEach(function(x){
+    ctx.fillStyle=x.color;ctx.fillRect(lx,ly-7,10,10);
+    ctx.fillStyle='#e8eaf0';ctx.textAlign='left';
+    ctx.fillText(x.name,lx+14,ly+2);
+    lx+=14+ctx.measureText(x.name).width+16;
+  });
+  ctx.fillStyle='#7a7f99';ctx.font='10px system-ui';ctx.textAlign='left';ctx.fillText('0',padL,H-6);
+  var endLabel=met?Math.round(refYd*0.9144)+'m':refYd+'yd';
+  ctx.textAlign='right';ctx.fillText(endLabel,W-padR,H-6);
+}
 
 // ── Trajectory engine (always works in imperial internally) ─────────────────
 // dense=true returns a point at every 1-yard step (the physics loop's native resolution)
