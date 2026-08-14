@@ -346,7 +346,7 @@
       </div>
       <div class="row2" style="align-items:start;">
         <div class="field"><label id="lblWind">Wind Speed (mph)</label><input type="number" id="fWind" value="10" min="0" max="200" step="1"/></div>
-        <div class="field"><label>Wind Clock (hr)</label><input type="number" id="fWindDir" value="3" min="1" max="12" step="1"/><small style="color:var(--muted);font-size:10px;">3=full R, 9=full L</small></div>
+        <div class="field"><label>Wind Clock (hr)<span class="help-tip" data-tip="Only the crosswind component of the wind &mdash; set by this clock position (3 or 9 o'clock = full effect, 12 or 6 o'clock = none) &mdash; deflects the trajectory sideways. A head or tailwind's effect on velocity along the line of the shot isn't separately simulated; that effect is much smaller than crosswind drift, so this model doesn't attempt to fold it in." onclick="showHelpTip(this,event)">?</span></label><input type="number" id="fWindDir" value="3" min="1" max="12" step="1"/><small style="color:var(--muted);font-size:10px;">3=full R, 9=full L</small></div>
       </div>
       <button class="btn btn-secondary" onclick="autoFillPressure()" style="margin-bottom:6px;font-size:12px;padding:6px;">&#128205; Pressure from altitude</button>
     </div>

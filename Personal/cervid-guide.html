@@ -206,7 +206,7 @@ footer{border-top:1px solid var(--border);padding:24px;text-align:center;color:v
 
 <div class="topic">
 <h3>The core numbers <span class="badge basic">Basic</span></h3>
-<p>Four fields drive most of the result: <span class="field-ref">Bullet Weight (gr)</span>, <span class="field-ref">Muzzle Vel. (fps)</span>, <span class="field-ref">BC (G1)</span>, and <span class="field-ref">Scope Height (in)</span>. Weight and muzzle velocity usually come straight off the ammunition box or your chronograph; BC (G1) is the manufacturer-quoted ballistic coefficient, almost always published as a G1 figure. Scope Height is the vertical distance from the centre of your bore to the centre of your scope &mdash; typically 1.5&ndash;2.5in for a rifle.</p>
+<p>Four fields drive most of the result: <span class="field-ref">Bullet Weight (gr)</span>, <span class="field-ref">Muzzle Vel. (fps)</span>, <span class="field-ref">BC (G1)</span>, and <span class="field-ref">Scope Height (in)</span>. Weight and muzzle velocity usually come straight off the ammunition box or your chronograph; BC (G1) is the manufacturer-quoted ballistic coefficient, almost always published as a G1 figure. Scope Height is the vertical distance from the centre of your bore to the centre of your scope &mdash; typically 2&ndash;3in for a rifle.</p>
 </div>
 
 <div class="topic">
@@ -449,7 +449,7 @@ footer{border-top:1px solid var(--border);padding:24px;text-align:center;color:v
 
 <div class="topic">
 <h3>Only the crosswind component of wind is modelled <span class="badge intermediate">Intermediate</span></h3>
-<p>A head or tailwind's effect on velocity along the line of the shot isn't separately simulated &mdash; only the crosswind component, from the Wind Clock convention, deflects the trajectory sideways.</p>
+<p>A head or tailwind's effect on velocity along the line of the shot isn't separately simulated &mdash; only the crosswind component, from the Wind Clock convention, deflects the trajectory sideways. This is a deliberate simplification, not an oversight. Typical wind speeds are a small fraction of typical muzzle velocities, so a headwind or tailwind changes the bullet's actual airspeed &mdash; and therefore its drag and time of flight &mdash; by only a percent or two: a second-order effect, dwarfed by the crosswind's direct sideways push and by other sources of uncertainty already built into the model, such as BC tolerance and chronograph error. Modelling it properly would also mean tracking wind as a full vector relative to the shot rather than a simple clock-position split &mdash; real added complexity for a correction too small to matter at practical hunting and target distances.</p>
 </div>
 
 <div class="topic">
@@ -465,7 +465,7 @@ footer{border-top:1px solid var(--border);padding:24px;text-align:center;color:v
 
 
 <footer>
-Cervid Ballistics User Guide &middot; matches the application as of August 13, 2026 &middot; this guide is a single offline file, just like the calculator itself
+Cervid Ballistics User Guide &middot; matches the application as of August 14, 2026 &middot; this guide is a single offline file, just like the calculator itself
 </footer>
 </main>
 </div>
