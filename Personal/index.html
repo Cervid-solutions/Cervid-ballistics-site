@@ -1746,16 +1746,39 @@ function renderCompareResults(list,refYd){
     {label:'Wind Drift ('+cuLabel+') at '+rngLabel,get:function(x){var rL=x.results[x.results.length-1];return fmtDir(cuWind(rL));}},
     {label:'Gyro Stability (Sg)',get:function(x){return(x.params.Sg!==null&&x.params.Sg!==undefined)?x.params.Sg.toFixed(2):'&mdash;';}}
   ];
-  var tableHtml=unitPicker+'<table class="compare-table"><thead><tr><th></th>'+list.map(function(x){
+  // Wrapped in .tbl-wrap (overflow-x:auto) — the same containment already used for the main
+  // single-load Results table. On a narrow iPhone in portrait, this table's unwrapped-nowrap
+  // label column ("Wind Drift (MOA) at 1000yd" etc.) plus 2-3 load columns can exceed the
+  // viewport width; without local scroll containment that overflow escapes into the page itself,
+  // which is what was tripping up iOS Safari's zoom/layout recalculation on rotation and made the
+  // chart and warning text appear to scale incorrectly. iPad/desktop never hit this because there's
+  // enough width for the table to fit either way.
+  var tableHtml=unitPicker+'<div class="tbl-wrap"><table class="compare-table"><thead><tr><th></th>'+list.map(function(x){
     return '<th><span class="swatch" style="background:'+x.color+';display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;"></span>'+x.name+(x.isLive?' <span style="color:var(--accent2);font-weight:700;" title="Using the live, not-yet-saved values currently shown on the Results page for this load, not the saved preset.">(live)</span>':'')+'</th>';
   }).join('')+'</tr></thead><tbody>'+
     rows.map(function(row){return '<tr><td class="metric-label">'+row.label+'</td>'+list.map(function(x){return '<td>'+row.get(x)+'</td>';}).join('')+'</tr>';}).join('')+
-    '</tbody></table>';
+    '</tbody></table></div>';
   var area=document.getElementById('compareResultsArea');
   if(!area)return;
   area.innerHTML='<div style="margin-bottom:12px;"><canvas id="compareCanvas" height="220"></canvas></div>'+warnHtml+tableHtml;
   drawCompareChart(list,refYd);
 }
+
+// Redraw the Compare chart on resize/rotation. drawCompareChart() sizes its canvas bitmap from
+// canvas.offsetWidth exactly once, at render time — without this listener, rotating the phone
+// changes the canvas's CSS box width but leaves the underlying pixel buffer untouched, so the
+// browser stretches the stale bitmap to fit the new box and the chart visibly warps. Reuses the
+// list/refYd already cached for the unit dropdown (lastCompareList/lastCompareRefYd) so this is a
+// pure redraw, not a recompute. Guarded on the overlay actually being open so this is a no-op the
+// rest of the time.
+function redrawCompareChartOnResize(){
+  var overlay=document.getElementById('compareOverlay');
+  if(overlay&&overlay.style.display!=='none'&&lastCompareList){
+    drawCompareChart(lastCompareList,lastCompareRefYd);
+  }
+}
+window.addEventListener('resize',redrawCompareChartOnResize);
+window.addEventListener('orientationchange',function(){setTimeout(redrawCompareChartOnResize,200);});
 
 function drawCompareChart(list,refYd){
   var canvas=document.getElementById('compareCanvas');if(!canvas)return;
