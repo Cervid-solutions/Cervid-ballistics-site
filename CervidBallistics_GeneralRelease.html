@@ -15,6 +15,11 @@
 <style>
   :root{--bg:#0f1117;--surface:#1a1d27;--surface2:#222639;--border:#2e3348;--accent:#4f8ef7;--accent2:#e06c3a;--text:#e8eaf0;--muted:#7a7f99;--green:#3ecf8e;--yellow:#f5c542;--red:#e05252;--radius:8px;}
   *{box-sizing:border-box;margin:0;padding:0;}
+  /* Prevents iOS Safari's automatic text-size inflation ("font boosting"), which can enlarge
+     standalone paragraph-like blocks — like the Compare warning banner — on an orientation
+     change even though nothing in our own CSS changed. Purely a Safari-rotation-only escape
+     hatch; every font-size in this file is still exactly what's written. */
+  html{-webkit-text-size-adjust:100%;text-size-adjust:100%;}
   body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;font-size:14px;min-height:100vh;padding-top:env(safe-area-inset-top,0px);}
   header{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;gap:16px;}
   header .titleWrap{display:flex;align-items:center;gap:12px;}
