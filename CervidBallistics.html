@@ -429,7 +429,10 @@
       <button onclick="hideRangeCard()" style="background:var(--accent2);color:#fff;border:none;border-radius:6px;padding:8px 14px;font-weight:700;cursor:pointer;touch-action:manipulation;flex-shrink:0;">Close</button>
     </div>
     <div id="rangeCardBody"></div>
-    <button onclick="window.print()" style="margin-top:20px;width:100%;padding:12px;background:var(--accent);color:#fff;border:none;border-radius:6px;font-weight:700;font-size:14px;cursor:pointer;touch-action:manipulation;">&#128424; Print</button>
+    <div style="display:flex;gap:10px;margin-top:20px;">
+      <button onclick="window.print()" style="flex:1;padding:12px;background:var(--accent);color:#fff;border:none;border-radius:6px;font-weight:700;font-size:14px;cursor:pointer;touch-action:manipulation;">&#128424; Print</button>
+      <button id="btnShareRangeCard" onclick="shareRangeCard()" style="flex:1;padding:12px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:6px;font-weight:700;font-size:14px;cursor:pointer;touch-action:manipulation;">&#128228; Share</button>
+    </div>
   </div>
 </div>
 <div id="reticleModal" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:10000;overflow:auto;">
@@ -2437,6 +2440,44 @@ function showRangeCard(){
 function hideRangeCard(){
   var el=document.getElementById('rangeCardModal');
   if(el)el.style.display='none';
+}
+// Plain-text version of the same rows shown on screen — built from lastResults directly rather
+// than scraped from the DOM, so it can never drift out of sync with what's actually displayed.
+// Exists to feed shareRangeCard(): the app itself has no server and can't push anything to a
+// Watch, but the iOS share sheet can hand this text to Notes, Reminders, or a personal Shortcut,
+// any of which do sync to and display on an Apple Watch.
+function buildRangeCardText(){
+  if(!lastResults)return '';
+  var r=lastResults,met=unitSystem==='metric';
+  var calibr=document.getElementById('fCalibr').value||'Range Card';
+  var unitLabel=unitDrop==='in'?(met?'cm':'in'):unitDrop==='cm'?'cm':unitDrop==='moa'?'MOA':unitDrop==='clicks'?'clicks':'mils';
+  var lines=r.results.map(function(row){
+    var val=unitDrop==='in'?row.dropIn:unitDrop==='cm'?row.dropCm:unitDrop==='moa'?row.moa:unitDrop==='clicks'?row.clicks:row.mils;
+    var rng=(met?Math.round(row.yd*0.9144):row.yd)+(met?'m':'yd');
+    var marker=row.isZero?' ★':(row.isSpot?' ◆':'');
+    return rng+marker+': '+val+' '+unitLabel;
+  });
+  return calibr+' — Range Card\n★ zero   ◆ spot range\n\n'+lines.join('\n');
+}
+// Web Share API first (opens the native iOS/macOS share sheet — Notes, Reminders, Shortcuts,
+// Messages, AirDrop, whatever's installed), falling back to clipboard copy on browsers/platforms
+// that don't support it (most desktop browsers) so the button is never a dead end.
+function shareRangeCard(){
+  var text=buildRangeCardText();
+  if(!text)return;
+  var title=(document.getElementById('fCalibr').value||'Range Card')+' — Range Card';
+  if(navigator.share){
+    navigator.share({title:title,text:text}).catch(function(){}); // user cancelling the sheet also rejects — nothing to report
+  }else if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(function(){
+      var btn=document.getElementById('btnShareRangeCard');
+      if(btn){var orig=btn.textContent;btn.textContent='Copied!';setTimeout(function(){btn.textContent=orig;},1500);}
+    }).catch(function(){
+      alert('Could not share or copy in this browser.');
+    });
+  }else{
+    alert('Sharing isn\'t supported in this browser — try Safari on iPhone, iPad, or Mac.');
+  }
 }
 
 // ── Reticle View ─────────────────────────────────────────────────────────────
