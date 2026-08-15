@@ -2465,9 +2465,12 @@ function buildRangeCardText(){
 function shareRangeCard(){
   var text=buildRangeCardText();
   if(!text)return;
-  var title=(document.getElementById('fCalibr').value||'Range Card')+' — Range Card';
+  // No title field: Safari's share sheet treats title+text (with no url) unpredictably when invoked
+  // from a regular browser tab, and on some targets (e.g. macOS Notes) it drops our text entirely in
+  // favour of a rich link card built from the page's own URL/title/thumbnail. Passing text alone is
+  // the combination most commonly reported to avoid that substitution.
   if(navigator.share){
-    navigator.share({title:title,text:text}).catch(function(){}); // user cancelling the sheet also rejects — nothing to report
+    navigator.share({text:text}).catch(function(){}); // user cancelling the sheet also rejects — nothing to report
   }else if(navigator.clipboard&&navigator.clipboard.writeText){
     navigator.clipboard.writeText(text).then(function(){
       var btn=document.getElementById('btnShareRangeCard');
