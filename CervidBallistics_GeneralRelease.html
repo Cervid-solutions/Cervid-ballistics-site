@@ -2040,11 +2040,11 @@ function computeTrajectory(p,dense){
       // line had before it got its own dense per-yard sampling. The chart now reads these instead.
       energyFtLbRaw:eKE,energyJRaw:eJ,
       driftIn:drift.toFixed(2),driftCm:(drift*2.54).toFixed(1),
-      driftMoa:driftMoa.toFixed(2),driftMils:driftMils.toFixed(2),
+      driftMoa:driftMoa.toFixed(2),driftMils:driftMils.toFixed(2),driftClicks:(driftMoa/clickSizeMoa).toFixed(0),
       spinIn:sdIn.toFixed(2),spinCm:(sdIn*2.54).toFixed(1),
-      spinMoa:sdMoa.toFixed(2),spinMils:sdMils.toFixed(2),
+      spinMoa:sdMoa.toFixed(2),spinMils:sdMils.toFixed(2),spinClicks:(sdMoa/clickSizeMoa).toFixed(0),
       coriolisIn:corIn.toFixed(2),coriolisCm:(corIn*2.54).toFixed(1),
-      coriolisMoa:corMoa.toFixed(2),coriolisMils:corMils.toFixed(2),
+      coriolisMoa:corMoa.toFixed(2),coriolisMils:corMils.toFixed(2),coriolisClicks:(corMoa/clickSizeMoa).toFixed(0),
       tof:r.t.toFixed(3),isZero:r.xYd===p.zeroYd,isSpot:p.spotYd&&r.xYd===p.spotYd,isSubsonic:r.mach<1
     };
   });
@@ -2324,7 +2324,20 @@ function calculate(){
   }
 }
 
-function fmtDir(val){var d=parseFloat(val);if(d===0)return'&mdash;';return d>0?val+' R':Math.abs(d).toFixed(2)+' L';}
+// Formats a signed lateral correction (wind drift, spin drift, Coriolis) as "X R"/"X L". The
+// negative branch re-renders via toFixed rather than reusing the original string directly (the
+// positive branch's simple concatenation can't be used there, since it would print the minus sign
+// twice as text — "-1.23 L"), so it derives its decimal count from the caller's own string instead
+// of hardcoding 2: every existing unit (mils/MOA/in/cm) already arrives pre-formatted to 2dp, so
+// this is a no-op for all of them, but whole-number click counts (0dp) now round-trip correctly
+// too — previously this always forced 2 decimals, which would have shown "-8 clicks" as "8.00 L"
+// instead of "8 L".
+function fmtDir(val){
+  var d=parseFloat(val);
+  if(d===0)return'&mdash;';
+  var s=String(val),dot=s.indexOf('.'),decimals=dot===-1?0:s.length-dot-1;
+  return d>0?val+' R':Math.abs(d).toFixed(decimals)+' L';
+}
 
 // ── Render results ──────────────────────────────────────────────────────────
 function renderResults(results,params,stability){
@@ -2354,18 +2367,18 @@ function renderResults(results,params,stability){
 
   // Wind column: mils→driftMils, moa→driftMoa, else linear (in or cm by unit system)
   var windIsAngular=unitDrop==='moa'||unitDrop==='mils';
-  var windCol=unitDrop==='moa'?'driftMoa':unitDrop==='mils'?'driftMils':(met?'driftCm':'driftIn');
-  var windHdr=unitDrop==='moa'?'Wind(MOA)':unitDrop==='mils'?'Wind(mil)':(met?'Wind(cm)':'Wind(in)');
-  var spinCol=unitDrop==='moa'?'spinMoa':unitDrop==='mils'?'spinMils':(met?'spinCm':'spinIn');
-  var spinHdr=unitDrop==='moa'?'Spin(MOA)':unitDrop==='mils'?'Spin(mil)':(met?'Spin(cm)':'Spin(in)');
-  var corCol=unitDrop==='moa'?'coriolisMoa':unitDrop==='mils'?'coriolisMils':(met?'coriolisCm':'coriolisIn');
+  var windCol=unitDrop==='clicks'?'driftClicks':unitDrop==='moa'?'driftMoa':unitDrop==='mils'?'driftMils':(met?'driftCm':'driftIn');
+  var windHdr=unitDrop==='clicks'?'Wind(clicks)':unitDrop==='moa'?'Wind(MOA)':unitDrop==='mils'?'Wind(mil)':(met?'Wind(cm)':'Wind(in)');
+  var spinCol=unitDrop==='clicks'?'spinClicks':unitDrop==='moa'?'spinMoa':unitDrop==='mils'?'spinMils':(met?'spinCm':'spinIn');
+  var spinHdr=unitDrop==='clicks'?'Spin(clicks)':unitDrop==='moa'?'Spin(MOA)':unitDrop==='mils'?'Spin(mil)':(met?'Spin(cm)':'Spin(in)');
+  var corCol=unitDrop==='clicks'?'coriolisClicks':unitDrop==='moa'?'coriolisMoa':unitDrop==='mils'?'coriolisMils':(met?'coriolisCm':'coriolisIn');
 
   // Range & velocity columns
   var rngHdr=met?'Range(m)':'Range(yd)';
   var velHdr=met?'Vel(m/s)':'Vel(fps)';
   var eHdrA=met?'E(J)':'E(ft-lb)';
   var eHdrB=met?'E(ft-lb)':'E(J)';
-  var corHdr=unitDrop==='moa'?'Cor(MOA)':unitDrop==='mils'?'Cor(mil)':(met?'Cor(cm)':'Cor(in)');
+  var corHdr=unitDrop==='clicks'?'Cor(clicks)':unitDrop==='moa'?'Cor(MOA)':unitDrop==='mils'?'Cor(mil)':(met?'Cor(cm)':'Cor(in)');
 
   var rows=results.map(function(r){
     var rng=met?Math.round(r.yd*0.9144):r.yd;
