@@ -1139,7 +1139,9 @@ function withRestoreMetadata(entry,priorEntry,supersedingBuiltinIdx,wasTrued,nom
   return entry;
 }
 // Reads the Firearm & Load section into a plain preset object. Pure — does not touch storage.
-function buildPresetEntryFromForm(name){
+// priorEntry (optional) is the preset slot being overwritten, if any — used only to carry
+// forward angularUnit when the Results table isn't currently on mils/MOA (see below).
+function buildPresetEntryFromForm(name,priorEntry){
   var met=unitSystem==='metric';
   var maxRaw=parseFloat(document.getElementById('fMax').value)||0;
   var zeroRaw=parseFloat(document.getElementById('fZero').value)||0;
@@ -1166,6 +1168,15 @@ function buildPresetEntryFromForm(name){
     // not "value greater than zero".
     zeroOffsetVal:document.getElementById('fZeroOffset').value!==''?(parseFloat(document.getElementById('fZeroOffset').value)||0):undefined,
     zeroOffsetUnit:document.getElementById('fZeroOffset').value!==''?zeroOffsetUnit:undefined,
+    // This rifle's own MIL/MOA turret preference — independent of calibre, since plenty of .177
+    // air rifles run MOA scopes and plenty of centrefires run mil turrets. Captured only when the
+    // Results table is actually showing mils or MOA at save time (its other display modes —
+    // clicks, inches, cm — say nothing about turret units); otherwise the previous saved value for
+    // this same preset is carried forward untouched, so briefly checking "clicks" before hitting
+    // Save can never silently erase a preference set earlier. A brand-new preset saved while on
+    // clicks/in/cm ends up with no preference at all, which falls back to the old calibre-based
+    // guess on next load — never worse than before this field existed.
+    angularUnit:(unitDrop==='mils'||unitDrop==='moa')?unitDrop:((priorEntry&&(priorEntry.angularUnit==='mils'||priorEntry.angularUnit==='moa'))?priorEntry.angularUnit:undefined),
     drag:document.getElementById('fDrag').value,
     shape:document.getElementById('fShape').value||'flatbase',
     twistDir:twistDir,
@@ -1206,7 +1217,7 @@ function saveCurrentAsPreset(){
     targetIdx=slotIdx;
   }
   var priorEntry=targetIdx!==null?d[currentMode][targetIdx]:null;
-  var entry=buildPresetEntryFromForm(name);
+  var entry=buildPresetEntryFromForm(name,priorEntry);
   entry=withRestoreMetadata(entry,priorEntry,editingBuiltinIdx,bake.wasTrued,bake.nominal);
   if(targetIdx!==null){
     d[currentMode][targetIdx]=entry;
@@ -1238,14 +1249,14 @@ function saveTruingToPreset(){
   if(loadedPresetRef.type==='c'){
     var existing=d[currentMode][loadedPresetRef.idx];
     if(existing&&existing.name===loadedPresetRef.name){
-      var entry=buildPresetEntryFromForm(loadedPresetRef.name);
+      var entry=buildPresetEntryFromForm(loadedPresetRef.name,existing);
       entry=withRestoreMetadata(entry,existing,null,true,bake.nominal);
       d[currentMode][loadedPresetRef.idx]=entry;
     } else if(simpleMode&&d[currentMode].length>0){
       // Tracked slot moved/was deleted, but Single Load Mode still only keeps one — replace
       // whatever custom preset remains rather than pushing a second entry.
       var slotIdx=d[currentMode].length-1;
-      var entry=withRestoreMetadata(buildPresetEntryFromForm(loadedPresetRef.name),d[currentMode][slotIdx],null,true,bake.nominal);
+      var entry=withRestoreMetadata(buildPresetEntryFromForm(loadedPresetRef.name,d[currentMode][slotIdx]),d[currentMode][slotIdx],null,true,bake.nominal);
       d[currentMode][slotIdx]=entry;
       loadedPresetRef={type:'c',idx:slotIdx,name:loadedPresetRef.name};
       movedFallback=true;
@@ -1262,7 +1273,7 @@ function saveTruingToPreset(){
     var entry;
     if(simpleMode&&d[currentMode].length>0){
       var slotIdx=d[currentMode].length-1;
-      entry=withRestoreMetadata(buildPresetEntryFromForm(biName),d[currentMode][slotIdx],biIdx,true,bake.nominal);
+      entry=withRestoreMetadata(buildPresetEntryFromForm(biName,d[currentMode][slotIdx]),d[currentMode][slotIdx],biIdx,true,bake.nominal);
       d[currentMode][slotIdx]=entry;
       loadedPresetRef={type:'c',idx:slotIdx,name:biName};
     } else {
@@ -1461,7 +1472,11 @@ function setMode(m){
 // that isn't backed by a saved slot (there currently is no such caller, but it's the safe default).
 function loadPreset(p,ref){
   loadedPresetRef=ref||null;
-  if(p.calibr&&p.calibr.indexOf('.177')!==-1){unitDrop='moa';}else{unitDrop='mils';}
+  // This preset's own saved MIL/MOA turret preference wins if it has one (set the first time it
+  // was saved with the Results table on mils or MOA); older presets from before this field existed
+  // fall back to the original calibre-based guess (.177 -> MOA, everything else -> mils).
+  if(p.angularUnit==='mils'||p.angularUnit==='moa'){unitDrop=p.angularUnit;}
+  else if(p.calibr&&p.calibr.indexOf('.177')!==-1){unitDrop='moa';}else{unitDrop='mils';}
   document.getElementById('fCalibr').value=p.calibr||'';
   document.getElementById('fBC').value=p.bc;
   document.getElementById('fBC7').value=p.bc7!==undefined&&p.bc7!==null?p.bc7:'';
@@ -1495,7 +1510,10 @@ function loadPreset(p,ref){
     setZeroOffsetUnit(p.zeroOffsetUnit||'mils');
   } else {
     document.getElementById('fZeroOffset').value='';
-    setZeroOffsetUnit('mils');
+    // No offset saved yet for this preset — default the entry unit to match this rifle's own
+    // MIL/MOA preference (just resolved above), not a hardcoded mils, so a shooter whose scope
+    // and Results table are already in MOA doesn't have to remember to flip a second toggle too.
+    setZeroOffsetUnit(unitDrop==='moa'?'moa':'mils');
   }
   if(p.dia)document.getElementById('fDia').value=met?(p.dia*25.4).toFixed(2):p.dia;
   if(p.len)document.getElementById('fLen').value=met?(p.len*25.4).toFixed(2):p.len;
