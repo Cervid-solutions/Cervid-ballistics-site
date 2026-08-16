@@ -1815,12 +1815,17 @@ function drawCompareChart(list,refYd){
   var ctx=canvas.getContext('2d');ctx.fillStyle='#1a1d27';ctx.fillRect(0,0,W,H);
   var dropVal=function(r){return met?parseFloat(r.dropCm):parseFloat(r.dropIn);};
   var allDrops=[];list.forEach(function(x){x.results.forEach(function(r){allDrops.push(dropVal(r));});});
-  var minD=Math.min.apply(null,allDrops),maxD=Math.max.apply(null,allDrops),pad=32,padL=32,padR=16,rng=(maxD-minD)||1;
+  // Top margin (padTop) is taller than the bottom margin (padBottom) to make room for two stacked
+  // header lines above the plot area: the vertical-axis unit label (added so the drop numbers along
+  // the left edge state their unit, matching the single-load chart's own "Drop(in/cm)" label) sits
+  // on its own line above the per-load colour-swatch legend, rather than sharing a row and risking
+  // collision with it.
+  var minD=Math.min.apply(null,allDrops),maxD=Math.max.apply(null,allDrops),padTop=44,padBottom=32,padL=32,padR=16,rng=(maxD-minD)||1;
   function tx(yd){return padL+(yd/refYd)*(W-padL-padR);}
-  function ty(d){return H-pad-((d-minD)/rng)*(H-pad*2);}
+  function ty(d){return H-padBottom-((d-minD)/rng)*(H-padTop-padBottom);}
   ctx.lineWidth=1;ctx.font='10px system-ui';
   for(var i=0;i<=4;i++){
-    var yy=pad+(i/4)*(H-pad*2);
+    var yy=padTop+(i/4)*(H-padTop-padBottom);
     ctx.strokeStyle='#2e3348';ctx.beginPath();ctx.moveTo(padL,yy);ctx.lineTo(W-padR,yy);ctx.stroke();
     var dVal=minD+rng*(1-i/4);
     var dRounded=met?Math.round(dVal):Math.round(dVal*10)/10;
@@ -1833,7 +1838,9 @@ function drawCompareChart(list,refYd){
     x.results.forEach(function(r,i){var xx=tx(r.yd),yy2=ty(dropVal(r));i===0?ctx.moveTo(xx,yy2):ctx.lineTo(xx,yy2);});
     ctx.strokeStyle=x.color;ctx.lineWidth=2.5;ctx.stroke();
   });
-  var lx=padL,ly=14;
+  ctx.fillStyle='#7a7f99';ctx.font='11px system-ui';ctx.textAlign='left';
+  ctx.fillText('Drop('+(met?'cm':'in')+')',padL+4,14);
+  var lx=padL,ly=28;
   ctx.font='11px system-ui';
   list.forEach(function(x){
     var label=x.name+(x.isLive?' (live)':'');
