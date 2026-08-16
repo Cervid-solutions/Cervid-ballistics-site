@@ -1856,8 +1856,8 @@ function renderCompareResults(list,refYd){
   // spells out the unit explicitly rather than leaving the reader to guess what's being shown.
   var cu=compareUnitDrop;
   var cuLabel=cu==='in'?'in':cu==='cm'?'cm':cu==='moa'?'MOA':cu==='clicks'?'clicks':'mil';
-  function cuDrop(rL){return cu==='in'?rL.dropIn:cu==='cm'?rL.dropCm:cu==='moa'?rL.moa:cu==='clicks'?rL.clicks:rL.mils;}
-  function cuWind(rL){return cu==='in'?rL.driftIn:cu==='cm'?rL.driftCm:cu==='moa'?rL.driftMoa:cu==='clicks'?rL.driftClicks:rL.driftMils;}
+  function cuDrop(rL){return cu==='in'?rL.dropIn:cu==='cm'?rL.dropCm:cu==='moa'?rL.moa:cu==='clicks'?toClicks(rL.moa):rL.mils;}
+  function cuWind(rL){return cu==='in'?rL.driftIn:cu==='cm'?rL.driftCm:cu==='moa'?rL.driftMoa:cu==='clicks'?toClicks(rL.driftMoa):rL.driftMils;}
   var unitPicker='<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:12px;color:var(--muted);flex-wrap:wrap;">Drop &amp; Wind units:'+
     '<select onchange="setCompareDropUnit(this.value)" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 8px;font-size:12px;">'+
     ['mils','moa','clicks','in','cm'].map(function(u){var lbl=u==='moa'?'MOA':u==='mils'?'mils':u==='clicks'?'clicks':u==='in'?'inches':'cm';return '<option value="'+u+'"'+(cu===u?' selected':'')+'>'+lbl+'</option>';}).join('')+
@@ -2032,7 +2032,14 @@ function computeTrajectory(p,dense){
     return{
       yd:r.xYd,fps:Math.round(r.v),mach:r.mach.toFixed(2),
       dropIn:dIn.toFixed(2),dropCm:(dIn*2.54).toFixed(1),
-      moa:moa.toFixed(2),mils:mils.toFixed(2),clicks:(moa/clickSizeMoa).toFixed(0),
+      // Deliberately no baked "clicks" field here (moa/clickSizeMoa) — clickSizeMoa can be changed
+      // by the user after Calculate has already run and these row objects are cached, and a value
+      // baked in at calculation time would silently go stale: switching the click-size selector
+      // would re-render the table from these same cached rows without ever recomputing them. Clicks
+      // are instead derived on the fly from the unit-invariant moa field via toClicks() wherever
+      // they're displayed (renderResults, renderCompareResults, Range Card), so they always reflect
+      // whatever click size is currently selected, not whatever was selected when Calculate ran.
+      moa:moa.toFixed(2),mils:mils.toFixed(2),
       energyFtLb:eKE.toFixed(1),energyJ:eJ.toFixed(0),
       // Full-precision (unrounded) energy, alongside the display-rounded strings above. The
       // table/CSV only ever need 1dp (ft-lb) or whole Joules, but that rounding is coarse enough
@@ -2042,11 +2049,11 @@ function computeTrajectory(p,dense){
       // line had before it got its own dense per-yard sampling. The chart now reads these instead.
       energyFtLbRaw:eKE,energyJRaw:eJ,
       driftIn:drift.toFixed(2),driftCm:(drift*2.54).toFixed(1),
-      driftMoa:driftMoa.toFixed(2),driftMils:driftMils.toFixed(2),driftClicks:(driftMoa/clickSizeMoa).toFixed(0),
+      driftMoa:driftMoa.toFixed(2),driftMils:driftMils.toFixed(2),
       spinIn:sdIn.toFixed(2),spinCm:(sdIn*2.54).toFixed(1),
-      spinMoa:sdMoa.toFixed(2),spinMils:sdMils.toFixed(2),spinClicks:(sdMoa/clickSizeMoa).toFixed(0),
+      spinMoa:sdMoa.toFixed(2),spinMils:sdMils.toFixed(2),
       coriolisIn:corIn.toFixed(2),coriolisCm:(corIn*2.54).toFixed(1),
-      coriolisMoa:corMoa.toFixed(2),coriolisMils:corMils.toFixed(2),coriolisClicks:(corMoa/clickSizeMoa).toFixed(0),
+      coriolisMoa:corMoa.toFixed(2),coriolisMils:corMils.toFixed(2),
       tof:r.t.toFixed(3),isZero:r.xYd===p.zeroYd,isSpot:p.spotYd&&r.xYd===p.spotYd,isSubsonic:r.mach<1
     };
   });
@@ -2060,6 +2067,11 @@ function setTwistDir(d){twistDir=d;document.getElementById('btnRH').classList.to
 // moment it's entered, since re-interpreting an already-entered number under a different unit
 // later would silently change what it means. Defaults to mils, matching the app's general default.
 function setZeroOffsetUnit(u){zeroOffsetUnit=u;document.getElementById('btnZeroOffsetUnitMils').classList.toggle('active',u==='mils');document.getElementById('btnZeroOffsetUnitMoa').classList.toggle('active',u==='moa');}
+// Converts a stored MOA string to a click count using whatever clickSizeMoa is current right now
+// — always called at the point of display rather than baked into a row at calculation time, so
+// switching the click-size selector after Calculate has already run updates every clicks value
+// immediately instead of silently continuing to show figures for the old click size.
+function toClicks(moaStr){return(parseFloat(moaStr)/clickSizeMoa).toFixed(0);}
 // Builds the <option> list for a turret click-size selector (1/8, 1/4, 1/2 MOA, or 0.1/0.2 MRAD
 // per click), marking whichever matches the current clickSizeMoa as selected. Shared by the
 // single-load Results table and the Compare Loads table so both click-size dropdowns always show
@@ -2377,13 +2389,17 @@ function renderResults(results,params,stability){
 
   var clickSel=clickSizeOptionsHtml();
 
-  // Wind column: mils→driftMils, moa→driftMoa, else linear (in or cm by unit system)
+  // Wind column: mils→driftMils, moa→driftMoa, clicks→toClicks(driftMoa), else linear (in or cm
+  // by unit system). Wind/Spin/Coriolis clicks are computed live from the row's moa field via
+  // toClicks() rather than looked up by column name, since a clicks value can't be a fixed field
+  // on the row the way the other units are — it depends on clickSizeMoa, which the user can change
+  // after these rows were already calculated (see the note on toClicks() itself).
   var windIsAngular=unitDrop==='moa'||unitDrop==='mils';
-  var windCol=unitDrop==='clicks'?'driftClicks':unitDrop==='moa'?'driftMoa':unitDrop==='mils'?'driftMils':(met?'driftCm':'driftIn');
   var windHdr=unitDrop==='clicks'?'Wind(clicks)':unitDrop==='moa'?'Wind(MOA)':unitDrop==='mils'?'Wind(mil)':(met?'Wind(cm)':'Wind(in)');
-  var spinCol=unitDrop==='clicks'?'spinClicks':unitDrop==='moa'?'spinMoa':unitDrop==='mils'?'spinMils':(met?'spinCm':'spinIn');
   var spinHdr=unitDrop==='clicks'?'Spin(clicks)':unitDrop==='moa'?'Spin(MOA)':unitDrop==='mils'?'Spin(mil)':(met?'Spin(cm)':'Spin(in)');
-  var corCol=unitDrop==='clicks'?'coriolisClicks':unitDrop==='moa'?'coriolisMoa':unitDrop==='mils'?'coriolisMils':(met?'coriolisCm':'coriolisIn');
+  function dispWind(r){return unitDrop==='clicks'?toClicks(r.driftMoa):unitDrop==='moa'?r.driftMoa:unitDrop==='mils'?r.driftMils:(met?r.driftCm:r.driftIn);}
+  function dispSpin(r){return unitDrop==='clicks'?toClicks(r.spinMoa):unitDrop==='moa'?r.spinMoa:unitDrop==='mils'?r.spinMils:(met?r.spinCm:r.spinIn);}
+  function dispCor(r){return unitDrop==='clicks'?toClicks(r.coriolisMoa):unitDrop==='moa'?r.coriolisMoa:unitDrop==='mils'?r.coriolisMils:(met?r.coriolisCm:r.coriolisIn);}
 
   // Range & velocity columns
   var rngHdr=met?'Range(m)':'Range(yd)';
@@ -2397,16 +2413,16 @@ function renderResults(results,params,stability){
     var vel=met?Math.round(r.fps*0.3048):r.fps;
     var eA=met?r.energyJ:r.energyFtLb;
     var eB=met?r.energyFtLb:r.energyJ;
-    var cor=r[corCol];
-    var drop=unitDrop==='in'?r.dropIn:unitDrop==='cm'?r.dropCm:unitDrop==='moa'?r.moa:unitDrop==='clicks'?r.clicks:r.mils;
+    var cor=dispCor(r);
+    var drop=unitDrop==='in'?r.dropIn:unitDrop==='cm'?r.dropCm:unitDrop==='moa'?r.moa:unitDrop==='clicks'?toClicks(r.moa):r.mils;
     var dn=parseFloat(drop),isMM=unitDrop==='moa'||unitDrop==='mils'||unitDrop==='clicks';
     var dc=isMM?(dn>0?'pos':dn<0?'neg':''):(dn<0?'neg':dn>0?'pos':'');
     return'<tr class="'+(r.isSubsonic?' subsonic':'')+(r.isZero?' zero-row':'')+(r.isSpot?' spot-row':'')+'">'+
       '<td>'+(r.isZero?'<strong>':'')+(r.isSpot?'<span style="color:var(--accent2);">':'')+rng+(r.isZero?' &#9733;</strong>':'')+(r.isSpot?' &#9670;</span>':'')+'</td>'+
       '<td>'+vel+'</td>'+
       '<td class="'+dc+'">'+drop+'</td>'+
-      '<td>'+fmtDir(r[windCol])+'</td>'+
-      '<td class="muted">'+fmtDir(r[spinCol])+'</td>'+
+      '<td>'+fmtDir(dispWind(r))+'</td>'+
+      '<td class="muted">'+fmtDir(dispSpin(r))+'</td>'+
       '<td class="'+(r.isSubsonic?'neg':'muted')+'">'+r.mach+(r.isSubsonic?' (sub)':'')+'</td>'+
       '<td class="muted">'+r.tof+'</td>'+
       '<td>'+eA+'</td>'+
@@ -2592,7 +2608,7 @@ function showRangeCard(){
   var calibr=document.getElementById('fCalibr').value||'Range Card';
   var unitLabel=unitDrop==='in'?(met?'cm':'in'):unitDrop==='cm'?'cm':unitDrop==='moa'?'MOA':unitDrop==='clicks'?'clicks':'mils';
   var rows=r.results.map(function(row){
-    var val=unitDrop==='in'?row.dropIn:unitDrop==='cm'?row.dropCm:unitDrop==='moa'?row.moa:unitDrop==='clicks'?row.clicks:row.mils;
+    var val=unitDrop==='in'?row.dropIn:unitDrop==='cm'?row.dropCm:unitDrop==='moa'?row.moa:unitDrop==='clicks'?toClicks(row.moa):row.mils;
     var rng=(met?Math.round(row.yd*0.9144):row.yd)+(met?'m':'yd');
     var rowCls=row.isZero?' rc-zero':(row.isSpot?' rc-spot':'');
     var marker=row.isZero?' &#9733;':(row.isSpot?' &#9670;':'');
@@ -2618,7 +2634,7 @@ function buildRangeCardText(){
   var calibr=document.getElementById('fCalibr').value||'Range Card';
   var unitLabel=unitDrop==='in'?(met?'cm':'in'):unitDrop==='cm'?'cm':unitDrop==='moa'?'MOA':unitDrop==='clicks'?'clicks':'mils';
   var lines=r.results.map(function(row){
-    var val=unitDrop==='in'?row.dropIn:unitDrop==='cm'?row.dropCm:unitDrop==='moa'?row.moa:unitDrop==='clicks'?row.clicks:row.mils;
+    var val=unitDrop==='in'?row.dropIn:unitDrop==='cm'?row.dropCm:unitDrop==='moa'?row.moa:unitDrop==='clicks'?toClicks(row.moa):row.mils;
     var rng=(met?Math.round(row.yd*0.9144):row.yd)+(met?'m':'yd');
     var marker=row.isZero?' ★':(row.isSpot?' ◆':'');
     return rng+marker+': '+val+' '+unitLabel;
