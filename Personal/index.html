@@ -2291,7 +2291,13 @@ function renderResults(results,params,stability){
   // Distinct from the Trued badge above — this doesn't mean the BC/drag model was touched at all,
   // just that the table is deliberately shifted by a known holdover at the zero range. Shown
   // whenever it's actually in effect so it's never a silent, invisible correction.
-  var zeroOffsetBadge=params.zeroOffsetMils?'<span style="background:rgba(79,142,247,.15);border:1px solid rgba(79,142,247,.4);color:var(--accent);border-radius:4px;padding:2px 8px;font-size:11px;font-weight:700;">Zero Offset '+(params.zeroOffsetMils>0?'+':'')+params.zeroOffsetMils.toFixed(2)+' mil</span>':'';
+  // Displayed in whichever angular unit the results table is currently showing (unitDrop), same
+  // as every other angular column (Drift, Spin, Coriolis) already does — not hard-locked to mils
+  // regardless of what the shooter has the page set to. Falls back to mils for the non-angular
+  // display modes (clicks/in/cm), since Zero Offset has no linear equivalent to show at a glance.
+  var zeroOffsetDisp=unitDrop==='moa'?params.zeroOffsetMils*(3.6/1.0472):params.zeroOffsetMils;
+  var zeroOffsetUnitLabel=unitDrop==='moa'?'MOA':'mil';
+  var zeroOffsetBadge=params.zeroOffsetMils?'<span style="background:rgba(79,142,247,.15);border:1px solid rgba(79,142,247,.4);color:var(--accent);border-radius:4px;padding:2px 8px;font-size:11px;font-weight:700;">Zero Offset '+(zeroOffsetDisp>0?'+':'')+zeroOffsetDisp.toFixed(2)+' '+zeroOffsetUnitLabel+'</span>':'';
   // Distinct again from both badges above. truingBadge reflects a LIVE, in-session bcMultiplier —
   // it disappears the moment truing gets saved to a preset, since baking folds the correction into
   // the BC number itself and resets the multiplier to 1. This badge instead reads the currently
