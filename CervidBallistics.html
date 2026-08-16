@@ -1756,13 +1756,15 @@ function renderCompareResults(list,refYd){
   // Results table's own unit toggle, via the dropdown below. Whichever is picked, the row label
   // spells out the unit explicitly rather than leaving the reader to guess what's being shown.
   var cu=compareUnitDrop;
-  var cuLabel=cu==='in'?'in':cu==='cm'?'cm':cu==='moa'?'MOA':'mil';
-  function cuDrop(rL){return cu==='in'?rL.dropIn:cu==='cm'?rL.dropCm:cu==='moa'?rL.moa:rL.mils;}
-  function cuWind(rL){return cu==='in'?rL.driftIn:cu==='cm'?rL.driftCm:cu==='moa'?rL.driftMoa:rL.driftMils;}
-  var unitPicker='<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:12px;color:var(--muted);">Drop &amp; Wind units:'+
+  var cuLabel=cu==='in'?'in':cu==='cm'?'cm':cu==='moa'?'MOA':cu==='clicks'?'clicks':'mil';
+  function cuDrop(rL){return cu==='in'?rL.dropIn:cu==='cm'?rL.dropCm:cu==='moa'?rL.moa:cu==='clicks'?rL.clicks:rL.mils;}
+  function cuWind(rL){return cu==='in'?rL.driftIn:cu==='cm'?rL.driftCm:cu==='moa'?rL.driftMoa:cu==='clicks'?rL.driftClicks:rL.driftMils;}
+  var unitPicker='<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:12px;color:var(--muted);flex-wrap:wrap;">Drop &amp; Wind units:'+
     '<select onchange="setCompareDropUnit(this.value)" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 8px;font-size:12px;">'+
-    ['mils','moa','in','cm'].map(function(u){var lbl=u==='moa'?'MOA':u==='mils'?'mils':u==='in'?'inches':'cm';return '<option value="'+u+'"'+(cu===u?' selected':'')+'>'+lbl+'</option>';}).join('')+
-    '</select></div>';
+    ['mils','moa','clicks','in','cm'].map(function(u){var lbl=u==='moa'?'MOA':u==='mils'?'mils':u==='clicks'?'clicks':u==='in'?'inches':'cm';return '<option value="'+u+'"'+(cu===u?' selected':'')+'>'+lbl+'</option>';}).join('')+
+    '</select>'+
+    (cu==='clicks'?'<select onchange="setClickSize(this.value)" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 8px;font-size:12px;">'+clickSizeOptionsHtml()+'</select>':'')+
+    '</div>';
   var rows=[
     {label:'Muzzle Velocity',get:function(x){var r0=x.results[0];return met?Math.round(r0.fps*0.3048)+' m/s':r0.fps+' fps';}},
     {label:'Muzzle Energy',get:function(x){var r0=x.results[0];return met?r0.energyJ+' J':r0.energyFtLb+' ft-lb';}},
@@ -1959,7 +1961,17 @@ function setTwistDir(d){twistDir=d;document.getElementById('btnRH').classList.to
 // moment it's entered, since re-interpreting an already-entered number under a different unit
 // later would silently change what it means. Defaults to mils, matching the app's general default.
 function setZeroOffsetUnit(u){zeroOffsetUnit=u;document.getElementById('btnZeroOffsetUnitMils').classList.toggle('active',u==='mils');document.getElementById('btnZeroOffsetUnitMoa').classList.toggle('active',u==='moa');}
-function setClickSize(v){clickSizeMoa=parseFloat(v)||0.25;if(lastResults)renderResults(lastResults.results,lastResults.params,lastResults.stability);}
+// Builds the <option> list for a turret click-size selector (1/8, 1/4, 1/2 MOA, or 0.1/0.2 MRAD
+// per click), marking whichever matches the current clickSizeMoa as selected. Shared by the
+// single-load Results table and the Compare Loads table so both click-size dropdowns always show
+// the same selection, since they're both driven by the one clickSizeMoa global.
+function clickSizeOptionsHtml(){
+  return['0.125','0.25','0.5','0.343775','0.68755'].map(function(v){
+    var lbl=v==='0.125'?'1/8 MOA/click':v==='0.25'?'1/4 MOA/click':v==='0.5'?'1/2 MOA/click':v==='0.343775'?'0.1 MRAD/click':'0.2 MRAD/click';
+    return '<option value="'+v+'" '+(Math.abs(clickSizeMoa-parseFloat(v))<0.001?'selected':'')+'>'+lbl+'</option>';
+  }).join('');
+}
+function setClickSize(v){clickSizeMoa=parseFloat(v)||0.25;if(lastResults)renderResults(lastResults.results,lastResults.params,lastResults.stability);if(lastCompareList)renderCompareResults(lastCompareList,lastCompareRefYd);}
 function setDropUnit(u){unitDrop=u;if(lastResults)renderResults(lastResults.results,lastResults.params,lastResults.stability);}
 function setTrueUnit(u){trueUnit=u;['Mils','Moa','In','Cm'].forEach(function(k){var el=document.getElementById('btnTrueUnit'+k);if(el)el.classList.toggle('active',u===k.toLowerCase());});}
 
@@ -2246,7 +2258,7 @@ function renderResults(results,params,stability){
     '<div class="stat-card '+sgSt.cls+'"><div class="label">Gyro Stability (Sg)'+sgHelp+'</div><div class="value">'+sg.toFixed(2)+'</div><div class="unit">'+sgSt.label+shapeNote+'</div></div>'+
     '<div class="stat-card"><div class="label">Min Twist (Sg 1.5)</div><div class="value" style="font-size:16px;">1:'+(stability.minTwist?stability.minTwist.toFixed(1):'?')+'"</div><div class="unit">Miller &middot; GH 1:'+(stability.ghTwist?stability.ghTwist.toFixed(1):'?')+'"</div></div>';
 
-  var clickSel='<option value="0.125" '+(Math.abs(clickSizeMoa-0.125)<0.001?'selected':'')+'>1/8 MOA/click</option><option value="0.25" '+(Math.abs(clickSizeMoa-0.25)<0.001?'selected':'')+'>1/4 MOA/click</option><option value="0.5" '+(Math.abs(clickSizeMoa-0.5)<0.001?'selected':'')+'>1/2 MOA/click</option><option value="0.343775" '+(Math.abs(clickSizeMoa-0.343775)<0.001?'selected':'')+'>0.1 MRAD/click</option><option value="0.68755" '+(Math.abs(clickSizeMoa-0.68755)<0.001?'selected':'')+'>0.2 MRAD/click</option>';
+  var clickSel=clickSizeOptionsHtml();
 
   // Wind column: mils→driftMils, moa→driftMoa, else linear (in or cm by unit system)
   var windIsAngular=unitDrop==='moa'||unitDrop==='mils';
