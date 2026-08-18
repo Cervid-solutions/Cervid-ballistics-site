@@ -153,11 +153,13 @@
   .restore-link{font-size:10px;color:var(--muted);cursor:pointer;text-decoration:underline;}
   .help-tip{display:inline-block;width:15px;height:15px;line-height:13px;text-align:center;border-radius:50%;background:var(--surface2);border:1px solid var(--border);color:var(--muted);font-size:9px;font-style:normal;font-weight:700;cursor:pointer;margin-left:3px;vertical-align:middle;touch-action:manipulation;}
   #helpTipPopover{display:none;position:fixed;z-index:9999;max-width:230px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:11px;line-height:1.45;color:var(--text);box-shadow:0 4px 16px rgba(0,0,0,.45);}
-  .rc-row{display:flex;justify-content:space-between;align-items:baseline;padding:14px 0;border-bottom:1px solid var(--border);}
+  .rc-row{display:flex;justify-content:space-between;align-items:center;padding:14px 0;border-bottom:1px solid var(--border);}
   .rc-row.rc-zero{background:rgba(79,142,247,.06);}
   .rc-row.rc-spot{background:rgba(224,108,58,.06);}
   .rc-range{color:var(--muted);font-size:22px;font-weight:700;}
+  .rc-valwrap{display:flex;flex-direction:column;align-items:flex-end;}
   .rc-val{color:var(--accent);font-size:32px;font-weight:800;}
+  .rc-wind{color:var(--muted);font-size:13px;font-weight:600;margin-top:2px;}
   @media print{
     body *{visibility:hidden;}
     #rangeCardModal, #rangeCardModal *{visibility:visible;}
@@ -2488,6 +2490,24 @@ function exportCSV(){
   var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='ballistics_'+calibr.replace(/\s+/g,'_')+'.csv';a.click();
 }
 
+// Returns the "per 1mph of full-value wind" reference figure for a Range Card row, in whatever
+// unit the holdover selector (unitDrop) is currently set to — same unit-switching convention as
+// dispWind()/cuWind() elsewhere in the app. Derived by dividing the row's drift (computed for
+// whatever wind speed was entered when Calculate ran, params.windMph) back down to a per-mph
+// rate — a linear approximation, matching how printed dope/wind cards traditionally present this,
+// since a single baked-in wind guess would otherwise carry false precision the shooter can't act
+// on if the real wind differs from what was entered. Returns null when the calculation used 0mph
+// wind, since there's nothing to derive a rate from. MOA/mils are shown as decimals (matching how
+// drift is already displayed everywhere else); clicks are rounded to a whole number, since clicks
+// are inherently discrete and toClicks() rounds them the same way everywhere else in the app.
+function windPerMph(row,windMph){
+  if(!windMph)return null;
+  if(unitDrop==='clicks')return toClicks((parseFloat(row.driftMoa)/windMph).toFixed(2))+' clicks/mph';
+  if(unitDrop==='moa')return (parseFloat(row.driftMoa)/windMph).toFixed(2)+' MOA/mph';
+  if(unitDrop==='mils')return (parseFloat(row.driftMils)/windMph).toFixed(2)+' mil/mph';
+  if(unitDrop==='cm')return (parseFloat(row.driftCm)/windMph).toFixed(2)+' cm/mph';
+  return (parseFloat(row.driftIn)/windMph).toFixed(2)+' in/mph';
+}
 // ── Range Card: a stripped-down, large-print range-vs-holdover view for glancing at in the
 // field (or on a bright phone screen) rather than the full stat-card/chart/table layout, which
 // is built for a desk. Reuses the currently selected drop unit so it matches whatever the main
@@ -2502,7 +2522,9 @@ function showRangeCard(){
     var rng=(met?Math.round(row.yd*0.9144):row.yd)+(met?'m':'yd');
     var rowCls=row.isZero?' rc-zero':(row.isSpot?' rc-spot':'');
     var marker=row.isZero?' &#9733;':(row.isSpot?' &#9670;':'');
-    return '<div class="rc-row'+rowCls+'"><span class="rc-range">'+rng+marker+'</span><span class="rc-val">'+val+'</span></div>';
+    var wpm=windPerMph(row,r.params&&r.params.windMph);
+    var windLine=wpm?'<div class="rc-wind">'+wpm+' wind</div>':'';
+    return '<div class="rc-row'+rowCls+'"><span class="rc-range">'+rng+marker+'</span><span class="rc-valwrap"><span class="rc-val">'+val+'</span>'+windLine+'</span></div>';
   }).join('');
   document.getElementById('rangeCardBody').innerHTML=rows;
   document.getElementById('rangeCardTitle').textContent=calibr;
@@ -2517,7 +2539,9 @@ function hideRangeCard(){
 // than scraped from the DOM, so it can never drift out of sync with what's actually displayed.
 // Exists to feed shareRangeCard(): the app itself has no server and can't push anything to a
 // Watch, but the iOS share sheet can hand this text to Notes, Reminders, or a personal Shortcut,
-// any of which do sync to and display on an Apple Watch.
+// any of which do sync to and display on an Apple Watch. The wind-per-mph reference (when
+// available) is appended in parentheses on the same line, so it survives the same plain-text
+// export path as everything else here — no separate handling needed for Notes/Watch/Shortcuts.
 function buildRangeCardText(){
   if(!lastResults)return '';
   var r=lastResults,met=unitSystem==='metric';
@@ -2527,7 +2551,8 @@ function buildRangeCardText(){
     var val=unitDrop==='in'?row.dropIn:unitDrop==='cm'?row.dropCm:unitDrop==='moa'?row.moa:unitDrop==='clicks'?toClicks(row.moa):row.mils;
     var rng=(met?Math.round(row.yd*0.9144):row.yd)+(met?'m':'yd');
     var marker=row.isZero?' ★':(row.isSpot?' ◆':'');
-    return rng+marker+': '+val+' '+unitLabel;
+    var wpm=windPerMph(row,r.params&&r.params.windMph);
+    return rng+marker+': '+val+' '+unitLabel+(wpm?'  ('+wpm+' wind)':'');
   });
   return calibr+' — Range Card\n★ zero   ◆ spot range\n\n'+lines.join('\n');
 }
