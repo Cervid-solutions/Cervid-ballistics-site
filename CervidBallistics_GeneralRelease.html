@@ -2617,13 +2617,26 @@ function exportCSV(){
 // wind, since there's nothing to derive a rate from. MOA/mils are shown as decimals (matching how
 // drift is already displayed everywhere else); clicks are rounded to a whole number, since clicks
 // are inherently discrete and toClicks() rounds them the same way everywhere else in the app.
-function windPerMph(row,windMph){
+// "met" governs which wind-speed unit the reference is denominated in — mph or kph — independent
+// of unitDrop (which only governs the numerator: mils/MOA/clicks/in/cm). This lets the rate follow
+// the page's metric/imperial toggle the same way every other Range Card value already does (range
+// in m vs yd, drop in cm vs in), rather than always being expressed per-mph regardless of display
+// unit. windMph itself is always the canonical mph value from params (computeTrajectory's internal
+// units), so it's converted to kph here rather than assuming the input field's raw entry.
+function windPerMph(row,windMph,met){
   if(!windMph)return null;
-  if(unitDrop==='clicks')return toClicks((parseFloat(row.driftMoa)/windMph).toFixed(2))+' clicks/mph';
-  if(unitDrop==='moa')return (parseFloat(row.driftMoa)/windMph).toFixed(2)+' MOA/mph';
-  if(unitDrop==='mils')return (parseFloat(row.driftMils)/windMph).toFixed(2)+' mil/mph';
-  if(unitDrop==='cm')return (parseFloat(row.driftCm)/windMph).toFixed(2)+' cm/mph';
-  return (parseFloat(row.driftIn)/windMph).toFixed(2)+' in/mph';
+  var rateWind=met?windMph*1.60934:windMph;
+  var period=met?'per kph':'per mph';
+  var valStr;
+  if(unitDrop==='clicks')valStr=toClicks((parseFloat(row.driftMoa)/rateWind).toFixed(2))+' clicks';
+  else if(unitDrop==='moa')valStr=(parseFloat(row.driftMoa)/rateWind).toFixed(2)+' MOA';
+  else if(unitDrop==='mils')valStr=(parseFloat(row.driftMils)/rateWind).toFixed(2)+' mil';
+  else if(unitDrop==='cm')valStr=(parseFloat(row.driftCm)/rateWind).toFixed(2)+' cm';
+  else valStr=(parseFloat(row.driftIn)/rateWind).toFixed(2)+' in';
+  // Explicit "(per mph)"/"(per kph)" label rather than a bare "(mph)"/"(kph)" suffix: this value is
+  // a rate (correction per unit of wind), not a wind-speed reading, and a bare unit suffix reads
+  // like the latter — easy to misread as "wind is 0.28mph" rather than "0.28 for every 1mph of wind".
+  return 'Wind ('+period+'): '+valStr;
 }
 // ── Range Card: a stripped-down, large-print range-vs-holdover view for glancing at in the
 // field (or on a bright phone screen) rather than the full stat-card/chart/table layout, which
@@ -2639,8 +2652,8 @@ function showRangeCard(){
     var rng=(met?Math.round(row.yd*0.9144):row.yd)+(met?'m':'yd');
     var rowCls=row.isZero?' rc-zero':(row.isSpot?' rc-spot':'');
     var marker=row.isZero?' &#9733;':(row.isSpot?' &#9670;':'');
-    var wpm=windPerMph(row,r.params&&r.params.windMph);
-    var windLine=wpm?'<div class="rc-wind">'+wpm+' wind</div>':'';
+    var wpm=windPerMph(row,r.params&&r.params.windMph,met);
+    var windLine=wpm?'<div class="rc-wind">'+wpm+'</div>':'';
     return '<div class="rc-row'+rowCls+'"><span class="rc-range">'+rng+marker+'</span><span class="rc-valwrap"><span class="rc-val">'+val+'</span>'+windLine+'</span></div>';
   }).join('');
   document.getElementById('rangeCardBody').innerHTML=rows;
@@ -2668,8 +2681,8 @@ function buildRangeCardText(){
     var val=unitDrop==='in'?row.dropIn:unitDrop==='cm'?row.dropCm:unitDrop==='moa'?row.moa:unitDrop==='clicks'?toClicks(row.moa):row.mils;
     var rng=(met?Math.round(row.yd*0.9144):row.yd)+(met?'m':'yd');
     var marker=row.isZero?' ★':(row.isSpot?' ◆':'');
-    var wpm=windPerMph(row,r.params&&r.params.windMph);
-    return rng+marker+': '+val+' '+unitLabel+(wpm?'  ('+wpm+' wind)':'');
+    var wpm=windPerMph(row,r.params&&r.params.windMph,met);
+    return rng+marker+': '+val+' '+unitLabel+(wpm?'  — '+wpm:'');
   });
   return calibr+' — Range Card\n★ zero   ◆ spot range\n\n'+lines.join('\n');
 }
