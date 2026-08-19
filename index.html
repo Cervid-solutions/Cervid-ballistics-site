@@ -2910,13 +2910,22 @@ function buildReticleSvg(patternKey,elevVal,windVal){
   var pat=RETICLE_PATTERNS[patternKey];
   var size=280,center=size/2,frameR=size*0.42,gap=10;
   var pxPerUnit=frameR/pat.span;
+  // Dot radius is derived from the on-screen spacing between marks (pxPerUnit) rather than a fixed
+  // pixel value, so a dot's diameter stays a fixed ~20% of the gap between adjacent marks — close to
+  // real mil-dot reticle specs (e.g. USMC mildot spec runs a dot diameter around 0.2 of the 1-mil
+  // spacing) — instead of looking chunkier or more crowded on patterns/spans where pxPerUnit happens
+  // to be smaller. This mattered most for the Christmas Tree's wind-hold dots, which sit only 1 mil
+  // apart at a much finer effective spacing than the Mil-Dot pattern's own dots; a fixed radius that
+  // looked fine on Mil-Dot was crowding adjacent dots together on the Tree's wider rows. The 1.2
+  // floor keeps dots from disappearing entirely if a pattern with a very large span is added later.
+  var dotR=Math.max(1.2,pxPerUnit*0.1);
   var stroke='#3ecf8e';
   var svg='<circle cx="'+center+'" cy="'+center+'" r="'+frameR+'" fill="#0a0c11" stroke="#2e3348" stroke-width="1"/>';
   for(var n=1;n<=pat.span;n++){
     var d=n*pxPerUnit;
     if(patternKey==='mildot'){
-      [center-d,center+d].forEach(function(cx){svg+='<circle cx="'+cx+'" cy="'+center+'" r="3.5" fill="'+stroke+'"/>';});
-      [center-d,center+d].forEach(function(cy){svg+='<circle cx="'+center+'" cy="'+cy+'" r="3.5" fill="'+stroke+'"/>';});
+      [center-d,center+d].forEach(function(cx){svg+='<circle cx="'+cx+'" cy="'+center+'" r="'+dotR+'" fill="'+stroke+'"/>';});
+      [center-d,center+d].forEach(function(cy){svg+='<circle cx="'+center+'" cy="'+cy+'" r="'+dotR+'" fill="'+stroke+'"/>';});
     } else if(patternKey==='moahash'){
       var isMajor=(n%5===0),tickLen=isMajor?9:5,w=isMajor?1.8:1;
       [center-d,center+d].forEach(function(cx){svg+='<line x1="'+cx+'" y1="'+(center-tickLen)+'" x2="'+cx+'" y2="'+(center+tickLen)+'" stroke="'+stroke+'" stroke-width="'+w+'"/>';});
@@ -2940,7 +2949,7 @@ function buildReticleSvg(patternKey,elevVal,windVal){
       svg+='<text x="'+(center+halfWidthMil*pxPerUnit+8)+'" y="'+(cy+3)+'" fill="#7a7f99" font-size="8" text-anchor="start">'+n+'</text>';
       for(var w2=1;w2<=dotCols;w2++){
         var wd=w2*pxPerUnit;
-        svg+='<circle cx="'+(center-wd)+'" cy="'+cy+'" r="2.2" fill="'+stroke+'"/><circle cx="'+(center+wd)+'" cy="'+cy+'" r="2.2" fill="'+stroke+'"/>';
+        svg+='<circle cx="'+(center-wd)+'" cy="'+cy+'" r="'+dotR+'" fill="'+stroke+'"/><circle cx="'+(center+wd)+'" cy="'+cy+'" r="'+dotR+'" fill="'+stroke+'"/>';
       }
     }
   }
