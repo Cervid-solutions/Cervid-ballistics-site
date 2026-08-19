@@ -2869,8 +2869,21 @@ function buildReticleSvg(patternKey,elevVal,windVal,windMph,windClock,met){
       svg+='<line x1="'+tipX+'" y1="'+tipY+'" x2="'+h1x+'" y2="'+h1y+'" stroke="#7a7f99" stroke-width="2.6"/>';
       svg+='<line x1="'+tipX+'" y1="'+tipY+'" x2="'+h2x+'" y2="'+h2y+'" stroke="#7a7f99" stroke-width="2.6"/>';
       svg+='<circle cx="'+hubX+'" cy="'+hubY+'" r="3" fill="#7a7f99"/>';
-      var speedLabel=met?(windMph*1.60934).toFixed(1)+'km/h':windMph+'mph';
-      svg+='<text x="'+hubX+'" y="'+(hubY+armLen+17)+'" fill="#7a7f99" font-size="12" font-weight="600" text-anchor="middle">'+speedLabel+'</text>';
+      // "PUSH" reframes the arrow explicitly as "which way the correction pushes point of impact,"
+      // not a literal weathervane reading — a bare directional arrow is genuinely ambiguous, since
+      // some people instinctively read it as "wind is coming from there" (the meteorological/
+      // weathervane convention) and others as "wind is blowing toward there," and this arrow is
+      // neither: it's drawn to agree with the app's own effect ("3=full R" on the Wind Clock field
+      // causes rightward drift, and this arrow points right at clock=3), so labelling it by effect
+      // avoids the reader importing either outside convention. The trailing R/L letter on the speed
+      // line gives the same crosswind-side readout a second, non-graphical way (useful at a glance
+      // without having to judge the arrow's exact angle), derived from the same sign wdx already
+      // carries — positive means rightward push, matching "positive drift = right" elsewhere in the
+      // app; omitted entirely for a pure head/tailwind (12/6 o'clock) where there's no crosswind side.
+      svg+='<text x="'+hubX+'" y="'+(hubY+armLen+9)+'" fill="#7a7f99" font-size="8" font-weight="700" letter-spacing="1" text-anchor="middle">PUSH</text>';
+      var sideLetter=wdx>0.05?' R':wdx<-0.05?' L':'';
+      var speedLabel=(met?(windMph*1.60934).toFixed(1)+'km/h':windMph+'mph')+sideLetter;
+      svg+='<text x="'+hubX+'" y="'+(hubY+armLen+22)+'" fill="#7a7f99" font-size="12" font-weight="600" text-anchor="middle">'+speedLabel+'</text>';
     } else {
       svg+='<circle cx="'+hubX+'" cy="'+hubY+'" r="3" fill="#7a7f99"/>';
       svg+='<text x="'+hubX+'" y="'+(hubY+armLen+17)+'" fill="#7a7f99" font-size="12" font-weight="600" text-anchor="middle">Calm</text>';
