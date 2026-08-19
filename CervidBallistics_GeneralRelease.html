@@ -2974,23 +2974,23 @@ function buildReticleSvg(patternKey,elevVal,windVal,windMph,windClock,met){
   // second target. windMph is undefined when called without wind context; skip drawing entirely
   // rather than rendering a broken/zero indicator in that case.
   if(windMph!==undefined){
-    var hubX=38,hubY=38,armLen=13;
+    var hubX=44,hubY=44,armLen=20;
     if(windMph>0){
       var wAngle=(windClock||3)*30*Math.PI/180;
       var wdx=Math.sin(wAngle),wdy=-Math.cos(wAngle);
       var tipX=hubX+wdx*armLen,tipY=hubY+wdy*armLen;
-      var headLen=5,back1=wAngle+Math.PI-Math.PI/7,back2=wAngle+Math.PI+Math.PI/7;
+      var headLen=7,back1=wAngle+Math.PI-Math.PI/7,back2=wAngle+Math.PI+Math.PI/7;
       var h1x=tipX+Math.sin(back1)*headLen,h1y=tipY-Math.cos(back1)*headLen;
       var h2x=tipX+Math.sin(back2)*headLen,h2y=tipY-Math.cos(back2)*headLen;
-      svg+='<line x1="'+hubX+'" y1="'+hubY+'" x2="'+tipX+'" y2="'+tipY+'" stroke="#7a7f99" stroke-width="1.8"/>';
-      svg+='<line x1="'+tipX+'" y1="'+tipY+'" x2="'+h1x+'" y2="'+h1y+'" stroke="#7a7f99" stroke-width="1.8"/>';
-      svg+='<line x1="'+tipX+'" y1="'+tipY+'" x2="'+h2x+'" y2="'+h2y+'" stroke="#7a7f99" stroke-width="1.8"/>';
-      svg+='<circle cx="'+hubX+'" cy="'+hubY+'" r="2" fill="#7a7f99"/>';
+      svg+='<line x1="'+hubX+'" y1="'+hubY+'" x2="'+tipX+'" y2="'+tipY+'" stroke="#7a7f99" stroke-width="2.6"/>';
+      svg+='<line x1="'+tipX+'" y1="'+tipY+'" x2="'+h1x+'" y2="'+h1y+'" stroke="#7a7f99" stroke-width="2.6"/>';
+      svg+='<line x1="'+tipX+'" y1="'+tipY+'" x2="'+h2x+'" y2="'+h2y+'" stroke="#7a7f99" stroke-width="2.6"/>';
+      svg+='<circle cx="'+hubX+'" cy="'+hubY+'" r="3" fill="#7a7f99"/>';
       var speedLabel=met?(windMph*1.60934).toFixed(1)+'km/h':windMph+'mph';
-      svg+='<text x="'+hubX+'" y="'+(hubY+armLen+14)+'" fill="#7a7f99" font-size="9" text-anchor="middle">'+speedLabel+'</text>';
+      svg+='<text x="'+hubX+'" y="'+(hubY+armLen+17)+'" fill="#7a7f99" font-size="12" font-weight="600" text-anchor="middle">'+speedLabel+'</text>';
     } else {
-      svg+='<circle cx="'+hubX+'" cy="'+hubY+'" r="2" fill="#7a7f99"/>';
-      svg+='<text x="'+hubX+'" y="'+(hubY+armLen+14)+'" fill="#7a7f99" font-size="9" text-anchor="middle">Calm</text>';
+      svg+='<circle cx="'+hubX+'" cy="'+hubY+'" r="3" fill="#7a7f99"/>';
+      svg+='<text x="'+hubX+'" y="'+(hubY+armLen+17)+'" fill="#7a7f99" font-size="12" font-weight="600" text-anchor="middle">Calm</text>';
     }
   }
   return '<svg viewBox="0 0 '+size+' '+size+'" width="100%" style="max-width:320px;display:block;margin:0 auto;border-radius:6px;">'+svg+'</svg>';
