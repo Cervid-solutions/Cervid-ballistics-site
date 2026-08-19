@@ -2765,8 +2765,8 @@ function renderReticleView(){
   // remainder to zero in both cases) before relying on it; see the project brief changelog.
   var remElev=elevVal-turretElev;
   var remWind=windVal+turretWind;
-  document.getElementById('reticleSvgWrap').innerHTML=buildReticleSvg(patternKey,remElev,remWind);
   var met=unitSystem==='metric';
+  document.getElementById('reticleSvgWrap').innerHTML=buildReticleSvg(patternKey,remElev,remWind,lastResults.params.windMph,lastResults.params.windClock,met);
   var rngLabel=met?Math.round(yd*0.9144)+'m':yd+'yd';
   // Same sign convention as before (see the derivation above), just applied to the remaining
   // (post-turret) values rather than the raw table values.
@@ -2789,7 +2789,7 @@ function renderReticleView(){
 // Draws a self-contained SVG reticle with a marker at the calculated hold point. elevVal/windVal
 // are in the pattern's own unit (mil or MOA) using the app's existing sign conventions (see
 // renderReticleView above) — this function only handles turning those numbers into pixels.
-function buildReticleSvg(patternKey,elevVal,windVal){
+function buildReticleSvg(patternKey,elevVal,windVal,windMph,windClock,met){
   var pat=RETICLE_PATTERNS[patternKey];
   var size=280,center=size/2,frameR=size*0.42,gap=10;
   var pxPerUnit=frameR/pat.span;
@@ -2847,6 +2847,35 @@ function buildReticleSvg(patternKey,elevVal,windVal){
   if(offReticle){var scale=frameR/dist;mx=center+(mx-center)*scale;my=center+(my-center)*scale;}
   svg+='<circle cx="'+mx+'" cy="'+my+'" r="6" fill="none" stroke="#e06c3a" stroke-width="2.5"/><circle cx="'+mx+'" cy="'+my+'" r="1.5" fill="#e06c3a"/>';
   if(offReticle)svg+='<text x="'+mx+'" y="'+(my<center?my-10:my+16)+'" fill="#e06c3a" font-size="9" text-anchor="middle" font-weight="700">OFF RETICLE</text>';
+  // Wind indicator: a small compass-style arrow in the top-left corner — well outside frameR, so it
+  // can't overlap any pattern's dots/ticks/labels — pointing toward the entered clock position,
+  // using the exact same "3=full R, 9=full L" analog-clock convention the Wind Clock input field
+  // already states (12=up, each hour +30° clockwise), so a user already familiar with that field
+  // reads the arrow the same way without learning a second convention. This is a static readout of
+  // the wind condition the drawn hold already accounts for, not an interactive control — drawn in
+  // muted grey rather than the orange used for the aim-point marker, so it can't be mistaken for a
+  // second target. windMph is undefined when called without wind context; skip drawing entirely
+  // rather than rendering a broken/zero indicator in that case.
+  if(windMph!==undefined){
+    var hubX=38,hubY=38,armLen=13;
+    if(windMph>0){
+      var wAngle=(windClock||3)*30*Math.PI/180;
+      var wdx=Math.sin(wAngle),wdy=-Math.cos(wAngle);
+      var tipX=hubX+wdx*armLen,tipY=hubY+wdy*armLen;
+      var headLen=5,back1=wAngle+Math.PI-Math.PI/7,back2=wAngle+Math.PI+Math.PI/7;
+      var h1x=tipX+Math.sin(back1)*headLen,h1y=tipY-Math.cos(back1)*headLen;
+      var h2x=tipX+Math.sin(back2)*headLen,h2y=tipY-Math.cos(back2)*headLen;
+      svg+='<line x1="'+hubX+'" y1="'+hubY+'" x2="'+tipX+'" y2="'+tipY+'" stroke="#7a7f99" stroke-width="1.8"/>';
+      svg+='<line x1="'+tipX+'" y1="'+tipY+'" x2="'+h1x+'" y2="'+h1y+'" stroke="#7a7f99" stroke-width="1.8"/>';
+      svg+='<line x1="'+tipX+'" y1="'+tipY+'" x2="'+h2x+'" y2="'+h2y+'" stroke="#7a7f99" stroke-width="1.8"/>';
+      svg+='<circle cx="'+hubX+'" cy="'+hubY+'" r="2" fill="#7a7f99"/>';
+      var speedLabel=met?(windMph*1.60934).toFixed(1)+'km/h':windMph+'mph';
+      svg+='<text x="'+hubX+'" y="'+(hubY+armLen+14)+'" fill="#7a7f99" font-size="9" text-anchor="middle">'+speedLabel+'</text>';
+    } else {
+      svg+='<circle cx="'+hubX+'" cy="'+hubY+'" r="2" fill="#7a7f99"/>';
+      svg+='<text x="'+hubX+'" y="'+(hubY+armLen+14)+'" fill="#7a7f99" font-size="9" text-anchor="middle">Calm</text>';
+    }
+  }
   return '<svg viewBox="0 0 '+size+' '+size+'" width="100%" style="max-width:320px;display:block;margin:0 auto;border-radius:6px;">'+svg+'</svg>';
 }
 
