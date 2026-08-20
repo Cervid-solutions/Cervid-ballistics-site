@@ -3005,10 +3005,10 @@ function buildReticleSvg(patternKey,elevVal,windVal,windMph,windClock,met){
       // without having to judge the arrow's exact angle), derived from the same sign wdx already
       // carries — positive means rightward push, matching "positive drift = right" elsewhere in the
       // app; omitted entirely for a pure head/tailwind (12/6 o'clock) where there's no crosswind side.
-      svg+='<text x="'+hubX+'" y="'+(hubY+armLen+4)+'" fill="#7a7f99" font-size="8" font-weight="700" letter-spacing="1" text-anchor="middle">PUSH</text>';
+      svg+='<text x="'+hubX+'" y="'+(hubY+armLen-1)+'" fill="#7a7f99" font-size="8" font-weight="700" letter-spacing="1" text-anchor="middle">PUSH</text>';
       var sideLetter=wdx>0.05?' R':wdx<-0.05?' L':'';
       var speedLabel=(met?(windMph*1.60934).toFixed(1)+'km/h':windMph+'mph')+sideLetter;
-      svg+='<text x="'+hubX+'" y="'+(hubY+armLen+17)+'" fill="#7a7f99" font-size="12" font-weight="600" text-anchor="middle">'+speedLabel+'</text>';
+      svg+='<text x="'+hubX+'" y="'+(hubY+armLen+12)+'" fill="#7a7f99" font-size="12" font-weight="600" text-anchor="middle">'+speedLabel+'</text>';
     } else {
       svg+='<circle cx="'+hubX+'" cy="'+hubY+'" r="2.5" fill="#7a7f99"/>';
       svg+='<text x="'+hubX+'" y="'+(hubY+armLen+17)+'" fill="#7a7f99" font-size="12" font-weight="600" text-anchor="middle">Calm</text>';
