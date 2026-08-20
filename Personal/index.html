@@ -2893,10 +2893,10 @@ function buildReticleSvg(patternKey,elevVal,windVal,windMph,windClock,met){
       // leaves an oversized, ever-tightened gap for horizontal/upward arrows — the repeated gap
       // reductions above eventually made the down-pointing case overlap the arrowhead. Instead, find
       // the lowest point actually reached by the shaft tip, the arrowhead's two base corners, or the
-      // hub circle for THIS direction, and anchor the text a fixed 6px below that, so near-horizontal
+      // hub circle for THIS direction, and anchor the text a fixed 11px below that, so near-horizontal
       // and upward arrows get a tight gap while a straight-down arrow still clears its own head.
       var maxArrowY=Math.max(tipY,leftY,rightY,hubY+2.5);
-      var pushY=maxArrowY+6;
+      var pushY=maxArrowY+11;
       var speedY=pushY+13;
       svg+='<text x="'+hubX+'" y="'+pushY+'" fill="#7a7f99" font-size="8" font-weight="700" letter-spacing="1" text-anchor="middle">PUSH</text>';
       var sideLetter=wdx>0.05?' R':wdx<-0.05?' L':'';
