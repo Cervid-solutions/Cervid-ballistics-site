@@ -2888,10 +2888,20 @@ function buildReticleSvg(patternKey,elevVal,windVal,windMph,windClock,met){
       // without having to judge the arrow's exact angle), derived from the same sign wdx already
       // carries — positive means rightward push, matching "positive drift = right" elsewhere in the
       // app; omitted entirely for a pure head/tailwind (12/6 o'clock) where there's no crosswind side.
-      svg+='<text x="'+hubX+'" y="'+(hubY+armLen-6)+'" fill="#7a7f99" font-size="8" font-weight="700" letter-spacing="1" text-anchor="middle">PUSH</text>';
+      // Text anchor is direction-aware rather than a fixed offset: a fixed hubY+armLen-based offset
+      // assumes the worst case (arrow pointing straight down), which is safe for a down arrow but
+      // leaves an oversized, ever-tightened gap for horizontal/upward arrows — the repeated gap
+      // reductions above eventually made the down-pointing case overlap the arrowhead. Instead, find
+      // the lowest point actually reached by the shaft tip, the arrowhead's two base corners, or the
+      // hub circle for THIS direction, and anchor the text a fixed 6px below that, so near-horizontal
+      // and upward arrows get a tight gap while a straight-down arrow still clears its own head.
+      var maxArrowY=Math.max(tipY,leftY,rightY,hubY+2.5);
+      var pushY=maxArrowY+6;
+      var speedY=pushY+13;
+      svg+='<text x="'+hubX+'" y="'+pushY+'" fill="#7a7f99" font-size="8" font-weight="700" letter-spacing="1" text-anchor="middle">PUSH</text>';
       var sideLetter=wdx>0.05?' R':wdx<-0.05?' L':'';
       var speedLabel=(met?(windMph*1.60934).toFixed(1)+'km/h':windMph+'mph')+sideLetter;
-      svg+='<text x="'+hubX+'" y="'+(hubY+armLen+7)+'" fill="#7a7f99" font-size="12" font-weight="600" text-anchor="middle">'+speedLabel+'</text>';
+      svg+='<text x="'+hubX+'" y="'+speedY+'" fill="#7a7f99" font-size="12" font-weight="600" text-anchor="middle">'+speedLabel+'</text>';
     } else {
       svg+='<circle cx="'+hubX+'" cy="'+hubY+'" r="2.5" fill="#7a7f99"/>';
       svg+='<text x="'+hubX+'" y="'+(hubY+armLen+17)+'" fill="#7a7f99" font-size="12" font-weight="600" text-anchor="middle">Calm</text>';
