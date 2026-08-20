@@ -2857,18 +2857,26 @@ function buildReticleSvg(patternKey,elevVal,windVal,windMph,windClock,met){
   // second target. windMph is undefined when called without wind context; skip drawing entirely
   // rather than rendering a broken/zero indicator in that case.
   if(windMph!==undefined){
-    var hubX=44,hubY=44,armLen=20;
+    var hubX=44,hubY=44,armLen=28;
     if(windMph>0){
       var wAngle=(windClock||3)*30*Math.PI/180;
       var wdx=Math.sin(wAngle),wdy=-Math.cos(wAngle);
       var tipX=hubX+wdx*armLen,tipY=hubY+wdy*armLen;
-      var headLen=7,back1=wAngle+Math.PI-Math.PI/7,back2=wAngle+Math.PI+Math.PI/7;
-      var h1x=tipX+Math.sin(back1)*headLen,h1y=tipY-Math.cos(back1)*headLen;
-      var h2x=tipX+Math.sin(back2)*headLen,h2y=tipY-Math.cos(back2)*headLen;
-      svg+='<line x1="'+hubX+'" y1="'+hubY+'" x2="'+tipX+'" y2="'+tipY+'" stroke="#7a7f99" stroke-width="2.6"/>';
-      svg+='<line x1="'+tipX+'" y1="'+tipY+'" x2="'+h1x+'" y2="'+h1y+'" stroke="#7a7f99" stroke-width="2.6"/>';
-      svg+='<line x1="'+tipX+'" y1="'+tipY+'" x2="'+h2x+'" y2="'+h2y+'" stroke="#7a7f99" stroke-width="2.6"/>';
-      svg+='<circle cx="'+hubX+'" cy="'+hubY+'" r="3" fill="#7a7f99"/>';
+      // Filled-triangle arrowhead rather than two open chevron strokes: three separate <line>
+      // segments meeting at a point (with the default flat "butt" line cap) never converge cleanly
+      // at any real stroke width — each segment's blunt edge shows through at a slightly different
+      // angle, reading as a jagged/misaligned tip rather than a sharp point. A single filled polygon
+      // has no seam to misalign, the same construction most icon arrows actually use. Shaft is drawn
+      // longer and thinner than before (28px/1.6px vs the old 20px/2.6px) with a rounded cap, for a
+      // more refined pointer look rather than a short, thick stub.
+      var headLen=8,headWidth=3.2;
+      var px=-wdy,py=wdx; // unit vector perpendicular to the shaft, for the triangle's base corners
+      var baseX=tipX-wdx*headLen,baseY=tipY-wdy*headLen;
+      var leftX=baseX+px*headWidth,leftY=baseY+py*headWidth;
+      var rightX=baseX-px*headWidth,rightY=baseY-py*headWidth;
+      svg+='<line x1="'+hubX+'" y1="'+hubY+'" x2="'+tipX+'" y2="'+tipY+'" stroke="#7a7f99" stroke-width="1.6" stroke-linecap="round"/>';
+      svg+='<polygon points="'+tipX+','+tipY+' '+leftX+','+leftY+' '+rightX+','+rightY+'" fill="#7a7f99"/>';
+      svg+='<circle cx="'+hubX+'" cy="'+hubY+'" r="2.5" fill="#7a7f99"/>';
       // "PUSH" reframes the arrow explicitly as "which way the correction pushes point of impact,"
       // not a literal weathervane reading — a bare directional arrow is genuinely ambiguous, since
       // some people instinctively read it as "wind is coming from there" (the meteorological/
@@ -2885,7 +2893,7 @@ function buildReticleSvg(patternKey,elevVal,windVal,windMph,windClock,met){
       var speedLabel=(met?(windMph*1.60934).toFixed(1)+'km/h':windMph+'mph')+sideLetter;
       svg+='<text x="'+hubX+'" y="'+(hubY+armLen+22)+'" fill="#7a7f99" font-size="12" font-weight="600" text-anchor="middle">'+speedLabel+'</text>';
     } else {
-      svg+='<circle cx="'+hubX+'" cy="'+hubY+'" r="3" fill="#7a7f99"/>';
+      svg+='<circle cx="'+hubX+'" cy="'+hubY+'" r="2.5" fill="#7a7f99"/>';
       svg+='<text x="'+hubX+'" y="'+(hubY+armLen+17)+'" fill="#7a7f99" font-size="12" font-weight="600" text-anchor="middle">Calm</text>';
     }
   }
