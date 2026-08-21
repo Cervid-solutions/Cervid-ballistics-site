@@ -398,6 +398,11 @@ footer{border-top:1px solid var(--border);padding:24px;text-align:center;color:v
 </div>
 
 <div class="topic">
+<h3>Overriding velocity in Reticle View <span class="badge intermediate">Intermediate</span></h3>
+<p>Below the wind row, a Velocity field lets you re-check the hold under a different muzzle velocity &mdash; handy for testing a chronograph reading against your saved figure without touching the preset or leaving Reticle View. It defaults to whatever velocity the current calculation actually used and keeps following it until you type your own; a <strong>Reset</strong> link beside it snaps back to the calculated value at any time, and it resets on its own the next time you press Calculate. Like the wind override, this is a genuine recalculation &mdash; the hold point and reticle marker update as soon as you finish typing, not an estimate.</p>
+</div>
+
+<div class="topic">
 <h3>Turret Dial <span class="badge advanced">Advanced</span></h3>
 <p>The optional Turret Dial (inside Reticle View) tracks what you've already dialed on your scope's elevation and windage turrets, then shows the <em>remaining</em> holdover needed on top of that &mdash; handy when you've dialed most of the correction and want to hold the small remainder rather than dial it all.</p>
 </div>
@@ -426,6 +431,11 @@ footer{border-top:1px solid var(--border);padding:24px;text-align:center;color:v
 <div class="topic">
 <h3>Drop &amp; Wind Drift units <span class="badge intermediate">Intermediate</span></h3>
 <p>The <span class="field-ref">Drop &amp; Wind units</span> dropdown above the comparison table switches those two rows between mils, MOA, clicks, inches, and cm &mdash; independent of whatever unit the single-load Results table happens to be showing. The row labels always state the unit directly, e.g. "Drop (mil) at 500yd", so there's never any doubt what's being read. Switching units is instant and doesn't re-run the comparison. Choosing clicks reveals the same turret click-size selector as the single-load Results table, and the two stay in sync &mdash; changing the click size in either place updates both.</p>
+</div>
+
+<div class="topic">
+<h3>Overriding velocity per load <span class="badge intermediate">Intermediate</span></h3>
+<p>Unlike the wind and distance overrides above, which apply to the whole comparison at once, velocity can be overridden separately for each column &mdash; a small Velocity box sits in each load's own header in the results table. Type a value there to test a chronograph reading, or nudge just one load's velocity without disturbing the other two, then press <strong>Compare</strong> again to see it take effect. A <strong>Reset</strong> link appears next to a column's box once it has an override, and takes effect immediately rather than waiting for the next Compare press. Deselecting a load clears its own override; clearing the whole selection back to zero clears all of them.</p>
 </div>
 
 <div class="topic">

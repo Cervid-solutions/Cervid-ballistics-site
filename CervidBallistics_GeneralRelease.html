@@ -494,6 +494,16 @@
       </label>
       <span class="compare-wind-readout" id="reticleWindReadout"></span>
     </div>
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:10px;">
+      <label style="font-size:12px;color:var(--muted);margin:0;">Velocity (optional &mdash; overrides today's calculated velocity for this reticle)</label>
+      <a href="#" onclick="resetReticleVelocity();return false;" style="font-size:11px;color:var(--accent2);">Reset</a>
+    </div>
+    <div class="compare-range-row" style="margin-top:4px;margin-bottom:14px;">
+      <label class="compare-range-label">Velocity
+        <input type="number" id="fReticleVelocity" min="1" step="1" oninput="onReticleVelocityChange()"/>
+        <span id="reticleVelocityUnitLbl">fps</span>
+      </label>
+    </div>
     <div class="field">
       <label>Reticle Pattern</label>
       <select id="reticlePatternSelect" onchange="onReticlePatternChange()">
@@ -704,6 +714,9 @@ function setUnitSystem(sys){
     var rwv=parseFloat(document.getElementById('fReticleWind').value)||0;
     if(rwv>0)document.getElementById('fReticleWind').value=(rwv*1.60934).toFixed(1);
     document.getElementById('reticleWindUnitLbl').textContent='kph';
+    var rvv=parseFloat(document.getElementById('fReticleVelocity').value)||0;
+    if(rvv>0)document.getElementById('fReticleVelocity').value=Math.round(rvv*0.3048);
+    document.getElementById('reticleVelocityUnitLbl').textContent='m/s';
   } else {
     document.getElementById('fMV').value=Math.round(mv/0.3048);
     document.getElementById('fSH').value=(sh/2.54).toFixed(2);
@@ -734,6 +747,9 @@ function setUnitSystem(sys){
     var rwv2=parseFloat(document.getElementById('fReticleWind').value)||0;
     if(rwv2>0)document.getElementById('fReticleWind').value=(rwv2/1.60934).toFixed(1);
     document.getElementById('reticleWindUnitLbl').textContent='mph';
+    var rvv2=parseFloat(document.getElementById('fReticleVelocity').value)||0;
+    if(rvv2>0)document.getElementById('fReticleVelocity').value=Math.round(rvv2/0.3048);
+    document.getElementById('reticleVelocityUnitLbl').textContent='fps';
   }
 
   applyBounds(sys);
@@ -1637,6 +1653,22 @@ var COMPARE_COLORS=['#4f8ef7','#e06c3a','#9d6fe0'];
 var compareMode=false;
 // Up to 3 entries: {mode:'air'|'cf'|'rf', type:'b'|'c', idx, name}
 var compareSelection=[];
+// Per-slot velocity override, keyed by compareRefKey() (mode:type:idx — the slot's ref identity,
+// not its column position, so an override stays attached to the load it was set on even if
+// another slot is toggled off/on around it and the columns shuffle). Unlike the shared Wind/
+// Compare-to overrides above (which apply to every slot at once), velocity is deliberately
+// per-load: a shooter comparing three rounds may want to nudge just one, e.g. testing a
+// chronograph reading against the saved book value for a single load without disturbing the
+// other two. Holds canonical fps; absent (no key) means "use that slot's own mv" (the preset's
+// p.mv, or lastResults.params.mvFps for the live-matched slot). Button-gated like Range/Wind: a
+// slot's value here only takes effect the next time Compare is pressed, except via the per-slot
+// Reset link (resetCompareVelocity()) which — like Reticle View's own Reset links — takes effect
+// immediately since undoing an override is expected to show right away.
+var compareVelocityOverrides={};
+// mode:type:idx — stable identity for a comparison slot, independent of which column it's
+// currently rendered in (columns are ordered by compareSelection, which can reorder as slots are
+// toggled off/on).
+function compareRefKey(ref){return ref.mode+':'+ref.type+':'+ref.idx;}
 // The comparison distance defaults to the shortest of the selected loads' own max ranges, and
 // keeps re-suggesting that default as the selection changes — right up until the shooter types
 // their own value into the field, at which point compareDistanceCustomized latches true and the
@@ -1665,6 +1697,26 @@ function setCompareDropUnit(u){compareUnitDrop=u;if(lastCompareList)renderCompar
 function markCompareRangeCustomized(){compareDistanceCustomized=true;}
 
 function markCompareWindCustomized(){compareWindCustomized=true;}
+
+// Stores (or clears) a single slot's velocity override, converting from whatever unit is
+// currently displayed back to canonical fps. Button-gated like Range/Wind above — this only
+// updates the state object, it does not recompute anything itself; the change takes effect the
+// next time Compare is pressed. A blank/invalid entry clears the override rather than leaving a
+// stale 0fps behind, same treatment as the Range/Wind fields' own "0/blank means unset" handling.
+function onCompareVelocityInput(el,refKey){
+  var raw=parseFloat(el.value)||0;
+  if(raw<=0){delete compareVelocityOverrides[refKey];return;}
+  compareVelocityOverrides[refKey]=unitSystem==='metric'?raw/0.3048:raw;
+}
+
+// Reset link shown only once a slot actually has an override (see renderCompareResults()).
+// Unlike onCompareVelocityInput() above, this takes effect immediately rather than waiting for
+// the next Compare press — undoing an override is expected to show right away, the same
+// immediacy already given to the Reticle View's own per-field Reset links.
+function resetCompareVelocity(refKey){
+  delete compareVelocityOverrides[refKey];
+  if(lastCompareList)runCompare();
+}
 
 // Pure geometry, deliberately factored out of the pointer-event plumbing below so it's trivial to
 // unit-test without a real DOM: given a pointer offset from the dial's center (dx,dy in the same
@@ -1851,7 +1903,7 @@ function presetEffectiveBc(p){
 // judged under the same "today's conditions" rather than whatever was on screen when each was
 // individually saved. forcedMaxYd, when given, overrides the preset's own max range — used to
 // bring all compared loads to a single shared comparison distance (see runCompare()).
-function buildParamsFromPreset(p,mode,forcedMaxYd){
+function buildParamsFromPreset(p,mode,forcedMaxYd,forcedMvFps){
   var met=unitSystem==='metric';
   var altRaw=parseFloat(document.getElementById('fAlt').value)||0;
   var tempRaw=parseFloat(document.getElementById('fTemp').value);if(isNaN(tempRaw))tempRaw=15;
@@ -1878,7 +1930,11 @@ function buildParamsFromPreset(p,mode,forcedMaxYd){
 
   var params={
     weightGr:p.wt,bc:effBc.bc,baseBc:effBc.bc,bcEstimated:effBc.estimated,
-    mvFps:p.mv,scopeInch:p.sh,zeroYd:Math.round(zeroYd),maxYd:Math.round(maxYd),
+    // Velocity, like maxYd above, can be overridden per-slot from Compare's own per-column
+    // velocity field (forcedMvFps) rather than always the preset's own saved p.mv — lets a shooter
+    // nudge just one load's velocity (e.g. testing a chronograph reading) without disturbing the
+    // other selected loads or the saved preset itself.
+    mvFps:forcedMvFps||p.mv,scopeInch:p.sh,zeroYd:Math.round(zeroYd),maxYd:Math.round(maxYd),
     zeroOffsetMils:zeroOffsetMils,
     altFt:altFt,tempC:tempRaw,humidPct:humidRaw,presHPa:presHPa,
     windMph:windMph,windClock:windDirRaw,
@@ -1910,11 +1966,16 @@ function toggleCompareSelect(mode,type,idx){
   var i=compareSelection.findIndex(function(s){return s.mode===mode&&s.type===type&&s.idx===idx;});
   if(i>=0){
     compareSelection.splice(i,1);
+    // A deselected slot's velocity override is tied to that specific load, not to "whichever load
+    // ends up back in this column" — so it's discarded here rather than left to silently reattach
+    // itself if the same preset is toggled back on later, or worse, silently apply to a *different*
+    // load that happens to land on the same mode/type/idx after a swap.
+    delete compareVelocityOverrides[compareRefKey({mode:mode,type:type,idx:idx})];
     // Clearing back down to zero selected loads is treated as starting a fresh comparison, so
     // the distance field goes back to auto-suggesting rather than keeping a stale custom value
     // around for whatever gets picked next. The wind override resets the same way, for the same
     // reason.
-    if(!compareSelection.length){compareDistanceCustomized=false;compareWindCustomized=false;}
+    if(!compareSelection.length){compareDistanceCustomized=false;compareWindCustomized=false;compareVelocityOverrides={};}
   } else {
     if(compareSelection.length>=3)return;
     var p=presetFromRef({mode:mode,type:type,idx:idx});
@@ -1994,10 +2055,15 @@ function runCompare(){
       // the last time Calculate() ran on the Inputs tab, silently ignoring the Compare page's own
       // wind override while every other (non-live) slot correctly picked it up via
       // buildParamsFromPreset() below.
-      params=Object.assign({},lastResults.params,{maxYd:refYd,maxNative:refYd,intervalNative:null,windMph:readCompareWindMph(),windClock:compareWindClockVal});
+      // Velocity override applies here too, same reasoning as the wind override comment above:
+      // without this, the live-matched slot would keep whatever mv was in effect the last time
+      // Calculate() ran on the Inputs tab, silently ignoring this slot's own Compare velocity
+      // override while every other (non-live) slot correctly picked it up via
+      // buildParamsFromPreset() below.
+      params=Object.assign({},lastResults.params,{maxYd:refYd,maxNative:refYd,intervalNative:null,windMph:readCompareWindMph(),windClock:compareWindClockVal,mvFps:compareVelocityOverrides[compareRefKey(x.ref)]||lastResults.params.mvFps});
       if(params.zeroYd>=params.maxYd)params.maxYd=params.zeroYd+20;
     } else {
-      params=buildParamsFromPreset(x.p,x.ref.mode,refYd);
+      params=buildParamsFromPreset(x.p,x.ref.mode,refYd,compareVelocityOverrides[compareRefKey(x.ref)]);
     }
     var results=computeTrajectory(params,true); // dense: every yard, for a smooth overlay line
     // Soft warnings, not a hard cap: the physics will happily extrapolate to any distance typed
@@ -2011,7 +2077,7 @@ function runCompare(){
     // modes. The per-row subsonic marker in the single-load results table is unaffected either way.
     var extrapolated=refYd>ownMaxYd;
     var wentSubsonic=x.ref.mode==='cf'&&results.some(function(r){return r.isSubsonic;});
-    return{name:x.p.name,color:COMPARE_COLORS[i],results:results,params:params,ownMaxYd:ownMaxYd,extrapolated:extrapolated,wentSubsonic:wentSubsonic,isLive:isLive};
+    return{name:x.p.name,color:COMPARE_COLORS[i],results:results,params:params,ownMaxYd:ownMaxYd,extrapolated:extrapolated,wentSubsonic:wentSubsonic,isLive:isLive,ref:x.ref};
   });
   lastCompareList=list;lastCompareRefYd=refYd; // cached so setCompareDropUnit() can re-render without recomputing
   renderCompareResults(list,refYd);
@@ -2060,7 +2126,20 @@ function renderCompareResults(list,refYd){
   // chart and warning text appear to scale incorrectly. iPad/desktop never hit this because there's
   // enough width for the table to fit either way.
   var tableHtml=unitPicker+'<div class="tbl-wrap"><table class="compare-table"><thead><tr><th></th>'+list.map(function(x){
-    return '<th><span class="swatch" style="background:'+x.color+';display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;"></span>'+x.name+(x.isLive?' <span style="color:var(--accent2);font-weight:700;" title="Using the live, not-yet-saved values currently shown on the Results page for this load, not the saved preset.">(live)</span>':'')+'</th>';
+    var refKey=compareRefKey(x.ref);
+    var hasOverride=compareVelocityOverrides.hasOwnProperty(refKey);
+    // Placeholder mirrors this slot's actual muzzle velocity (x.results[0].fps — already reflects
+    // whatever mv this comparison run just used, overridden or not) purely as a typing guide; the
+    // field itself stays blank unless a per-slot override is actually in effect, so an empty box
+    // unambiguously means "using this load's own velocity" rather than showing a value that looks
+    // customized when it isn't.
+    var baselineDisp=met?Math.round(x.results[0].fps*0.3048):x.results[0].fps;
+    var overrideDisp=hasOverride?(met?Math.round(compareVelocityOverrides[refKey]*0.3048):Math.round(compareVelocityOverrides[refKey])):'';
+    return '<th><span class="swatch" style="background:'+x.color+';display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;"></span>'+x.name+(x.isLive?' <span style="color:var(--accent2);font-weight:700;" title="Using the live, not-yet-saved values currently shown on the Results page for this load, not the saved preset.">(live)</span>':'')+
+      '<div style="margin-top:6px;font-weight:400;font-size:11px;color:var(--muted);white-space:nowrap;">Velocity '+
+      '<input type="number" min="1" step="1" value="'+overrideDisp+'" placeholder="'+baselineDisp+'" style="width:60px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 4px;font-size:11px;" oninput="onCompareVelocityInput(this,\''+refKey+'\')"/> '+(met?'m/s':'fps')+
+      (hasOverride?' <a href="#" onclick="resetCompareVelocity(\''+refKey+'\');return false;" style="font-size:10px;color:var(--accent2);">Reset</a>':'')+
+      '</div></th>';
   }).join('')+'</tr></thead><tbody>'+
     rows.map(function(row){return '<tr><td class="metric-label">'+row.label+'</td>'+list.map(function(x){return '<td>'+row.get(x)+'</td>';}).join('')+'</tr>';}).join('')+
     '</tbody></table></div>';
@@ -2526,9 +2605,10 @@ function calculate(){
     // yard internally either way), just recording every point instead of only the interval marks.
     var chartResults=computeTrajectory(params,true);
     lastResults={results:results,params:params,stability:stability,chartResults:chartResults};
-    // A fresh calculation is the Reticle View's wind override's natural "start over" boundary —
-    // same role clearing the selection back to empty plays for Compare's own latch.
+    // A fresh calculation is the Reticle View's wind/velocity overrides' natural "start over"
+    // boundary — same role clearing the selection back to empty plays for Compare's own latch.
     reticleWindCustomized=false;
+    reticleVelocityCustomized=false;
     renderResults(results,params,stability);
     if(window.innerWidth<=900)setMobileTab('results');
   }catch(err){
@@ -3010,6 +3090,48 @@ function resetReticleWind(){
   updateReticleWindSuggestion();
   renderReticleView();
 }
+
+// Reticle View's own muzzle velocity override — same auto-suggest/customize/reset shape as the
+// wind override just above, sourced from lastResults.params.mvFps rather than windMph/windClock.
+// Unlike wind, there's no direction component, so this is a plain speed field with no dial.
+var reticleVelocityCustomized=false;
+// Reads the velocity override field, converting from whatever unit is currently displayed (fps or
+// m/s, matching the main fMV field's own 0.3048 factor) back to canonical fps.
+function readReticleVelocityFps(){
+  var el=document.getElementById('fReticleVelocity');
+  if(!el)return 0;
+  var raw=parseFloat(el.value)||0;
+  if(raw<=0)return 0;
+  return unitSystem==='metric'?raw/0.3048:raw;
+}
+// Writes a canonical-fps speed into the field in whichever unit is currently displayed.
+function writeReticleVelocityFps(fps){
+  var el=document.getElementById('fReticleVelocity');
+  if(!el)return;
+  var met=unitSystem==='metric';
+  el.value=met?Math.round(fps*0.3048):Math.round(fps);
+  var lbl=document.getElementById('reticleVelocityUnitLbl');
+  if(lbl)lbl.textContent=met?'m/s':'fps';
+}
+// Re-suggests the velocity baked into the last Calculate() run, sourced from lastResults.params
+// (not the live form) for the same reason as the wind suggestion above — everything else on this
+// page is already frozen from that same source of truth.
+function updateReticleVelocitySuggestion(){
+  if(reticleVelocityCustomized||!lastResults)return;
+  writeReticleVelocityFps(lastResults.params.mvFps);
+}
+// Velocity field's oninput handler — recomputes immediately, same reasoning as
+// onReticleWindSpeedChange() (this page has no separate "Apply" step).
+function onReticleVelocityChange(){
+  reticleVelocityCustomized=true;
+  renderReticleView();
+}
+// Snaps the override back to the velocity baked into the last Calculate() run and re-renders.
+function resetReticleVelocity(){
+  reticleVelocityCustomized=false;
+  updateReticleVelocitySuggestion();
+  renderReticleView();
+}
 // Attaches the dial's drag/tap handling once (called from the bottom-of-script init block).
 // Structurally identical to initCompareWindDial(), with one deliberate difference: the dial's own
 // redraw (ticks/hand) happens live on every pointermove, same as Compare's, but the expensive part
@@ -3054,6 +3176,7 @@ function showReticleView(){
   turretElevMil=0; turretWindMil=0; // fresh turret dial each time the view is opened
   refreshTurretUI();
   updateReticleWindSuggestion();
+  updateReticleVelocitySuggestion();
   renderReticleView();
   document.getElementById('reticleModal').style.display='block';
 }
@@ -3168,7 +3291,8 @@ function renderReticleView(){
   // there's no special-casing needed for the common case — same principle already relied on for
   // Compare's own live-match fallback.
   var reticleWindMph=readReticleWindMph();
-  var effParams=Object.assign({},lastResults.params,{windMph:reticleWindMph,windClock:reticleWindClockVal});
+  var reticleVelocityFps=readReticleVelocityFps()||lastResults.params.mvFps;
+  var effParams=Object.assign({},lastResults.params,{windMph:reticleWindMph,windClock:reticleWindClockVal,mvFps:reticleVelocityFps});
   var effResults=computeTrajectory(effParams)||lastResults.results;
   var row=effResults.find(function(r){return r.yd===yd;});
   if(!row)return;
