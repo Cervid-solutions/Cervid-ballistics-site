@@ -111,7 +111,10 @@
      each be a few px of circumference, well under a reliable mobile touch target. Instead the whole
      72px ring is one drag/tap surface that snaps to the nearest hour, so accuracy doesn't depend on
      hitting a tiny spot. Wraps to its own line below "Compare to" on narrow screens exactly like
-     that row already does (both use flex-wrap:wrap), so this never squeezes horizontally.  */
+     that row already does (both use flex-wrap:wrap), so this never squeezes horizontally.
+     These .compare-wind-row/.wind-dial classes are shared with the Reticle View's own wind
+     override (#reticleWindDial etc., see renderReticleWindDial()) — same visual language, two
+     independent pieces of state, so the styling lives in one place rather than being duplicated. */
   .compare-wind-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:18px;}
   .wind-dial{position:relative;width:72px;height:72px;border-radius:50%;background:var(--bg);border:1px solid var(--border);flex-shrink:0;touch-action:none;cursor:pointer;}
   .wind-dial .tick{position:absolute;width:3px;height:3px;margin:-1.5px;border-radius:50%;background:var(--muted);}
@@ -479,6 +482,18 @@
       <label>Range</label>
       <select id="reticleRangeSelect" onchange="renderReticleView()"></select>
     </div>
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:10px;">
+      <label style="font-size:12px;color:var(--muted);margin:0;">Wind (optional &mdash; overrides today's calculated wind for this reticle)</label>
+      <a href="#" onclick="resetReticleWind();return false;" style="font-size:11px;color:var(--accent2);">Reset</a>
+    </div>
+    <div class="compare-wind-row" style="margin-top:4px;margin-bottom:14px;">
+      <div class="wind-dial" id="reticleWindDial" role="slider" aria-label="Wind direction override for the reticle" tabindex="0"></div>
+      <label class="compare-range-label">Wind
+        <input type="number" id="fReticleWind" min="0" step="1" oninput="onReticleWindSpeedChange()"/>
+        <span id="reticleWindUnitLbl">mph</span>
+      </label>
+      <span class="compare-wind-readout" id="reticleWindReadout"></span>
+    </div>
     <div class="field">
       <label>Reticle Pattern</label>
       <select id="reticlePatternSelect" onchange="onReticlePatternChange()">
@@ -686,6 +701,9 @@ function setUnitSystem(sys){
     var cwv=parseFloat(document.getElementById('fCompareWind').value)||0;
     if(cwv>0)document.getElementById('fCompareWind').value=(cwv*1.60934).toFixed(1);
     document.getElementById('compareWindUnitLbl').textContent='kph';
+    var rwv=parseFloat(document.getElementById('fReticleWind').value)||0;
+    if(rwv>0)document.getElementById('fReticleWind').value=(rwv*1.60934).toFixed(1);
+    document.getElementById('reticleWindUnitLbl').textContent='kph';
   } else {
     document.getElementById('fMV').value=Math.round(mv/0.3048);
     document.getElementById('fSH').value=(sh/2.54).toFixed(2);
@@ -713,6 +731,9 @@ function setUnitSystem(sys){
     var cwv2=parseFloat(document.getElementById('fCompareWind').value)||0;
     if(cwv2>0)document.getElementById('fCompareWind').value=(cwv2/1.60934).toFixed(1);
     document.getElementById('compareWindUnitLbl').textContent='mph';
+    var rwv2=parseFloat(document.getElementById('fReticleWind').value)||0;
+    if(rwv2>0)document.getElementById('fReticleWind').value=(rwv2/1.60934).toFixed(1);
+    document.getElementById('reticleWindUnitLbl').textContent='mph';
   }
 
   applyBounds(sys);
@@ -2505,6 +2526,9 @@ function calculate(){
     // yard internally either way), just recording every point instead of only the interval marks.
     var chartResults=computeTrajectory(params,true);
     lastResults={results:results,params:params,stability:stability,chartResults:chartResults};
+    // A fresh calculation is the Reticle View's wind override's natural "start over" boundary —
+    // same role clearing the selection back to empty plays for Compare's own latch.
+    reticleWindCustomized=false;
     renderResults(results,params,stability);
     if(window.innerWidth<=900)setMobileTab('results');
   }catch(err){
@@ -2893,6 +2917,20 @@ var turretElevMil=0, turretWindMil=0;
 // for something that rarely varies.
 var MIL_CLICK_SIZE=0.1;
 function turretClickSize(unit){return unit==='moa'?clickSizeMoa:MIL_CLICK_SIZE;}
+
+// Reticle View's own wind speed+direction override — same auto-suggest/customize concept as
+// Compare Loads' (compareWindCustomized/fCompareWind), but deliberately independent state: these
+// are two different pages a shooter could have open in the same session with two different
+// hypothetical winds in mind, so sharing one set of variables would leak one page's override into
+// the other. Defaults to whatever lastResults.params carried at the last Calculate() (NOT the raw,
+// possibly-since-edited live fWind/fWindDir fields — everything else on this page is already
+// frozen from lastResults, so the wind override stays consistent with that same source of truth)
+// until the shooter drags the dial or edits the speed field, at which point it latches. The latch
+// resets automatically whenever a fresh Calculate() runs (see lastResults assignment in
+// calculate()) — a new calculation is this feature's natural "start over" boundary, the same role
+// zeroing the selection back to empty plays for Compare's own latch.
+var reticleWindCustomized=false;
+var reticleWindClockVal=3;
 // Steps one turret input by exactly one click in whichever unit the current reticle pattern
 // displays, then runs it through the same onTurretInputChange() path a manual edit would -
 // keeps the stepper buttons and free-text entry always in agreement about what a "click" is.
@@ -2906,6 +2944,102 @@ function stepTurretInput(which,dir){
   el.value=Math.round(v*100)/100;
   onTurretInputChange();
 }
+
+// Reads the wind speed override field, converting from whatever unit is currently displayed back
+// to canonical mph — mirrors readCompareWindMph() exactly, just against fReticleWind.
+function readReticleWindMph(){
+  var el=document.getElementById('fReticleWind');
+  if(!el)return 0;
+  var raw=parseFloat(el.value)||0;
+  if(raw<=0)return 0;
+  return unitSystem==='metric'?raw/1.60934:raw;
+}
+// Writes a canonical-mph speed into the field in whichever unit is currently displayed, and keeps
+// the unit label in sync — mirrors writeCompareWindMph() exactly.
+function writeReticleWindMph(mph){
+  var el=document.getElementById('fReticleWind');
+  if(!el)return;
+  var met=unitSystem==='metric';
+  el.value=met?(mph*1.60934).toFixed(1):mph.toFixed(1);
+  var lbl=document.getElementById('reticleWindUnitLbl');
+  if(lbl)lbl.textContent=met?'kph':'mph';
+}
+// Re-suggests the wind baked into the last Calculate() run, but only while the shooter hasn't
+// already customized this page's own override — mirrors updateCompareWindSuggestion()'s
+// auto-follow/latch logic, sourced from lastResults.params rather than the live form fields (see
+// the reticleWindCustomized declaration above for why).
+function updateReticleWindSuggestion(){
+  if(reticleWindCustomized||!lastResults)return;
+  writeReticleWindMph(lastResults.params.windMph);
+  reticleWindClockVal=lastResults.params.windClock||3;
+  renderReticleWindDial();
+}
+// Redraws the dial's ticks/numbers/hand from reticleWindClockVal — identical shape to
+// renderCompareWindDial(), just targeting #reticleWindDial/#reticleWindReadout.
+function renderReticleWindDial(){
+  var el=document.getElementById('reticleWindDial');
+  if(!el)return;
+  var size=72,r=size/2,numR=r-10;
+  var html='';
+  for(var h=1;h<=12;h++){
+    var angle=(h*30-90)*Math.PI/180;
+    var active=h===reticleWindClockVal;
+    var tx=r+Math.cos(angle)*(r-4),ty=r+Math.sin(angle)*(r-4);
+    html+='<div class="tick'+(active?' active':'')+'" style="left:'+tx+'px;top:'+ty+'px;"></div>';
+    var nx=r+Math.cos(angle)*numR,ny=r+Math.sin(angle)*numR;
+    html+='<div class="num'+(active?' active':'')+'" style="left:'+nx+'px;top:'+ny+'px;">'+h+'</div>';
+  }
+  html+='<div class="hand" style="height:'+(r-8)+'px;transform:rotate('+(reticleWindClockVal*30)+'deg);"></div>';
+  html+='<div class="hub"></div>';
+  el.innerHTML=html;
+  var readout=document.getElementById('reticleWindReadout');
+  if(readout)readout.textContent=reticleWindClockVal+" o'clock";
+}
+// Speed field's oninput handler. Unlike Compare (which defers its recompute to a separate Compare
+// button), the Reticle page re-renders live on every other control here — range, pattern, and
+// turret inputs all already recompute on every change — so typing a new wind speed does the same
+// for consistency, rather than needing its own "Apply" affordance.
+function onReticleWindSpeedChange(){
+  reticleWindCustomized=true;
+  renderReticleView();
+}
+// Snaps the override back to the wind baked into the last Calculate() run and re-renders — same
+// affordance and placement as the Turret Dial's own "Reset" link right below it.
+function resetReticleWind(){
+  reticleWindCustomized=false;
+  updateReticleWindSuggestion();
+  renderReticleView();
+}
+// Attaches the dial's drag/tap handling once (called from the bottom-of-script init block).
+// Structurally identical to initCompareWindDial(), with one deliberate difference: the dial's own
+// redraw (ticks/hand) happens live on every pointermove, same as Compare's, but the expensive part
+// — actually recomputing the trajectory via renderReticleView() — is deferred to pointerup/
+// pointercancel rather than firing on every move. Recomputing a full trajectory many times a
+// second during a fast drag would be wasteful and could feel laggy on an older phone, whereas the
+// dial's ticks and hand are pure CSS and cost nothing to update continuously.
+function initReticleWindDial(){
+  var dial=document.getElementById('reticleWindDial');
+  if(!dial)return;
+  var dragging=false;
+  function setFromEvent(e){
+    var rect=dial.getBoundingClientRect();
+    var cx=rect.left+rect.width/2,cy=rect.top+rect.height/2;
+    var hour=clockHourFromAngle(e.clientX-cx,e.clientY-cy);
+    reticleWindCustomized=true;
+    if(hour!==reticleWindClockVal){reticleWindClockVal=hour;renderReticleWindDial();}
+  }
+  function commit(){ if(dragging){dragging=false; renderReticleView();} }
+  dial.addEventListener('pointerdown',function(e){
+    dragging=true;
+    if(dial.setPointerCapture)dial.setPointerCapture(e.pointerId);
+    setFromEvent(e);
+  });
+  dial.addEventListener('pointermove',function(e){if(dragging)setFromEvent(e);});
+  dial.addEventListener('pointerup',commit);
+  dial.addEventListener('pointercancel',commit);
+  renderReticleWindDial();
+}
+
 function showReticleView(){
   if(!lastResults)return;
   var met=unitSystem==='metric';
@@ -2919,6 +3053,7 @@ function showReticleView(){
   document.getElementById('reticleSubtitle').textContent=(document.getElementById('fCalibr').value||'Reticle')+' · orange ring marks the hold point';
   turretElevMil=0; turretWindMil=0; // fresh turret dial each time the view is opened
   refreshTurretUI();
+  updateReticleWindSuggestion();
   renderReticleView();
   document.getElementById('reticleModal').style.display='block';
 }
@@ -3021,7 +3156,21 @@ function buildTurretStripsSvg(pat,turretElev,turretWind){
 function renderReticleView(){
   if(!lastResults)return;
   var yd=parseInt(document.getElementById('reticleRangeSelect').value,10);
-  var row=lastResults.results.find(function(r){return r.yd===yd;});
+  // Wind override: recompute the trajectory with whatever this page's own speed+direction
+  // controls are set to (which mirror lastResults.params.windMph/windClock until customized —
+  // see updateReticleWindSuggestion()) rather than reading the row straight out of the frozen
+  // lastResults.results. A full recompute, not a rescale of the cached drift figure, is required
+  // because the headwind/tailwind component of ANY wind vector also has a small effect on drop
+  // and time-of-flight (see the Wind Clock field's own help-tip) — not just the crosswind
+  // component reflected in drift — so a cheap rescale would silently disagree with what Compare
+  // or the main Results table would show for the same override wind. When the override hasn't
+  // been touched this reproduces lastResults.results exactly (same params, same physics), so
+  // there's no special-casing needed for the common case — same principle already relied on for
+  // Compare's own live-match fallback.
+  var reticleWindMph=readReticleWindMph();
+  var effParams=Object.assign({},lastResults.params,{windMph:reticleWindMph,windClock:reticleWindClockVal});
+  var effResults=computeTrajectory(effParams)||lastResults.results;
+  var row=effResults.find(function(r){return r.yd===yd;});
   if(!row)return;
   var patternKey=document.getElementById('reticlePatternSelect').value;
   var pat=RETICLE_PATTERNS[patternKey];
@@ -3039,7 +3188,10 @@ function renderReticleView(){
   var remElev=elevVal-turretElev;
   var remWind=windVal+turretWind;
   var met=unitSystem==='metric';
-  document.getElementById('reticleSvgWrap').innerHTML=buildReticleSvg(patternKey,remElev,remWind,lastResults.params.windMph,lastResults.params.windClock,met);
+  // Sourced from the override (reticleWindMph/reticleWindClockVal), not lastResults.params, so
+  // the reticle's own read-only wind arrow always agrees with the input dial above it rather than
+  // showing two different "current wind" readings on the same screen.
+  document.getElementById('reticleSvgWrap').innerHTML=buildReticleSvg(patternKey,remElev,remWind,reticleWindMph,reticleWindClockVal,met);
   var rngLabel=met?Math.round(yd*0.9144)+'m':yd+'yd';
   // Same sign convention as before (see the derivation above), just applied to the remaining
   // (post-turret) values rather than the raw table values.
@@ -3292,6 +3444,7 @@ updateSimpleModeUI();
 renderPresets();
 syncLayout();
 initCompareWindDial();
+initReticleWindDial();
 </script>
 </body>
 </html>
