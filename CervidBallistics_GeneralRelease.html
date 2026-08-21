@@ -104,6 +104,23 @@
   .compare-range-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:18px;}
   .compare-range-label{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);}
   .compare-range-label input{width:70px;padding:5px 8px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;}
+  /* Wind override row: an editable speed field plus a drag-anywhere clock-face dial for direction,
+     following the exact same auto-suggest/customize pattern as "Compare to" above it (see
+     compareWindCustomized in the script below). The dial is deliberately NOT 12 discrete tap
+     targets — at any size that fits inline with the rest of this row, 12 separate hit zones would
+     each be a few px of circumference, well under a reliable mobile touch target. Instead the whole
+     72px ring is one drag/tap surface that snaps to the nearest hour, so accuracy doesn't depend on
+     hitting a tiny spot. Wraps to its own line below "Compare to" on narrow screens exactly like
+     that row already does (both use flex-wrap:wrap), so this never squeezes horizontally.  */
+  .compare-wind-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:18px;}
+  .wind-dial{position:relative;width:72px;height:72px;border-radius:50%;background:var(--bg);border:1px solid var(--border);flex-shrink:0;touch-action:none;cursor:pointer;}
+  .wind-dial .tick{position:absolute;width:3px;height:3px;margin:-1.5px;border-radius:50%;background:var(--muted);}
+  .wind-dial .tick.active{background:var(--accent);width:5px;height:5px;margin:-2.5px;box-shadow:0 0 0 3px rgba(79,142,247,.25);}
+  .wind-dial .num{position:absolute;font-size:8px;color:var(--muted);transform:translate(-50%,-50%);pointer-events:none;user-select:none;}
+  .wind-dial .num.active{color:var(--accent);font-weight:700;}
+  .wind-dial .hand{position:absolute;left:50%;top:50%;width:2px;background:var(--accent);transform-origin:top center;border-radius:1px;pointer-events:none;}
+  .wind-dial .hub{position:absolute;left:50%;top:50%;width:6px;height:6px;background:var(--accent);border-radius:50%;transform:translate(-50%,-50%);pointer-events:none;}
+  .compare-wind-readout{font-size:11px;color:var(--muted);}
   .compare-chip{display:flex;align-items:center;gap:6px;padding:4px 10px;border-radius:14px;background:var(--surface2);border:1px solid var(--border);font-size:12px;}
   .compare-chip .swatch{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
   .compare-chip .remove{cursor:pointer;color:var(--muted);font-weight:700;touch-action:manipulation;}
@@ -228,6 +245,14 @@
         <input type="number" id="fCompareRange" min="1" step="1" oninput="markCompareRangeCustomized()"/>
         <span id="compareRangeUnitLbl">yd</span>
       </label>
+    </div>
+    <div class="compare-wind-row">
+      <div class="wind-dial" id="compareWindDial" role="slider" aria-label="Wind direction override for this comparison" tabindex="0"></div>
+      <label class="compare-range-label">Wind
+        <input type="number" id="fCompareWind" min="0" step="1" oninput="markCompareWindCustomized()"/>
+        <span id="compareWindUnitLbl">mph</span>
+      </label>
+      <span class="compare-wind-readout" id="compareWindReadout"></span>
     </div>
     <div id="comparePickerModes"></div>
     <div id="compareResultsArea"></div>
@@ -658,6 +683,9 @@ function setUnitSystem(sys){
     var crv=parseFloat(document.getElementById('fCompareRange').value)||0;
     if(crv>0)document.getElementById('fCompareRange').value=Math.round(crv*0.9144);
     document.getElementById('compareRangeUnitLbl').textContent='m';
+    var cwv=parseFloat(document.getElementById('fCompareWind').value)||0;
+    if(cwv>0)document.getElementById('fCompareWind').value=(cwv*1.60934).toFixed(1);
+    document.getElementById('compareWindUnitLbl').textContent='kph';
   } else {
     document.getElementById('fMV').value=Math.round(mv/0.3048);
     document.getElementById('fSH').value=(sh/2.54).toFixed(2);
@@ -682,6 +710,9 @@ function setUnitSystem(sys){
     var crv2=parseFloat(document.getElementById('fCompareRange').value)||0;
     if(crv2>0)document.getElementById('fCompareRange').value=Math.round(crv2/0.9144);
     document.getElementById('compareRangeUnitLbl').textContent='yd';
+    var cwv2=parseFloat(document.getElementById('fCompareWind').value)||0;
+    if(cwv2>0)document.getElementById('fCompareWind').value=(cwv2/1.60934).toFixed(1);
+    document.getElementById('compareWindUnitLbl').textContent='mph';
   }
 
   applyBounds(sys);
@@ -1598,10 +1629,125 @@ var compareDistanceCustomized=false;
 // than re-run through runCompare(), since switching units never changes the underlying numbers.
 var compareUnitDrop='mils';
 var lastCompareList=null,lastCompareRefYd=null;
+// Wind speed+direction override for the comparison, mirroring compareDistanceCustomized/
+// fCompareRange exactly: both auto-follow the live Inputs-tab wind (fWind/fWindDir) until the
+// shooter touches either control, at which point they latch to whatever's been set and stop
+// re-syncing, right up until the selection is cleared to zero. One shared latch covers both fields
+// (rather than one each) since speed and direction are really one concept — "the wind used for this
+// comparison" — and a shooter who's already overridden the speed almost certainly wants their own
+// direction too, not to have it silently snap back to today's live value.
+var compareWindCustomized=false;
+var compareWindClockVal=3; // 1-12, current dial position; kept in sync with fWindDir until customized
 
 function setCompareDropUnit(u){compareUnitDrop=u;if(lastCompareList)renderCompareResults(lastCompareList,lastCompareRefYd);}
 
 function markCompareRangeCustomized(){compareDistanceCustomized=true;}
+
+function markCompareWindCustomized(){compareWindCustomized=true;}
+
+// Pure geometry, deliberately factored out of the pointer-event plumbing below so it's trivial to
+// unit-test without a real DOM: given a pointer offset from the dial's center (dx,dy in the same
+// coordinate space as clientX/clientY, where +y is down), returns the nearest clock hour 1-12 using
+// the same 12=up, 3=right, 6=down, 9=left mapping as the Wind Clock field and the Reticle View's own
+// wind indicator (buildReticleSvg's wAngle/wdx/wdy). atan2 gives the angle from the positive x-axis
+// (3 o'clock) increasing clockwise-with-down-y; +90 rotates so 0deg lines up with 12 o'clock instead.
+function clockHourFromAngle(dx,dy){
+  var deg=Math.atan2(dy,dx)*180/Math.PI+90;
+  if(deg<0)deg+=360;
+  var hour=Math.round(deg/30)%12;
+  if(hour===0)hour=12;
+  return hour;
+}
+
+// Redraws the dial's ticks/numbers/hand from compareWindClockVal. Only the inner content is
+// replaced (innerHTML on the #compareWindDial element itself) — the element's own pointer-event
+// listeners, attached once in initCompareWindDial(), are untouched by that and keep working after
+// every redraw.
+function renderCompareWindDial(){
+  var el=document.getElementById('compareWindDial');
+  if(!el)return;
+  var size=72,r=size/2,numR=r-10;
+  var html='';
+  for(var h=1;h<=12;h++){
+    var angle=(h*30-90)*Math.PI/180;
+    var active=h===compareWindClockVal;
+    var tx=r+Math.cos(angle)*(r-4),ty=r+Math.sin(angle)*(r-4);
+    html+='<div class="tick'+(active?' active':'')+'" style="left:'+tx+'px;top:'+ty+'px;"></div>';
+    var nx=r+Math.cos(angle)*numR,ny=r+Math.sin(angle)*numR;
+    html+='<div class="num'+(active?' active':'')+'" style="left:'+nx+'px;top:'+ny+'px;">'+h+'</div>';
+  }
+  html+='<div class="hand" style="height:'+(r-8)+'px;transform:rotate('+(compareWindClockVal*30)+'deg);"></div>';
+  html+='<div class="hub"></div>';
+  el.innerHTML=html;
+  var readout=document.getElementById('compareWindReadout');
+  if(readout)readout.textContent=compareWindClockVal+" o'clock";
+}
+
+// Attaches the dial's drag/tap handling once (called from the bottom-of-script init block, like
+// renderPresets()/syncLayout()). Uses Pointer Events rather than separate mouse/touch listeners so
+// mouse, touch, and pen all go through one code path, and setPointerCapture keeps the drag tracking
+// even once a finger slides off the (deliberately small, 72px) circle — without capture, a fast or
+// wide drag on a phone would otherwise "lose" the dial the moment the finger crosses its edge.
+function initCompareWindDial(){
+  var dial=document.getElementById('compareWindDial');
+  if(!dial)return;
+  var dragging=false;
+  function setFromEvent(e){
+    var rect=dial.getBoundingClientRect();
+    var cx=rect.left+rect.width/2,cy=rect.top+rect.height/2;
+    var hour=clockHourFromAngle(e.clientX-cx,e.clientY-cy);
+    compareWindCustomized=true;
+    if(hour!==compareWindClockVal){compareWindClockVal=hour;renderCompareWindDial();}
+  }
+  dial.addEventListener('pointerdown',function(e){
+    dragging=true;
+    if(dial.setPointerCapture)dial.setPointerCapture(e.pointerId);
+    setFromEvent(e);
+  });
+  dial.addEventListener('pointermove',function(e){if(dragging)setFromEvent(e);});
+  dial.addEventListener('pointerup',function(){dragging=false;});
+  dial.addEventListener('pointercancel',function(){dragging=false;});
+  renderCompareWindDial();
+}
+
+// Reads the wind speed override field, converting from whatever unit is currently displayed back
+// to canonical mph (0 means "blank/invalid" — buildParamsFromPreset's caller already treats 0mph
+// as "no wind", same as the main Inputs-tab field, so no separate fallback is needed here).
+function readCompareWindMph(){
+  var el=document.getElementById('fCompareWind');
+  if(!el)return 0;
+  var raw=parseFloat(el.value)||0;
+  if(raw<=0)return 0;
+  return unitSystem==='metric'?raw/1.60934:raw;
+}
+
+// Writes a canonical-mph speed into the field, converted into whichever unit is currently
+// displayed, and keeps the unit label in sync — same shape as writeCompareRangeYd().
+function writeCompareWindMph(mph){
+  var el=document.getElementById('fCompareWind');
+  if(!el)return;
+  var met=unitSystem==='metric';
+  el.value=met?(mph*1.60934).toFixed(1):mph.toFixed(1);
+  var lbl=document.getElementById('compareWindUnitLbl');
+  if(lbl)lbl.textContent=met?'kph':'mph';
+}
+
+// Re-suggests today's live Inputs-tab wind (speed AND direction together) whenever the selection
+// changes, but only while the shooter hasn't already touched either override control this
+// comparison session — mirrors updateCompareRangeSuggestion() exactly. Copies the live fWind
+// field's displayed value straight across rather than round-tripping it through mph, since both
+// fields always follow the same unit toggle in lockstep.
+function updateCompareWindSuggestion(){
+  if(compareWindCustomized)return;
+  var el=document.getElementById('fCompareWind');
+  if(!compareSelection.length){if(el)el.value='';return;}
+  var liveWindEl=document.getElementById('fWind');
+  if(el&&liveWindEl)el.value=liveWindEl.value;
+  var lbl=document.getElementById('compareWindUnitLbl');
+  if(lbl)lbl.textContent=unitSystem==='metric'?'kph':'mph';
+  compareWindClockVal=parseFloat(document.getElementById('fWindDir').value)||3;
+  renderCompareWindDial();
+}
 
 // Reads the "Compare to" field, converting it from whatever unit is currently displayed back to
 // native yards (0 means "blank/invalid" — runCompare() falls back to the auto default in that
@@ -1690,14 +1836,18 @@ function buildParamsFromPreset(p,mode,forcedMaxYd){
   var tempRaw=parseFloat(document.getElementById('fTemp').value);if(isNaN(tempRaw))tempRaw=15;
   var humidRaw=parseFloat(document.getElementById('fHumid').value);if(isNaN(humidRaw))humidRaw=50;
   var pressRaw=parseFloat(document.getElementById('fPress').value)||29.92;
-  var windRaw=parseFloat(document.getElementById('fWind').value)||0;
-  var windDirRaw=parseFloat(document.getElementById('fWindDir').value)||3;
   var angleRaw=parseFloat(document.getElementById('fAngle').value)||0;
   var latRaw=parseFloat(document.getElementById('fLat').value)||0;
   var azRaw=parseFloat(document.getElementById('fAzimuth').value)||0;
   var altFt=met?altRaw*3.28084:altRaw;
   var presHPa=met?pressRaw:pressRaw*33.8639;
-  var windMph=met?windRaw/1.60934:windRaw;
+  // Wind is the one environmental input that does NOT come straight from the live Inputs-tab
+  // fields — it comes from the Compare page's own speed+direction override (fCompareWind /
+  // compareWindClockVal), which auto-mirrors the live fWind/fWindDir fields until the shooter
+  // deliberately overrides it (see updateCompareWindSuggestion()). Every other environmental
+  // condition here is still read live and shared unconditionally across all compared loads.
+  var windMph=readCompareWindMph();
+  var windDirRaw=compareWindClockVal;
 
   var effBc=presetEffectiveBc(p);
   var modeDef=MODE_DEFAULT_RANGE[mode]||MODE_DEFAULT_RANGE.cf;
@@ -1741,8 +1891,9 @@ function toggleCompareSelect(mode,type,idx){
     compareSelection.splice(i,1);
     // Clearing back down to zero selected loads is treated as starting a fresh comparison, so
     // the distance field goes back to auto-suggesting rather than keeping a stale custom value
-    // around for whatever gets picked next.
-    if(!compareSelection.length)compareDistanceCustomized=false;
+    // around for whatever gets picked next. The wind override resets the same way, for the same
+    // reason.
+    if(!compareSelection.length){compareDistanceCustomized=false;compareWindCustomized=false;}
   } else {
     if(compareSelection.length>=3)return;
     var p=presetFromRef({mode:mode,type:type,idx:idx});
@@ -1752,6 +1903,7 @@ function toggleCompareSelect(mode,type,idx){
   renderComparePicker();
   renderCompareStrip();
   updateCompareRangeSuggestion();
+  updateCompareWindSuggestion();
 }
 
 function renderComparePicker(){
@@ -1816,8 +1968,12 @@ function runCompare(){
       // whatever is actually driving the Results page right now) rather than re-reading the
       // saved preset, so an amendment that hasn't been saved yet still shows up in Compare.
       // Cloned (not mutated) so the shooter's live single-load state is never touched, and the
-      // max range is overridden to the shared comparison distance like every other slot.
-      params=Object.assign({},lastResults.params,{maxYd:refYd,maxNative:refYd,intervalNative:null});
+      // max range is overridden to the shared comparison distance like every other slot. Wind is
+      // overridden too — without this, the live-matched slot would keep whatever wind was in effect
+      // the last time Calculate() ran on the Inputs tab, silently ignoring the Compare page's own
+      // wind override while every other (non-live) slot correctly picked it up via
+      // buildParamsFromPreset() below.
+      params=Object.assign({},lastResults.params,{maxYd:refYd,maxNative:refYd,intervalNative:null,windMph:readCompareWindMph(),windClock:compareWindClockVal});
       if(params.zeroYd>=params.maxYd)params.maxYd=params.zeroYd+20;
     } else {
       params=buildParamsFromPreset(x.p,x.ref.mode,refYd);
@@ -3135,6 +3291,7 @@ updateSortModeLink();
 updateSimpleModeUI();
 renderPresets();
 syncLayout();
+initCompareWindDial();
 </script>
 </body>
 </html>
