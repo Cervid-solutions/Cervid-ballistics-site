@@ -140,6 +140,14 @@
   .compare-table th,.compare-table td{padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;}
   .compare-table th{color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.04em;}
   .compare-table td.metric-label{color:var(--muted);white-space:nowrap;}
+  /* HUD's two hero numbers (elevation, windage) — deliberately the biggest type anywhere in the
+     app, since the whole point of this view is a single glance in the field rather than reading a
+     table. The headline stat table below reuses .compare-table as-is. */
+  .hud-hero-row{display:flex;gap:14px;justify-content:center;text-align:center;margin:18px 0 20px;flex-wrap:wrap;}
+  .hud-hero{flex:1;min-width:140px;}
+  .hud-hero .hud-hero-label{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px;}
+  .hud-hero .hud-hero-value{font-size:56px;font-weight:800;line-height:1;color:var(--accent);}
+  .hud-hero .hud-hero-unit{font-size:13px;color:var(--muted);margin-top:4px;}
   @media(max-width:900px){.btn-compare-toggle{margin-left:0;margin-top:8px;width:100%;}}
   .preset-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
   /* Right padding (34px) reserves a column for the single overflow-menu toggle in the top-right
@@ -535,6 +543,70 @@
     <p style="color:var(--muted);font-size:11px;margin-top:14px;">Generic reticle pattern, not a specific manufacturer's design — hash spacing may not exactly match your scope. Assumes the reticle is at its calibrated magnification (max power for second-focal-plane scopes, any power for first-focal-plane).</p>
   </div>
 </div>
+<div id="hudModal" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:10000;overflow:auto;">
+  <div style="max-width:440px;margin:0 auto;padding:20px 18px 60px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:10px;">
+      <div>
+        <h2 style="margin:0;font-size:19px;">HUD (Head Up Display)</h2>
+        <div id="hudSubtitle" style="color:var(--muted);font-size:12px;margin-top:2px;"></div>
+      </div>
+      <button onclick="hideHud()" style="background:var(--accent2);color:#fff;border:none;border-radius:6px;padding:8px 14px;font-weight:700;cursor:pointer;touch-action:manipulation;flex-shrink:0;">Close</button>
+    </div>
+    <div class="compare-range-row" style="margin-bottom:4px;">
+      <label class="compare-range-label">Distance to target
+        <input type="number" id="fHudRange" min="1" step="1" oninput="onHudRangeChange()" placeholder="e.g. 437"/>
+        <span id="hudRangeUnitLbl">yd</span>
+      </label>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:14px;">
+      <label style="font-size:12px;color:var(--muted);margin:0;">Wind (optional &mdash; overrides today's calculated wind for the HUD)</label>
+      <a href="#" onclick="resetHudWind();return false;" style="font-size:11px;color:var(--accent2);">Reset</a>
+    </div>
+    <div class="compare-wind-row" style="margin-top:4px;margin-bottom:14px;">
+      <div class="wind-dial" id="hudWindDial" role="slider" aria-label="Wind direction override for the HUD" tabindex="0"></div>
+      <label class="compare-range-label">Wind
+        <input type="number" id="fHudWind" min="0" step="1" oninput="onHudWindSpeedChange()"/>
+        <span id="hudWindUnitLbl">mph</span>
+      </label>
+      <span class="compare-wind-readout" id="hudWindReadout"></span>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:10px;">
+      <label style="font-size:12px;color:var(--muted);margin:0;">Velocity (optional &mdash; overrides today's calculated velocity for the HUD)</label>
+      <a href="#" onclick="resetHudVelocity();return false;" style="font-size:11px;color:var(--accent2);">Reset</a>
+    </div>
+    <div class="compare-range-row" style="margin-top:4px;margin-bottom:14px;">
+      <label class="compare-range-label">Velocity
+        <input type="number" id="fHudVelocity" min="1" step="1" oninput="onHudVelocityChange()"/>
+        <span id="hudVelocityUnitLbl">fps</span>
+      </label>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px;margin-bottom:4px;">
+      <label style="font-size:12px;color:var(--muted);">Units</label>
+      <select id="hudUnitSelect" onchange="setHudDropUnit(this.value)" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 8px;font-size:12px;">
+        <option value="mils">mils</option>
+        <option value="moa">MOA</option>
+        <option value="clicks">clicks</option>
+      </select>
+      <select id="hudClickSizeSelect" onchange="setClickSize(this.value)" style="display:none;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 8px;font-size:12px;"></select>
+    </div>
+    <div id="hudEmptyState" style="text-align:center;color:var(--muted);padding:40px 10px;font-size:13px;">Enter a distance to target above.</div>
+    <div id="hudSolution" style="display:none;">
+      <div class="hud-hero-row">
+        <div class="hud-hero">
+          <div class="hud-hero-label" id="hudElevLabel">Elevation</div>
+          <div class="hud-hero-value" id="hudElevValue">&mdash;</div>
+          <div class="hud-hero-unit" id="hudElevUnit"></div>
+        </div>
+        <div class="hud-hero">
+          <div class="hud-hero-label" id="hudWindageLabel">Windage</div>
+          <div class="hud-hero-value" id="hudWindageValue">&mdash;</div>
+          <div class="hud-hero-unit" id="hudWindageUnit"></div>
+        </div>
+      </div>
+      <div class="tbl-wrap"><table class="compare-table" id="hudStatTable"><tbody></tbody></table></div>
+    </div>
+  </div>
+</div>
 <script>
 // ── Cervid icon (bullet + scope crosshair) ──────────────────────────────────
 // Returns an inline SVG string at the given pixel size, reusing the shared
@@ -713,6 +785,15 @@ function setUnitSystem(sys){
     var rvv=parseFloat(document.getElementById('fReticleVelocity').value)||0;
     if(rvv>0)document.getElementById('fReticleVelocity').value=Math.round(rvv*0.3048);
     document.getElementById('reticleVelocityUnitLbl').textContent='m/s';
+    var hrv=parseFloat(document.getElementById('fHudRange').value)||0;
+    if(hrv>0)document.getElementById('fHudRange').value=Math.round(hrv*0.9144);
+    document.getElementById('hudRangeUnitLbl').textContent='m';
+    var hwv=parseFloat(document.getElementById('fHudWind').value)||0;
+    if(hwv>0)document.getElementById('fHudWind').value=(hwv*1.60934).toFixed(1);
+    document.getElementById('hudWindUnitLbl').textContent='kph';
+    var hvv=parseFloat(document.getElementById('fHudVelocity').value)||0;
+    if(hvv>0)document.getElementById('fHudVelocity').value=Math.round(hvv*0.3048);
+    document.getElementById('hudVelocityUnitLbl').textContent='m/s';
   } else {
     document.getElementById('fMV').value=Math.round(mv/0.3048);
     document.getElementById('fSH').value=(sh/2.54).toFixed(2);
@@ -746,6 +827,15 @@ function setUnitSystem(sys){
     var rvv2=parseFloat(document.getElementById('fReticleVelocity').value)||0;
     if(rvv2>0)document.getElementById('fReticleVelocity').value=Math.round(rvv2/0.3048);
     document.getElementById('reticleVelocityUnitLbl').textContent='fps';
+    var hrv2=parseFloat(document.getElementById('fHudRange').value)||0;
+    if(hrv2>0)document.getElementById('fHudRange').value=Math.round(hrv2/0.9144);
+    document.getElementById('hudRangeUnitLbl').textContent='yd';
+    var hwv2=parseFloat(document.getElementById('fHudWind').value)||0;
+    if(hwv2>0)document.getElementById('fHudWind').value=(hwv2/1.60934).toFixed(1);
+    document.getElementById('hudWindUnitLbl').textContent='mph';
+    var hvv2=parseFloat(document.getElementById('fHudVelocity').value)||0;
+    if(hvv2>0)document.getElementById('fHudVelocity').value=Math.round(hvv2/0.3048);
+    document.getElementById('hudVelocityUnitLbl').textContent='fps';
   }
 
   applyBounds(sys);
@@ -2492,6 +2582,8 @@ function calculate(){
     // boundary — same role clearing the selection back to empty plays for Compare's own latch.
     reticleWindCustomized=false;
     reticleVelocityCustomized=false;
+    hudWindCustomized=false;
+    hudVelocityCustomized=false;
     renderResults(results,params,stability);
     if(window.innerWidth<=900)setMobileTab('results');
   }catch(err){
@@ -2641,7 +2733,8 @@ function renderResults(results,params,stability){
     (unitDrop==='clicks'?'<select onchange="setClickSize(this.value)" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 8px;font-size:12px;">'+clickSel+'</select>':'')+
     '<button class="btn btn-secondary" style="width:auto;padding:5px 14px;font-size:12px;" onclick="exportCSV()">Export CSV</button>'+
     '<button class="btn btn-secondary" style="width:auto;padding:5px 14px;font-size:12px;" onclick="showRangeCard()">&#128203; Range Card</button>'+
-    '<button class="btn btn-secondary" style="width:auto;padding:5px 14px;font-size:12px;" onclick="showReticleView()">'+bulletIcon(12)+' Reticle View</button></div></div>'+
+    '<button class="btn btn-secondary" style="width:auto;padding:5px 14px;font-size:12px;" onclick="showReticleView()">'+bulletIcon(12)+' Reticle View</button>'+
+    '<button class="btn btn-secondary" style="width:auto;padding:5px 14px;font-size:12px;" onclick="showHud()">&#128225; HUD</button></div></div>'+
     '<div class="stat-cards">'+
     '<div class="stat-card '+eSt+'"><div class="label">Muzzle Energy</div><div class="value">'+(met?r0.energyJ:muzzE.toFixed(0))+'</div><div class="unit">'+eAtMuzz+(eTag?'<br><strong>'+eTag+'</strong>':'')+'</div>'+(currentMode==='air'?'<div class="energy-bar"><div class="energy-fill" style="width:'+Math.min(100,muzzE)+'%;background:'+(muzzE>100?'var(--red)':muzzE>80?'var(--yellow)':'var(--green)')+'"></div></div>':'')+'</div>'+
     '<div class="stat-card"><div class="label">Muzzle Velocity</div><div class="value">'+muzzVel+'</div><div class="unit">'+muzzVelSub+'</div></div>'+
@@ -3043,6 +3136,241 @@ function initReticleWindDial(){
   dial.addEventListener('pointerup',commit);
   dial.addEventListener('pointercancel',commit);
   renderReticleWindDial();
+}
+
+// ── HUD (Head Up Display) ────────────────────────────────────────────────────
+// A single-glance, single-distance readout — the biggest type anywhere in the app — for "what do
+// I dial/hold right now for this one target," closer to a rangefinder's built-in ballistic overlay
+// than to any existing view. Distinct from Range Card (every distance at once, large print) and
+// Reticle View (one distance, but graphical and tied to a specific reticle pattern): HUD is one
+// distance, numeric only, angular units only (mils/MOA/clicks — no linear in/cm, since a HUD is
+// meant to be dialed or held, not read as a physical measurement).
+//
+// Wind and velocity overrides here are their own independent state (hudWind*/hudVelocity*),
+// deliberately separate from both Compare's and Reticle's own copies, for the same reason those
+// two are already kept apart from each other: three views a shooter could have open in the same
+// session with three different hypothetical conditions in mind. Both auto-suggest from
+// lastResults.params (not the live, possibly-since-edited Inputs-tab fields) and reset on the next
+// Calculate(), exactly like Reticle's.
+var hudWindCustomized=false;
+var hudWindClockVal=3;
+var hudVelocityCustomized=false;
+var hudUnitDrop='mils';
+
+// Reads the free-typed distance field, converting from whatever unit is currently displayed back
+// to canonical yards — mirrors readCompareRangeYd() exactly, just against fHudRange. Unlike
+// Reticle's range <select> (which only offers whatever distances the main table happened to
+// compute at its interval), this accepts any distance the shooter actually ranged, not just a
+// tabulated mark.
+function readHudRangeYd(){
+  var el=document.getElementById('fHudRange');
+  if(!el)return 0;
+  var raw=parseFloat(el.value)||0;
+  if(raw<=0)return 0;
+  return unitSystem==='metric'?Math.round(raw/0.9144):Math.round(raw);
+}
+function readHudWindMph(){
+  var el=document.getElementById('fHudWind');
+  if(!el)return 0;
+  var raw=parseFloat(el.value)||0;
+  if(raw<=0)return 0;
+  return unitSystem==='metric'?raw/1.60934:raw;
+}
+function writeHudWindMph(mph){
+  var el=document.getElementById('fHudWind');
+  if(!el)return;
+  var met=unitSystem==='metric';
+  el.value=met?(mph*1.60934).toFixed(1):mph.toFixed(1);
+  var lbl=document.getElementById('hudWindUnitLbl');
+  if(lbl)lbl.textContent=met?'kph':'mph';
+}
+function updateHudWindSuggestion(){
+  if(hudWindCustomized||!lastResults)return;
+  writeHudWindMph(lastResults.params.windMph);
+  hudWindClockVal=lastResults.params.windClock||3;
+  renderHudWindDial();
+}
+function renderHudWindDial(){
+  var el=document.getElementById('hudWindDial');
+  if(!el)return;
+  var size=72,r=size/2,numR=r-10;
+  var html='';
+  for(var h=1;h<=12;h++){
+    var angle=(h*30-90)*Math.PI/180;
+    var active=h===hudWindClockVal;
+    var tx=r+Math.cos(angle)*(r-4),ty=r+Math.sin(angle)*(r-4);
+    html+='<div class="tick'+(active?' active':'')+'" style="left:'+tx+'px;top:'+ty+'px;"></div>';
+    var nx=r+Math.cos(angle)*numR,ny=r+Math.sin(angle)*numR;
+    html+='<div class="num'+(active?' active':'')+'" style="left:'+nx+'px;top:'+ny+'px;">'+h+'</div>';
+  }
+  html+='<div class="hand" style="height:'+(r-8)+'px;transform:rotate('+(hudWindClockVal*30)+'deg);"></div>';
+  html+='<div class="hub"></div>';
+  el.innerHTML=html;
+  var readout=document.getElementById('hudWindReadout');
+  if(readout)readout.textContent=hudWindClockVal+" o'clock";
+}
+function onHudWindSpeedChange(){
+  hudWindCustomized=true;
+  renderHud();
+}
+function resetHudWind(){
+  hudWindCustomized=false;
+  updateHudWindSuggestion();
+  renderHud();
+}
+function readHudVelocityFps(){
+  var el=document.getElementById('fHudVelocity');
+  if(!el)return 0;
+  var raw=parseFloat(el.value)||0;
+  if(raw<=0)return 0;
+  return unitSystem==='metric'?raw/0.3048:raw;
+}
+function writeHudVelocityFps(fps){
+  var el=document.getElementById('fHudVelocity');
+  if(!el)return;
+  var met=unitSystem==='metric';
+  el.value=met?Math.round(fps*0.3048):Math.round(fps);
+  var lbl=document.getElementById('hudVelocityUnitLbl');
+  if(lbl)lbl.textContent=met?'m/s':'fps';
+}
+function updateHudVelocitySuggestion(){
+  if(hudVelocityCustomized||!lastResults)return;
+  writeHudVelocityFps(lastResults.params.mvFps);
+}
+function onHudVelocityChange(){
+  hudVelocityCustomized=true;
+  renderHud();
+}
+function resetHudVelocity(){
+  hudVelocityCustomized=false;
+  updateHudVelocitySuggestion();
+  renderHud();
+}
+// Angular-only, unlike Compare's Drop & Wind Drift dropdown (which also offers linear in/cm) —
+// a HUD reading is something you dial or hold, not a physical measurement to note down.
+function setHudDropUnit(u){
+  hudUnitDrop=u;
+  updateHudClickSizeVisibility();
+  renderHud();
+}
+function updateHudClickSizeVisibility(){
+  var sel=document.getElementById('hudClickSizeSelect');
+  if(!sel)return;
+  if(hudUnitDrop==='clicks'){sel.innerHTML=clickSizeOptionsHtml();sel.style.display='';}
+  else sel.style.display='none';
+}
+function initHudWindDial(){
+  var dial=document.getElementById('hudWindDial');
+  if(!dial)return;
+  var dragging=false;
+  function setFromEvent(e){
+    var rect=dial.getBoundingClientRect();
+    var cx=rect.left+rect.width/2,cy=rect.top+rect.height/2;
+    var hour=clockHourFromAngle(e.clientX-cx,e.clientY-cy);
+    hudWindCustomized=true;
+    if(hour!==hudWindClockVal){hudWindClockVal=hour;renderHudWindDial();}
+  }
+  function commit(){ if(dragging){dragging=false; renderHud();} }
+  dial.addEventListener('pointerdown',function(e){
+    dragging=true;
+    if(dial.setPointerCapture)dial.setPointerCapture(e.pointerId);
+    setFromEvent(e);
+  });
+  dial.addEventListener('pointermove',function(e){if(dragging)setFromEvent(e);});
+  dial.addEventListener('pointerup',commit);
+  dial.addEventListener('pointercancel',commit);
+  renderHudWindDial();
+}
+function showHud(){
+  if(!lastResults)return;
+  document.getElementById('hudSubtitle').textContent=(document.getElementById('fCalibr').value||'HUD')+' · enter a distance to target';
+  document.getElementById('hudUnitSelect').value=hudUnitDrop;
+  updateHudClickSizeVisibility();
+  updateHudWindSuggestion();
+  updateHudVelocitySuggestion();
+  renderHud();
+  document.getElementById('hudModal').style.display='block';
+}
+function hideHud(){
+  var el=document.getElementById('hudModal');
+  if(el)el.style.display='none';
+}
+function onHudRangeChange(){
+  renderHud();
+}
+// The core recompute. A genuine fresh computeTrajectory() call under this page's own wind/velocity
+// overrides and the exact typed distance — not a rescale of any cached row — for the same reason
+// established for every other override in the app: the headwind/tailwind component of wind and
+// velocity itself both have second-order effects on drop and time-of-flight, so anything less than
+// a full recompute risks silently disagreeing with what Compare or the Results table would show
+// for the same conditions.
+//
+// One wrinkle specific to HUD: unlike Compare's shared reference range (which always wants the row
+// AT its own maxYd, since that's the intentional endpoint for every slot), a HUD distance can
+// legitimately be shorter than the loaded zero — e.g. zeroed at 100yd, ranging something at 40yd.
+// computeTrajectory() only walks its zeroing pre-pass out to a fixed offset past zeroFt regardless
+// of maxYd, but the MAIN trajectory loop (the one that actually produces the returned rows and the
+// zero-referenced line-of-sight baseline, zLOS) stops at maxYd*3ft — so if maxYd were set to the
+// typed distance directly and that distance is short of the zero, the zero point itself would never
+// appear in the raw samples, and zLOS would silently fall back to an assumed (and generally wrong)
+// height at the zero range. So maxYd is always padded out to at least zeroYd+20 (same guard already
+// used for Compare's isLive branch, same reason), guaranteeing the zero point is actually walked —
+// and then, because dense mode records every whole yard along the way, the specific row matching
+// the typed distance is picked out of the full set rather than assumed to be the last one.
+function renderHud(){
+  if(!lastResults)return;
+  var targetYd=readHudRangeYd();
+  var empty=document.getElementById('hudEmptyState'),solution=document.getElementById('hudSolution');
+  if(!targetYd){
+    empty.style.display='';
+    solution.style.display='none';
+    return;
+  }
+  var hudWindMph=readHudWindMph();
+  var hudVelocityFps=readHudVelocityFps()||lastResults.params.mvFps;
+  var safeMaxYd=Math.max(targetYd,lastResults.params.zeroYd+20);
+  var effParams=Object.assign({},lastResults.params,{windMph:hudWindMph,windClock:hudWindClockVal,mvFps:hudVelocityFps,maxYd:safeMaxYd,maxNative:safeMaxYd,intervalNative:null});
+  var effResults=computeTrajectory(effParams,true);
+  if(!effResults||!effResults.length)return;
+  var row=effResults.find(function(r){return r.yd===targetYd;})||effResults[effResults.length-1];
+  var r0=effResults[0];
+  var met=unitSystem==='metric';
+  empty.style.display='none';
+  solution.style.display='';
+
+  // Hero numbers: elevation and windage in whichever angular unit is currently selected. Same
+  // sign convention as Reticle View's own elevDir/windDir (elevVal positive->'down' label, negative
+  // ->'up'; windVal positive->'left', negative->'right' — copied verbatim from renderReticleView()
+  // rather than re-derived, since that convention is already tested and correct there).
+  var elevVal=hudUnitDrop==='clicks'?parseFloat(toClicks(row.moa)):hudUnitDrop==='moa'?parseFloat(row.moa):parseFloat(row.mils);
+  var windVal=hudUnitDrop==='clicks'?parseFloat(toClicks(row.driftMoa)):hudUnitDrop==='moa'?parseFloat(row.driftMoa):parseFloat(row.driftMils);
+  var unitLabel=hudUnitDrop==='clicks'?'clicks':hudUnitDrop==='moa'?'MOA':'mils';
+  var elevDir=elevVal>0.005?'Hold Down':elevVal<-0.005?'Hold Up':'On';
+  var windDir=windVal>0.005?'Hold Left':windVal<-0.005?'Hold Right':'On';
+  document.getElementById('hudElevLabel').textContent=elevDir;
+  document.getElementById('hudElevValue').textContent=Math.abs(elevVal).toFixed(hudUnitDrop==='clicks'?0:2);
+  document.getElementById('hudElevUnit').textContent=unitLabel;
+  document.getElementById('hudWindageLabel').textContent=windDir;
+  document.getElementById('hudWindageValue').textContent=Math.abs(windVal).toFixed(hudUnitDrop==='clicks'?0:2);
+  document.getElementById('hudWindageUnit').textContent=unitLabel;
+
+  // Headline stat table — same six figures and the same physical-distance (not angular) treatment
+  // for Drop/Wind that the main Results page's own stat cards already use, so this table is a
+  // useful complement to the hero numbers above rather than just restating them. Air Density
+  // depends only on altitude/temp/humidity/pressure, none of which HUD overrides, so it reads
+  // identically to the main page's own Air Density card regardless of the typed distance.
+  var muzzE=r0.energyFtLb;
+  var rows=[
+    ['Muzzle Energy',met?r0.energyJ+' J':muzzE+' ft-lb'],
+    ['Velocity at Target',met?Math.round(row.fps*0.3048)+' m/s':row.fps+' fps'],
+    ['Energy at Target',met?row.energyJ+' J':row.energyFtLb+' ft-lb'],
+    ['Drop',met?row.dropCm+' cm':row.dropIn+' in'],
+    ['Wind',met?row.driftCm+' cm':row.driftIn+' in'],
+    ['Air Density',(airDensityRatio(effParams.altFt,effParams.tempC,effParams.humidPct,effParams.presHPa)*100).toFixed(1)+'% of std atmosphere']
+  ];
+  document.getElementById('hudStatTable').querySelector('tbody').innerHTML=rows.map(function(r){
+    return '<tr><td class="metric-label">'+r[0]+'</td><td>'+r[1]+'</td></tr>';
+  }).join('');
 }
 
 function showReticleView(){
@@ -3459,6 +3787,7 @@ renderPresets();
 syncLayout();
 initCompareWindDial();
 initReticleWindDial();
+initHudWindDial();
 </script>
 </body>
 </html>
