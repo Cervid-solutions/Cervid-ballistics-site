@@ -2311,6 +2311,15 @@ function computeTrajectory(p,dense){
     var corIn=r.wc*12;
     var corMoa=r.xYd>0?corIn*cosA2/(r.xYd/100*1.0472):0;
     var corMils=r.xYd>0?corIn*cosA2/(r.xYd*0.036):0;
+    // Total windage: crosswind drift + spin drift + (lateral) Coriolis, summed as raw numbers before
+    // rounding rather than adding the already-toFixed() display strings, so this doesn't compound
+    // three independent roundings into a slightly-off total. All three share the same sign convention
+    // (positive = drifts/pushes right — see fmtDir()), so a plain sum is correct, not a special-cased
+    // combination. This is the figure Reticle View and HUD actually use as "what to dial/hold" for
+    // windage; the separate driftMoa/driftMils/spinMoa/... fields above are kept as-is and still drive
+    // the main Results table's individual Wind/Spin Drift/Coriolis columns, which stay split out for
+    // the shooter's own interest rather than being replaced by this combined figure.
+    var totalWindMoa=driftMoa+sdMoa+corMoa,totalWindMils=driftMils+sdMils+corMils;
     return{
       yd:r.xYd,fps:Math.round(r.v),mach:r.mach.toFixed(2),
       dropIn:dIn.toFixed(2),dropCm:(dIn*2.54).toFixed(1),
@@ -2336,6 +2345,7 @@ function computeTrajectory(p,dense){
       spinMoa:sdMoa.toFixed(2),spinMils:sdMils.toFixed(2),
       coriolisIn:corIn.toFixed(2),coriolisCm:(corIn*2.54).toFixed(1),
       coriolisMoa:corMoa.toFixed(2),coriolisMils:corMils.toFixed(2),
+      totalWindMoa:totalWindMoa.toFixed(2),totalWindMils:totalWindMils.toFixed(2),
       tof:r.t.toFixed(3),isZero:r.xYd===p.zeroYd,isSpot:p.spotYd&&r.xYd===p.spotYd,isSubsonic:r.mach<1
     };
   });
@@ -3386,7 +3396,12 @@ function renderHud(){
   // ->'up'; windVal positive->'left', negative->'right' — copied verbatim from renderReticleView()
   // rather than re-derived, since that convention is already tested and correct there).
   var elevVal=hudUnitDrop==='clicks'?parseFloat(toClicks(row.moa)):hudUnitDrop==='moa'?parseFloat(row.moa):parseFloat(row.mils);
-  var windVal=hudUnitDrop==='clicks'?parseFloat(toClicks(row.driftMoa)):hudUnitDrop==='moa'?parseFloat(row.driftMoa):parseFloat(row.driftMils);
+  // Combined windage hold — crosswind drift + spin drift + (lateral) Coriolis (totalWindMils/
+  // totalWindMoa, see computeTrajectory()) — not crosswind drift alone, matching Reticle View's own
+  // windVal. The headline stat table's separate "Wind" row below stays crosswind-only, mirroring the
+  // main Results page's own Wind/Spin Drift/Coriolis columns, which this hero number is deliberately
+  // not replacing — it's the one place those three get added together for a single dial/hold figure.
+  var windVal=hudUnitDrop==='clicks'?parseFloat(toClicks(row.totalWindMoa)):hudUnitDrop==='moa'?parseFloat(row.totalWindMoa):parseFloat(row.totalWindMils);
   var unitLabel=hudUnitDrop==='clicks'?'clicks':hudUnitDrop==='moa'?'MOA':'mils';
   var elevDir=elevVal>0.005?'Hold Down':elevVal<-0.005?'Hold Up':'On';
   var windDir=windVal>0.005?'Hold Left':windVal<-0.005?'Hold Right':'On';
@@ -3553,7 +3568,12 @@ function renderReticleView(){
   var patternKey=document.getElementById('reticlePatternSelect').value;
   var pat=RETICLE_PATTERNS[patternKey];
   var elevVal=pat.unit==='mil'?parseFloat(row.mils):parseFloat(row.moa);
-  var windVal=pat.unit==='mil'?parseFloat(row.driftMils):parseFloat(row.driftMoa);
+  // windVal is the combined windage hold: crosswind drift + spin drift + (lateral) Coriolis added
+  // together (totalWindMils/totalWindMoa — see computeTrajectory()), not crosswind drift alone, so
+  // the shooter reads a single figure to dial/hold rather than needing to sum three table columns
+  // themselves. Those three individual figures remain visible as their own columns/stat cards for
+  // reference; this is the only place they're combined into one number.
+  var windVal=pat.unit==='mil'?parseFloat(row.totalWindMils):parseFloat(row.totalWindMoa);
   // Turret dial, converted from canonical mils into the pattern's current unit.
   var turretElev=pat.unit==='moa'?turretElevMil*MIL_TO_MOA:turretElevMil;
   var turretWind=pat.unit==='moa'?turretWindMil*MIL_TO_MOA:turretWindMil;
