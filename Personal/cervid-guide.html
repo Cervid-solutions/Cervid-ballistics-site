@@ -294,7 +294,7 @@ footer{border-top:1px solid var(--border);padding:24px;text-align:center;color:v
 <div class="topic">
 <h3>Gyroscopic Stability (Sg) &amp; Min Twist <span class="badge advanced">Advanced</span></h3>
 <p>Sg is classified into bands: below 1.0 Unstable, 1.0&ndash;1.4 Marginal, 1.4&ndash;2.5 Stable, 2.5&ndash;4.0 Over-stabilised, above 4.0 Excessively fast. The Min Twist card shows the loosest twist rate (in both Miller's and Greenhill's formulas) that would still adequately stabilise the projectile you've entered.</p>
-<div class="callout limit">Sg has no muzzle-velocity correction term, despite being referenced to roughly 2800fps rifle velocities &mdash; air rifle loads typically run 700&ndash;950fps. This is a known, documented gap rather than an oversight.</div>
+<div class="callout limit">Sg is referenced to roughly 2800fps rifle velocities. Miller did publish a velocity correction, capping it at its value at the speed of sound rather than shrinking it further into subsonic territory &mdash; but neither the base formula nor that correction was validated against 700&ndash;950fps airgun pellets, so the app doesn't apply it. Read the raw Sg figure for pellets as indicative rather than exact.</div>
 </div>
 
 <div class="topic">
@@ -479,8 +479,8 @@ footer{border-top:1px solid var(--border);padding:24px;text-align:center;color:v
 </div>
 
 <div class="topic">
-<h3>Sg has no velocity correction term <span class="badge advanced">Advanced</span></h3>
-<p>Miller's stability formula is referenced to roughly 2800fps rifle velocities. Air rifle loads typically run 700&ndash;950fps, so the raw Sg figure for pellets should be read as indicative rather than exact &mdash; a documented, known gap rather than a bug.</p>
+<h3>Sg doesn't apply Miller's velocity correction <span class="badge advanced">Advanced</span></h3>
+<p>Miller's stability formula is referenced to roughly 2800fps rifle velocities, and Miller did publish a velocity correction &mdash; capped at its value at the speed of sound rather than extrapolated further into subsonic territory. Air rifle loads typically run 700&ndash;950fps, but the app doesn't apply this correction: neither the base formula nor Miller's own correction was derived from or validated against airgun pellets, so adding it would swap one unvalidated number for another rather than clearly improve accuracy. Read the raw Sg figure for pellets as indicative rather than exact &mdash; a documented, known limitation rather than a bug.</p>
 </div>
 
 <div class="topic">
