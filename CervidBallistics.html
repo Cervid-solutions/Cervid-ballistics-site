@@ -37,7 +37,7 @@
   .section-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:12px;}
   .field{margin-bottom:10px;}
   .field label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;}
-  .field input,.field select{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:7px 10px;font-size:13px;outline:none;transition:border-color .2s;}
+  .field input,.field select{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:7px 10px;font-size:16px;outline:none;transition:border-color .2s;}
   .field input:focus,.field select:focus{border-color:var(--accent);}
   .field select option{background:var(--surface);}
   /* align-items:end keeps each row's INPUT boxes level with each other even when one field's
@@ -103,7 +103,7 @@
   .compare-strip{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;min-height:26px;}
   .compare-range-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:18px;}
   .compare-range-label{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);}
-  .compare-range-label input{width:70px;padding:5px 8px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;}
+  .compare-range-label input{width:82px;padding:5px 8px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:16px;}
   /* Wind override row: an editable speed field plus a drag-anywhere clock-face dial for direction,
      following the exact same auto-suggest/customize pattern as "Compare to" above it (see
      compareWindCustomized in the script below). The dial is deliberately NOT 12 discrete tap
@@ -173,7 +173,7 @@
   .preset-menu button.danger{color:var(--red);}
   .preset-menu button.positive{color:var(--green);}
   .save-preset-row{display:flex;gap:5px;margin-top:8px;align-items:center;}
-  .save-preset-row input{flex:1;min-width:0;background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:5px 8px;font-size:12px;outline:none;}
+  .save-preset-row input{flex:1;min-width:0;background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:5px 8px;font-size:16px;outline:none;}
   .save-preset-row button{padding:5px 10px;background:var(--accent2);color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;touch-action:manipulation;}
   .cancel-edit-link{font-size:10px;color:var(--muted);cursor:pointer;text-decoration:underline;white-space:nowrap;display:none;}
   .preset-section-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
@@ -584,12 +584,12 @@
     </div>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px;margin-bottom:4px;">
       <label style="font-size:12px;color:var(--muted);">Units</label>
-      <select id="hudUnitSelect" onchange="setHudDropUnit(this.value)" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 8px;font-size:12px;">
+      <select id="hudUnitSelect" onchange="setHudDropUnit(this.value)" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 8px;font-size:16px;">
         <option value="mils">mils</option>
         <option value="moa">MOA</option>
         <option value="clicks">clicks</option>
       </select>
-      <select id="hudClickSizeSelect" onchange="setClickSize(this.value)" style="display:none;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 8px;font-size:12px;"></select>
+      <select id="hudClickSizeSelect" onchange="setClickSize(this.value)" style="display:none;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 8px;font-size:16px;"></select>
     </div>
     <div id="hudEmptyState" style="text-align:center;color:var(--muted);padding:40px 10px;font-size:13px;">Enter a distance to target above.</div>
     <div id="hudSolution" style="display:none;">
@@ -2112,10 +2112,10 @@ function renderCompareResults(list,refYd){
   function cuDrop(rL){return cu==='in'?rL.dropIn:cu==='cm'?rL.dropCm:cu==='moa'?rL.moa:cu==='clicks'?toClicks(rL.moa):rL.mils;}
   function cuWind(rL){return cu==='in'?rL.driftIn:cu==='cm'?rL.driftCm:cu==='moa'?rL.driftMoa:cu==='clicks'?toClicks(rL.driftMoa):rL.driftMils;}
   var unitPicker='<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:12px;color:var(--muted);flex-wrap:wrap;">Drop &amp; Wind units:'+
-    '<select onchange="setCompareDropUnit(this.value)" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 8px;font-size:12px;">'+
+    '<select onchange="setCompareDropUnit(this.value)" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 8px;font-size:16px;">'+
     ['mils','moa','clicks','in','cm'].map(function(u){var lbl=u==='moa'?'MOA':u==='mils'?'mils':u==='clicks'?'clicks':u==='in'?'inches':'cm';return '<option value="'+u+'"'+(cu===u?' selected':'')+'>'+lbl+'</option>';}).join('')+
     '</select>'+
-    (cu==='clicks'?'<select onchange="setClickSize(this.value)" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 8px;font-size:12px;">'+clickSizeOptionsHtml()+'</select>':'')+
+    (cu==='clicks'?'<select onchange="setClickSize(this.value)" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 8px;font-size:16px;">'+clickSizeOptionsHtml()+'</select>':'')+
     '</div>';
   var rows=[
     {label:'Muzzle Velocity',get:function(x){var r0=x.results[0];return met?Math.round(r0.fps*0.3048)+' m/s':r0.fps+' fps';}},
@@ -2153,7 +2153,7 @@ function renderCompareResults(list,refYd){
       // squeezed into a table header cell this narrow. Sized down from the Turret Dial's own 26px
       // buttons to fit this tighter column.
       '<button type="button" onclick="stepCompareVelocity(\''+refKey+'\',-1)" style="width:18px;height:18px;flex:none;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:12px;line-height:1;cursor:pointer;touch-action:manipulation;padding:0;">&minus;</button>'+
-      '<input type="number" id="'+velInputId+'" min="1" step="1" value="'+overrideDisp+'" placeholder="'+baselineDisp+'" style="width:46px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 4px;font-size:11px;text-align:center;" oninput="onCompareVelocityInput(this,\''+refKey+'\')"/>'+
+      '<input type="number" id="'+velInputId+'" min="1" step="1" value="'+overrideDisp+'" placeholder="'+baselineDisp+'" style="width:58px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 4px;font-size:16px;text-align:center;" oninput="onCompareVelocityInput(this,\''+refKey+'\')"/>'+
       '<button type="button" onclick="stepCompareVelocity(\''+refKey+'\',1)" style="width:18px;height:18px;flex:none;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:12px;line-height:1;cursor:pointer;touch-action:manipulation;padding:0;">+</button> '+(met?'m/s':'fps')+
       (hasOverride?' <a href="#" onclick="resetCompareVelocity(\''+refKey+'\');return false;" style="font-size:10px;color:var(--accent2);">Reset</a>':'')+
       '</div></th>';
@@ -2756,7 +2756,7 @@ function renderResults(results,params,stability){
     '<button class="'+(unitDrop==='in'?'active':'')+'" onclick="setDropUnit(\'in\')">inches</button>'+
     '<button class="'+(unitDrop==='cm'?'active':'')+'" onclick="setDropUnit(\'cm\')">cm</button></div>'+
     '<span class="help-tip" data-tip="mils (milliradians): 1 mil at 100m is about 10cm of drop or drift. MOA (Minutes of Angle): 1 MOA at 100yd is about 1.047in. clicks: scope adjustment clicks, converted using your selected click size below." onclick="showHelpTip(this,event)">?</span>'+
-    (unitDrop==='clicks'?'<select onchange="setClickSize(this.value)" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 8px;font-size:12px;">'+clickSel+'</select>':'')+
+    (unitDrop==='clicks'?'<select onchange="setClickSize(this.value)" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 8px;font-size:16px;">'+clickSel+'</select>':'')+
     '<button class="btn btn-secondary" style="width:auto;padding:5px 14px;font-size:12px;" onclick="exportCSV()">Export CSV</button>'+
     '<button class="btn btn-secondary" style="width:auto;padding:5px 14px;font-size:12px;" onclick="showRangeCard()">&#128203; Range Card</button>'+
     '<button class="btn btn-secondary" style="width:auto;padding:5px 14px;font-size:12px;" onclick="showReticleView()">'+bulletIcon(12)+' Reticle View</button>'+
