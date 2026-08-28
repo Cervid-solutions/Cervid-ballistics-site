@@ -453,7 +453,7 @@
   </div>
 
   <div class="main" id="mainArea">
-    <div class="empty-state"><div class="icon"><img src="cervid-icon-square.jpg" alt="" style="width:173px;height:173px;object-fit:cover;border-radius:12px;"></div><p>Select a Quick Preset or configure your load, then tap <strong>Calculate Trajectory</strong></p><p style="font-size:11px;margin-top:10px;line-height:1.4;"><br><br>The guide within the app contains valuable insights into the features contained within the ballistic calculator and how it creates firing solutions.<br><br>Send feedback to <a href="mailto:ballistics@cervid.net" style="color:var(--muted);">ballistics@cervid.net</a><br><br>&copy; Copyright 2026<br>Simon J. Gibson, CBE</p></div>
+    <div class="empty-state"><div class="icon"><img src="cervid-icon-square.jpg" alt="" style="width:173px;height:173px;object-fit:cover;border-radius:12px;"></div><p>Select a Quick Preset or configure your load, then tap <strong>Calculate Trajectory</strong></p><p style="font-size:11px;margin-top:10px;line-height:1.4;"><br><br><span style="font-size:14px;">The guide within the app contains valuable insights into the features contained within the ballistic calculator and how the physics engine creates firing solutions.<br><br>Send feedback to <a href="mailto:ballistics@cervid.net" style="color:var(--muted);">ballistics@cervid.net</a></span><br><br>&copy; Copyright 2026<br>Simon J. Gibson, CBE</p></div>
   </div>
 </div>
 <div class="mobile-tab-bar" id="mobileTabBar">
@@ -1624,7 +1624,7 @@ function setMode(m){
   loadedPresetRef=null;
   lastResults=null; // old trajectory no longer describes anything meaningful — clear it rather
   // than leaving a stale chart/table on screen computed from the load that just got wiped above.
-  document.getElementById('mainArea').innerHTML='<div class="empty-state"><div class="icon"><img src="cervid-icon-square.jpg" alt="" style="width:173px;height:173px;object-fit:cover;border-radius:12px;"></div><p>Select a Quick Preset or configure your load, then tap <strong>Calculate Trajectory</strong></p><p style="font-size:11px;margin-top:10px;line-height:1.4;"><br><br>The guide within the app contains valuable insights into the features contained within the ballistic calculator and how it creates firing solutions.<br><br>Send feedback to <a href="mailto:ballistics@cervid.net" style="color:var(--muted);">ballistics@cervid.net</a><br><br>&copy; Copyright 2026<br>Simon J. Gibson, CBE</p></div>';
+  document.getElementById('mainArea').innerHTML='<div class="empty-state"><div class="icon"><img src="cervid-icon-square.jpg" alt="" style="width:173px;height:173px;object-fit:cover;border-radius:12px;"></div><p>Select a Quick Preset or configure your load, then tap <strong>Calculate Trajectory</strong></p><p style="font-size:11px;margin-top:10px;line-height:1.4;"><br><br><span style="font-size:14px;">The guide within the app contains valuable insights into the features contained within the ballistic calculator and how the physics engine creates firing solutions.<br><br>Send feedback to <a href="mailto:ballistics@cervid.net" style="color:var(--muted);">ballistics@cervid.net</a></span><br><br>&copy; Copyright 2026<br>Simon J. Gibson, CBE</p></div>';
   savePrefs({mode:m});
 }
 
