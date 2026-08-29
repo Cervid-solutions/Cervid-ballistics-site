@@ -179,6 +179,13 @@
   .preset-section-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
   .preset-section-hdr .section-title{margin-bottom:0;}
   .restore-link{font-size:10px;color:var(--muted);cursor:pointer;text-decoration:underline;}
+  /* Real button chrome (border + background, not just underlined text) for actions that were easy
+     to miss at a glance despite being functionally important — Export/Import presets and the various
+     override Reset links. Matches the existing resetTruing() button's established ghost-button
+     pattern (transparent bg, 1px border, 5px radius) rather than inventing a new visual language,
+     bumped to 12px per the font-legibility pass this was added for. Deliberately scoped to just these
+     controls — .restore-link's other uses (Sort by calibre, Restore defaults, Undo) were left as-is. */
+  .link-btn{display:inline-block;padding:3px 8px;background:transparent;border:1px solid var(--border);border-radius:5px;color:var(--accent2);font-size:12px;text-decoration:none;cursor:pointer;touch-action:manipulation;}
   .help-tip{display:inline-block;width:15px;height:15px;line-height:13px;text-align:center;border-radius:50%;background:var(--surface2);border:1px solid var(--border);color:var(--muted);font-size:9px;font-style:normal;font-weight:700;cursor:pointer;margin-left:3px;vertical-align:middle;touch-action:manipulation;}
   #helpTipPopover{display:none;position:fixed;z-index:9999;max-width:230px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:11px;line-height:1.45;color:var(--text);box-shadow:0 4px 16px rgba(0,0,0,.45);}
   .rc-row{display:flex;justify-content:space-between;align-items:center;padding:14px 0;border-bottom:1px solid var(--border);}
@@ -300,8 +307,8 @@
       </div>
       <div id="presetEditStatus" style="font-size:11px;color:var(--muted);margin-top:4px;min-height:14px;"></div>
       <div style="display:flex;gap:10px;align-items:center;margin-top:8px;">
-        <span class="restore-link" onclick="exportPresets()">&#11015; Export presets</span>
-        <span class="restore-link" onclick="document.getElementById('importPresetsFile').click()">&#11014; Import presets</span>
+        <span class="link-btn" onclick="exportPresets()">&#11015; Export presets</span>
+        <span class="link-btn" onclick="document.getElementById('importPresetsFile').click()">&#11014; Import presets</span>
         <input type="file" id="importPresetsFile" accept="application/json" style="display:none;" onchange="importPresetsFile(this)"/>
       </div>
     </div>
@@ -346,7 +353,7 @@
           <button type="button" onclick="dismissBcWarning()" style="padding:3px 10px;background:transparent;border:1px solid var(--border);border-radius:5px;color:var(--muted);font-size:11px;cursor:pointer;touch-action:manipulation;">Dismiss</button>
         </div>
       </div>
-      <div class="field"><label>Projectile Shape <span style="color:var(--muted);font-size:10px;">(approx. gyro stability correction)</span></label><select id="fShape">
+      <div class="field"><label>Projectile Shape <span style="color:var(--muted);font-size:12px;">(approx. gyro stability correction)</span></label><select id="fShape">
         <option value="flatbase">Flat-base</option>
         <option value="boattail">Boat-tail</option>
         <option value="diabolo">Diabolo (pellet skirt)</option>
@@ -357,7 +364,7 @@
         <div class="field"><label id="lblTwist">Twist 1:X (in)<span class="help-tip" data-tip="Barrel twist rate: one full rifling rotation per X inches (or mm) of travel. A lower number means faster/tighter twist - more spin for a given velocity, needed to stabilize longer/heavier projectiles." onclick="showHelpTip(this,event)">?</span></label><input type="number" id="fTwist" value="16" min="4" max="36" step="0.5"/></div>
       </div>
       <div class="field" style="margin-top:-2px;">
-        <label>Twist Direction <span style="color:var(--muted);font-size:10px;">(for spin drift)</span></label>
+        <label>Twist Direction <span style="color:var(--muted);font-size:12px;">(for spin drift)</span></label>
         <div class="unit-toggle">
           <button class="active" id="btnRH" onclick="setTwistDir(1)">RH &#8635; (standard)</button>
           <button id="btnLH" onclick="setTwistDir(-1)">LH &#8634;</button>
@@ -384,7 +391,7 @@
       </div>
       <div class="row2" style="align-items:start;">
         <div class="field"><label id="lblWind">Wind Speed (mph)</label><input type="number" id="fWind" value="10" min="0" max="200" step="1"/></div>
-        <div class="field"><label>Wind Clock (hr)<span class="help-tip" data-tip="This clock position drives two separate effects. The crosswind component (3 or 9 o'clock = full effect, 12 or 6 o'clock = none) deflects the trajectory sideways. The head/tailwind component (12 or 6 o'clock = full effect, 3 or 9 o'clock = none) very slightly changes drag: a headwind adds a touch more drop and time of flight, a tailwind takes a touch off both. That second effect is real but small &mdash; for a typical rifle load it's a fraction of the crosswind's effect at the same wind speed, though it's proportionally larger for slower, lower-BC projectiles like air rifle pellets." onclick="showHelpTip(this,event)">?</span></label><input type="number" id="fWindDir" value="3" min="1" max="12" step="1"/><small style="color:var(--muted);font-size:10px;">3=full R, 9=full L</small></div>
+        <div class="field"><label>Wind Clock (hr)<span class="help-tip" data-tip="This clock position drives two separate effects. The crosswind component (3 or 9 o'clock = full effect, 12 or 6 o'clock = none) deflects the trajectory sideways. The head/tailwind component (12 or 6 o'clock = full effect, 3 or 9 o'clock = none) very slightly changes drag: a headwind adds a touch more drop and time of flight, a tailwind takes a touch off both. That second effect is real but small &mdash; for a typical rifle load it's a fraction of the crosswind's effect at the same wind speed, though it's proportionally larger for slower, lower-BC projectiles like air rifle pellets." onclick="showHelpTip(this,event)">?</span></label><input type="number" id="fWindDir" value="3" min="1" max="12" step="1"/><small style="color:var(--muted);font-size:12px;">3=full R, 9=full L</small></div>
       </div>
       <button class="btn btn-secondary" onclick="autoFillPressure()" style="margin-bottom:6px;font-size:12px;padding:6px;">&#128205; Pressure from altitude</button>
     </div>
@@ -394,7 +401,7 @@
       <div class="section-title">Location (Coriolis)</div>
       <div class="row2" style="align-items:start;">
         <div class="field"><label>Latitude (&deg;N)</label><input type="number" id="fLat" value="54" min="-90" max="90" step="0.5"/></div>
-        <div class="field"><label>Azimuth (&deg;)<span class="help-tip" data-tip="The compass direction you are firing toward, in degrees (0=North, 90=East, 180=South, 270=West). Used with Latitude to calculate the Coriolis effect - the Earth's rotation deflecting the bullet slightly, which only matters at longer ranges. If you do not know it, 0 (North) is a reasonable default and the effect is small anyway." onclick="showHelpTip(this,event)">?</span></label><input type="number" id="fAzimuth" value="0" min="0" max="360" step="5"/><small style="color:var(--muted);font-size:10px;">0=N 90=E 180=S</small></div>
+        <div class="field"><label>Azimuth (&deg;)<span class="help-tip" data-tip="The compass direction you are firing toward, in degrees (0=North, 90=East, 180=South, 270=West). Used with Latitude to calculate the Coriolis effect - the Earth's rotation deflecting the bullet slightly, which only matters at longer ranges. If you do not know it, 0 (North) is a reasonable default and the effect is small anyway." onclick="showHelpTip(this,event)">?</span></label><input type="number" id="fAzimuth" value="0" min="0" max="360" step="5"/><small style="color:var(--muted);font-size:12px;">0=N 90=E 180=S</small></div>
       </div>
     </div>
 
@@ -488,7 +495,7 @@
     </div>
     <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:10px;">
       <label style="font-size:12px;color:var(--muted);margin:0;">Wind (optional &mdash; overrides today's calculated wind for this reticle)</label>
-      <a href="#" onclick="resetReticleWind();return false;" style="font-size:11px;color:var(--accent2);">Reset</a>
+      <a href="#" onclick="resetReticleWind();return false;" class="link-btn">Reset</a>
     </div>
     <div class="compare-wind-row" style="margin-top:4px;margin-bottom:14px;">
       <div class="wind-dial" id="reticleWindDial" role="slider" aria-label="Wind direction override for the reticle" tabindex="0"></div>
@@ -500,7 +507,7 @@
     </div>
     <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:10px;">
       <label style="font-size:12px;color:var(--muted);margin:0;">Velocity (optional &mdash; overrides today's calculated velocity for this reticle)</label>
-      <a href="#" onclick="resetReticleVelocity();return false;" style="font-size:11px;color:var(--accent2);">Reset</a>
+      <a href="#" onclick="resetReticleVelocity();return false;" class="link-btn">Reset</a>
     </div>
     <div class="compare-range-row" style="margin-top:4px;margin-bottom:14px;">
       <label class="compare-range-label">Velocity
@@ -518,7 +525,7 @@
     </div>
     <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:10px;">
       <label style="font-size:12px;color:var(--muted);margin:0;">Turret Dial (optional — what you've already dialed on the scope)</label>
-      <a href="#" onclick="resetTurretDial();return false;" style="font-size:11px;color:var(--accent2);">Reset</a>
+      <a href="#" onclick="resetTurretDial();return false;" class="link-btn">Reset</a>
     </div>
     <div class="row2" style="margin-top:4px;">
       <div class="field"><label>Elevation <span id="turretElevUnit" style="color:var(--muted);font-weight:400;"></span></label>
@@ -560,7 +567,7 @@
     </div>
     <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:14px;">
       <label style="font-size:12px;color:var(--muted);margin:0;">Wind (optional &mdash; overrides today's calculated wind for the HUD)</label>
-      <a href="#" onclick="resetHudWind();return false;" style="font-size:11px;color:var(--accent2);">Reset</a>
+      <a href="#" onclick="resetHudWind();return false;" class="link-btn">Reset</a>
     </div>
     <div class="compare-wind-row" style="margin-top:4px;margin-bottom:14px;">
       <div class="wind-dial" id="hudWindDial" role="slider" aria-label="Wind direction override for the HUD" tabindex="0"></div>
@@ -572,7 +579,7 @@
     </div>
     <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:10px;">
       <label style="font-size:12px;color:var(--muted);margin:0;">Velocity (optional &mdash; overrides today's calculated velocity for the HUD)</label>
-      <a href="#" onclick="resetHudVelocity();return false;" style="font-size:11px;color:var(--accent2);">Reset</a>
+      <a href="#" onclick="resetHudVelocity();return false;" class="link-btn">Reset</a>
     </div>
     <div class="compare-range-row" style="margin-top:4px;margin-bottom:14px;">
       <label class="compare-range-label">Velocity
@@ -2155,7 +2162,7 @@ function renderCompareResults(list,refYd){
       '<button type="button" onclick="stepCompareVelocity(\''+refKey+'\',-1)" style="width:18px;height:18px;flex:none;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:12px;line-height:1;cursor:pointer;touch-action:manipulation;padding:0;">&minus;</button>'+
       '<input type="number" id="'+velInputId+'" min="1" step="1" value="'+overrideDisp+'" placeholder="'+baselineDisp+'" style="width:58px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 4px;font-size:16px;text-align:center;" oninput="onCompareVelocityInput(this,\''+refKey+'\')"/>'+
       '<button type="button" onclick="stepCompareVelocity(\''+refKey+'\',1)" style="width:18px;height:18px;flex:none;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:12px;line-height:1;cursor:pointer;touch-action:manipulation;padding:0;">+</button> '+(met?'m/s':'fps')+
-      (hasOverride?' <a href="#" onclick="resetCompareVelocity(\''+refKey+'\');return false;" style="font-size:10px;color:var(--accent2);">Reset</a>':'')+
+      (hasOverride?' <a href="#" onclick="resetCompareVelocity(\''+refKey+'\');return false;" class="link-btn">Reset</a>':'')+
       '</div></th>';
   }).join('')+'</tr></thead><tbody>'+
     rows.map(function(row){return '<tr><td class="metric-label">'+row.label+'</td>'+list.map(function(x){return '<td>'+row.get(x)+'</td>';}).join('')+'</tr>';}).join('')+
