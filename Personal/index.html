@@ -335,12 +335,22 @@
         <div class="field"><label id="lblInterval">Interval (yd)</label><input type="number" id="fInterval" value="10" min="1" max="500" step="5" placeholder="auto"/></div>
       </div>
       <div class="field">
-        <label>Zero Offset (optional) <span class="help-tip" data-tip="If this projectile is known to hold over or under point of aim at your zero range - for example after switching loads without re-zeroing the scope - enter that known amount here. Positive = hold up. This shifts the whole table by a constant angular amount; it does not adjust BC like Trajectory Truing does. Leave blank for a normal zero." onclick="showHelpTip(this,event)">?</span></label>
+        <label>Zero Offset &ndash; Elevation (optional) <span class="help-tip" data-tip="If this projectile is known to hold over or under point of aim at your zero range - for example after switching loads without re-zeroing the scope - enter that known amount here. Positive = hold up. This shifts the whole table by a constant angular amount; it does not adjust BC like Trajectory Truing does. Leave blank for a normal zero." onclick="showHelpTip(this,event)">?</span></label>
         <div style="display:flex;gap:6px;">
           <input type="number" id="fZeroOffset" value="" placeholder="e.g. 0.3" step="0.01" style="flex:1;min-width:0;"/>
           <div class="unit-toggle" style="flex-shrink:0;">
             <button id="btnZeroOffsetUnitMils" class="active" onclick="setZeroOffsetUnit('mils')">mils</button>
             <button id="btnZeroOffsetUnitMoa" onclick="setZeroOffsetUnit('moa')">MOA</button>
+          </div>
+        </div>
+      </div>
+      <div class="field">
+        <label>Zero Offset &ndash; Windage (optional) <span class="help-tip" data-tip="If this projectile is also known to land left or right of point of aim at your zero range - for example a scope that isn't perfectly boresighted, or a previous zero done in a crosswind - enter that known amount here. Positive = holds/dials right, matching the Wind/Spin/Coriolis convention elsewhere in the app. This shifts the whole windage column by a constant angular amount, on top of (not instead of) wind deflection, spin drift, and Coriolis. Leave blank for a normal zero." onclick="showHelpTip(this,event)">?</span></label>
+        <div style="display:flex;gap:6px;">
+          <input type="number" id="fZeroOffsetWindage" value="" placeholder="e.g. 0.2" step="0.01" style="flex:1;min-width:0;"/>
+          <div class="unit-toggle" style="flex-shrink:0;">
+            <button id="btnZeroOffsetWindageUnitMils" class="active" onclick="setZeroOffsetWindageUnit('mils')">mils</button>
+            <button id="btnZeroOffsetWindageUnitMoa" onclick="setZeroOffsetWindageUnit('moa')">MOA</button>
           </div>
         </div>
       </div>
@@ -1272,6 +1282,12 @@ function buildPresetEntryFromForm(name,priorEntry){
     // not "value greater than zero".
     zeroOffsetVal:document.getElementById('fZeroOffset').value!==''?(parseFloat(document.getElementById('fZeroOffset').value)||0):undefined,
     zeroOffsetUnit:document.getElementById('fZeroOffset').value!==''?zeroOffsetUnit:undefined,
+    // Windage Zero Offset — same rationale and presence rule as the elevation one directly above,
+    // just for a left/right known holdover instead of up/down. Kept as its own independent
+    // val/unit pair rather than reusing zeroOffsetUnit, since a shooter could reasonably want the
+    // elevation entry in mils and the windage entry in MOA (or vice versa).
+    zeroOffsetWindageVal:document.getElementById('fZeroOffsetWindage').value!==''?(parseFloat(document.getElementById('fZeroOffsetWindage').value)||0):undefined,
+    zeroOffsetWindageUnit:document.getElementById('fZeroOffsetWindage').value!==''?zeroOffsetWindageUnit:undefined,
     // This rifle's own MIL/MOA turret preference — independent of calibre, since plenty of .177
     // air rifles run MOA scopes and plenty of centrefires run mil turrets. Captured only when the
     // Results table is actually showing mils or MOA at save time (its other display modes —
@@ -1528,6 +1544,7 @@ function setMode(m){
   document.getElementById('fZero').value=unitSystem==='metric'?Math.round(defZero*0.9144):defZero;
   document.getElementById('fZeroOffset').value='';setZeroOffsetUnit('mils'); // a new category is a
   // different load entirely — any known holdover was specific to the previous projectile.
+  document.getElementById('fZeroOffsetWindage').value='';setZeroOffsetWindageUnit('mils');
   clearTruingState(); // switching category (air/rimfire/centrefire) always means a different load
   loadedPresetRef=null;
   lastResults=null; // old trajectory no longer describes anything meaningful — clear it rather
@@ -1584,6 +1601,16 @@ function loadPreset(p,ref){
     // MIL/MOA preference (just resolved above), not a hardcoded mils, so a shooter whose scope
     // and Results table are already in MOA doesn't have to remember to flip a second toggle too.
     setZeroOffsetUnit(unitDrop==='moa'?'moa':'mils');
+  }
+  // Windage Zero Offset follows the exact same definite-state-on-every-load rule as elevation
+  // above — its own saved value+unit, or a fully blank/default state, never a leftover from the
+  // previously loaded preset.
+  if(p.zeroOffsetWindageVal!==undefined){
+    document.getElementById('fZeroOffsetWindage').value=p.zeroOffsetWindageVal;
+    setZeroOffsetWindageUnit(p.zeroOffsetWindageUnit||'mils');
+  } else {
+    document.getElementById('fZeroOffsetWindage').value='';
+    setZeroOffsetWindageUnit(unitDrop==='moa'?'moa':'mils');
   }
   if(p.dia)document.getElementById('fDia').value=met?(p.dia*25.4).toFixed(2):p.dia;
   if(p.len)document.getElementById('fLen').value=met?(p.len*25.4).toFixed(2):p.len;
@@ -2306,6 +2333,19 @@ function computeTrajectory(p,dense){
     var moa=r.xYd>0?-dIn*cosA2/(r.xYd/100*1.0472):0;
     var mils=r.xYd>0?-dIn*cosA2/(r.xYd*0.036):0;
     var drift=windFps*(r.t-r.xFt/p.mvFps)*12;
+    // Windage Zero Offset: the same constant-angular-shift idea as the elevation Zero Offset above,
+    // just applied to windage instead of drop. Unlike dIn, "drift" is not already self-cancelling
+    // to 0 at the zero yard by construction — crosswind drift at short zero ranges is normally
+    // small but not exactly zero — so this isn't "the zero row reads a real value instead of
+    // always 0" the way the elevation version is; it's simply "shift the whole windage figure by a
+    // known constant amount," e.g. to correct for a scope that isn't perfectly boresighted, or a
+    // previous zero done in a crosswind. No leading minus sign here (unlike dIn above): driftMoa/
+    // driftMils are +drift*cosA2/(...), with no negation, so adding directly here (rather than
+    // subtracting) makes a positive entered value come out as positive (R) windage — matching the
+    // "positive = holds/dials right" convention used throughout (see fmtDir()) and the elevation
+    // field's own "positive = hold up" convention. Dividing by cosA2 cancels the cosA2
+    // multiplication below exactly, same reasoning as the elevation term.
+    if(p.zeroOffsetWindageMils)drift+=p.zeroOffsetWindageMils*r.xYd*0.036/cosA2;
     var driftMoa=r.xYd>0?drift*cosA2/(r.xYd/100*1.0472):0;
     var driftMils=r.xYd>0?drift*cosA2/(r.xYd*0.036):0;
     // Spin drift — Litz formula: SD(in) = 1.25 × (Sg + 1.2) × ToF²
@@ -2359,13 +2399,14 @@ function computeTrajectory(p,dense){
 }
 
 // ── Calculate ───────────────────────────────────────────────────────────────
-var lastResults=null,unitDrop='mils',clickSizeMoa=0.25,twistDir=1,bcMultiplier=1.0,trueUnit='mils',zeroOffsetUnit='mils';
+var lastResults=null,unitDrop='mils',clickSizeMoa=0.25,twistDir=1,bcMultiplier=1.0,trueUnit='mils',zeroOffsetUnit='mils',zeroOffsetWindageUnit='mils';
 function setTwistDir(d){twistDir=d;document.getElementById('btnRH').classList.toggle('active',d===1);document.getElementById('btnLH').classList.toggle('active',d===-1);}
 // Independent of unitDrop (the results-table display toggle, which the shooter can freely flip
 // between mils/MOA/clicks/in/cm after calculating) — Zero Offset needs its own fixed unit at the
 // moment it's entered, since re-interpreting an already-entered number under a different unit
 // later would silently change what it means. Defaults to mils, matching the app's general default.
 function setZeroOffsetUnit(u){zeroOffsetUnit=u;document.getElementById('btnZeroOffsetUnitMils').classList.toggle('active',u==='mils');document.getElementById('btnZeroOffsetUnitMoa').classList.toggle('active',u==='moa');}
+function setZeroOffsetWindageUnit(u){zeroOffsetWindageUnit=u;document.getElementById('btnZeroOffsetWindageUnitMils').classList.toggle('active',u==='mils');document.getElementById('btnZeroOffsetWindageUnitMoa').classList.toggle('active',u==='moa');}
 // Converts a stored MOA string to a click count using whatever clickSizeMoa is current right now
 // — always called at the point of display rather than baked into a row at calculation time, so
 // switching the click-size selector after Calculate has already run updates every clicks value
@@ -2579,6 +2620,11 @@ function calculate(){
     // MOA->mils is a fixed ratio of those two constants.
     var zeroOffsetRaw=parseFloat(document.getElementById('fZeroOffset').value)||0;
     var zeroOffsetMils=zeroOffsetUnit==='moa'?zeroOffsetRaw*(1.0472/3.6):zeroOffsetRaw;
+    // Windage Zero Offset — same conversion, same rationale, just for a known left/right holdover
+    // instead of up/down. Converted to its own canonical mils-equivalent independently of the
+    // elevation one above, since the two are entered (and can be in different units) separately.
+    var zeroOffsetWindageRaw=parseFloat(document.getElementById('fZeroOffsetWindage').value)||0;
+    var zeroOffsetWindageMils=zeroOffsetWindageUnit==='moa'?zeroOffsetWindageRaw*(1.0472/3.6):zeroOffsetWindageRaw;
 
     var effBc=effectiveBc();
     var rawBc=effBc.bc;
@@ -2586,7 +2632,7 @@ function calculate(){
       weightGr:parseFloat(document.getElementById('fWeight').value)||40,
       bc:rawBc*bcMultiplier,baseBc:rawBc,bcEstimated:effBc.estimated,
       mvFps:mvFps,scopeInch:scopeIn,zeroYd:Math.round(zeroYd),maxYd:Math.round(maxYd),
-      zeroOffsetMils:zeroOffsetMils,
+      zeroOffsetMils:zeroOffsetMils,zeroOffsetWindageMils:zeroOffsetWindageMils,
       altFt:altFt,tempC:parseFloat(document.getElementById('fTemp').value)||15,
       humidPct:parseFloat(document.getElementById('fHumid').value)||50,
       presHPa:presHPa,
@@ -2742,7 +2788,13 @@ function renderResults(results,params,stability){
   // display modes (clicks/in/cm), since Zero Offset has no linear equivalent to show at a glance.
   var zeroOffsetDisp=unitDrop==='moa'?params.zeroOffsetMils*(3.6/1.0472):params.zeroOffsetMils;
   var zeroOffsetUnitLabel=unitDrop==='moa'?'MOA':'mil';
-  var zeroOffsetBadge=params.zeroOffsetMils?'<span style="background:rgba(79,142,247,.15);border:1px solid rgba(79,142,247,.4);color:var(--accent);border-radius:4px;padding:2px 8px;font-size:11px;font-weight:700;">Zero Offset '+(zeroOffsetDisp>0?'+':'')+zeroOffsetDisp.toFixed(2)+' '+zeroOffsetUnitLabel+'</span>':'';
+  var zeroOffsetBadge=params.zeroOffsetMils?'<span style="background:rgba(79,142,247,.15);border:1px solid rgba(79,142,247,.4);color:var(--accent);border-radius:4px;padding:2px 8px;font-size:11px;font-weight:700;">Zero Offset (Elev) '+(zeroOffsetDisp>0?'+':'')+zeroOffsetDisp.toFixed(2)+' '+zeroOffsetUnitLabel+'</span>':'';
+  // Windage Zero Offset's own badge — same styling and same unitDrop-following behaviour as the
+  // elevation badge above, but formatted with fmtDir() (R/L) rather than a +/- sign, since windage
+  // is a directional convention throughout the rest of the app (Wind, Spin Drift, Coriolis columns
+  // all use R/L too), not an up/down one.
+  var zeroOffsetWindDisp=unitDrop==='moa'?params.zeroOffsetWindageMils*(3.6/1.0472):params.zeroOffsetWindageMils;
+  var zeroOffsetWindBadge=params.zeroOffsetWindageMils?'<span style="background:rgba(79,142,247,.15);border:1px solid rgba(79,142,247,.4);color:var(--accent);border-radius:4px;padding:2px 8px;font-size:11px;font-weight:700;">Zero Offset (Wind) '+fmtDir(zeroOffsetWindDisp.toFixed(2))+' '+zeroOffsetUnitLabel+'</span>':'';
   // Distinct again from both badges above. truingBadge reflects a LIVE, in-session bcMultiplier —
   // it disappears the moment truing gets saved to a preset, since baking folds the correction into
   // the BC number itself and resets the multiplier to 1. This badge instead reads the currently
@@ -2765,7 +2817,7 @@ function renderResults(results,params,stability){
   }
   var bcDisp=(params.bc).toFixed(4);
   var bcSrcNote=params.bcEstimated?', estimated from G1':'';
-  var html='<div class="results-header"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;"><h2>'+calibr+'</h2>'+modeTag+truingBadge+zeroOffsetBadge+bakedTruingBadge+'<span style="color:var(--muted);font-size:12px;">'+params.weightGr+'gr &middot; '+(met?(params.mvFps*0.3048).toFixed(0)+'m/s':params.mvFps+'fps')+' &middot; BC '+bcDisp+' ('+params.dragModel.toUpperCase()+bcSrcNote+')</span></div>'+
+  var html='<div class="results-header"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;"><h2>'+calibr+'</h2>'+modeTag+truingBadge+zeroOffsetBadge+zeroOffsetWindBadge+bakedTruingBadge+'<span style="color:var(--muted);font-size:12px;">'+params.weightGr+'gr &middot; '+(met?(params.mvFps*0.3048).toFixed(0)+'m/s':params.mvFps+'fps')+' &middot; BC '+bcDisp+' ('+params.dragModel.toUpperCase()+bcSrcNote+')</span></div>'+
     '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;"><div class="unit-toggle">'+
     '<button class="'+(unitDrop==='mils'?'active':'')+'" onclick="setDropUnit(\'mils\')">mils</button>'+
     '<button class="'+(unitDrop==='moa'?'active':'')+'" onclick="setDropUnit(\'moa\')">MOA</button>'+
@@ -3758,6 +3810,7 @@ function clearLoadFields(){
   document.getElementById('fZero').value='';
   document.getElementById('fMax').value='';
   document.getElementById('fZeroOffset').value='';setZeroOffsetUnit('mils');
+  document.getElementById('fZeroOffsetWindage').value='';setZeroOffsetWindageUnit('mils');
   document.getElementById('fDia').value='';
   document.getElementById('fLen').value='';
   document.getElementById('fTwist').value='';
