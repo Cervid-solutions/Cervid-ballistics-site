@@ -1973,6 +1973,12 @@ function buildParamsFromPreset(p,mode,forcedMaxYd,forcedMvFps){
   var zeroYd=p.zero||modeDef.zero;
   var maxYd=forcedMaxYd||p.max||modeDef.max;
   var zeroOffsetMils=p.zeroOffsetVal!==undefined?zeroOffsetToMils(p.zeroOffsetVal,p.zeroOffsetUnit):0;
+  // Windage Zero Offset was missing from this function entirely until this fix — buildParamsFromPreset()
+  // read a saved preset's elevation offset but never its windage one, so Compare Loads silently ignored
+  // any windage offset baked into a preset (the live-matched slot in runCompare() was never affected,
+  // since that path clones lastResults.params directly, which already carries zeroOffsetWindageMils from
+  // calculate() — only the non-live, saved-preset path here had the gap).
+  var zeroOffsetWindageMils=p.zeroOffsetWindageVal!==undefined?zeroOffsetToMils(p.zeroOffsetWindageVal,p.zeroOffsetWindageUnit):0;
 
   var params={
     weightGr:p.wt,bc:effBc.bc,baseBc:effBc.bc,bcEstimated:effBc.estimated,
@@ -1981,7 +1987,7 @@ function buildParamsFromPreset(p,mode,forcedMaxYd,forcedMvFps){
     // nudge just one load's velocity (e.g. testing a chronograph reading) without disturbing the
     // other selected loads or the saved preset itself.
     mvFps:forcedMvFps||p.mv,scopeInch:p.sh,zeroYd:Math.round(zeroYd),maxYd:Math.round(maxYd),
-    zeroOffsetMils:zeroOffsetMils,
+    zeroOffsetMils:zeroOffsetMils,zeroOffsetWindageMils:zeroOffsetWindageMils,
     altFt:altFt,tempC:tempRaw,humidPct:humidRaw,presHPa:presHPa,
     windMph:windMph,windClock:windDirRaw,
     angleDeg:angleRaw,latDeg:latRaw,azimuthDeg:azRaw,
