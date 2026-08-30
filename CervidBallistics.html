@@ -341,8 +341,10 @@
           <div class="unit-toggle" style="flex-shrink:0;">
             <button id="btnZeroOffsetUnitMils" class="active" onclick="setZeroOffsetUnit('mils')">mils</button>
             <button id="btnZeroOffsetUnitMoa" onclick="setZeroOffsetUnit('moa')">MOA</button>
+            <button id="btnZeroOffsetUnitClicks" onclick="setZeroOffsetUnit('clicks')">clicks</button>
           </div>
         </div>
+        <select id="zeroOffsetClickSizeSel" onchange="setClickSize(this.value)" style="display:none;margin-top:6px;width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 8px;font-size:16px;"></select>
       </div>
       <div class="field">
         <label>Zero Offset &ndash; Windage (optional) <span class="help-tip" data-tip="If this projectile is also known to land left or right of point of aim at your zero range - for example a scope that isn't perfectly boresighted, or a previous zero done in a crosswind - enter that known amount here. Positive = holds/dials right, matching the Wind/Spin/Coriolis convention elsewhere in the app. This shifts the whole windage column by a constant angular amount, on top of (not instead of) wind deflection, spin drift, and Coriolis. Leave blank for a normal zero." onclick="showHelpTip(this,event)">?</span></label>
@@ -351,8 +353,10 @@
           <div class="unit-toggle" style="flex-shrink:0;">
             <button id="btnZeroOffsetWindageUnitMils" class="active" onclick="setZeroOffsetWindageUnit('mils')">mils</button>
             <button id="btnZeroOffsetWindageUnitMoa" onclick="setZeroOffsetWindageUnit('moa')">MOA</button>
+            <button id="btnZeroOffsetWindageUnitClicks" onclick="setZeroOffsetWindageUnit('clicks')">clicks</button>
           </div>
         </div>
+        <select id="zeroOffsetWindageClickSizeSel" onchange="setClickSize(this.value)" style="display:none;margin-top:6px;width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 8px;font-size:16px;"></select>
       </div>
       <div class="field"><label>Spot Range (<span id="lblSpotUnit">yd</span>) <span style="color:var(--accent2);font-size:10px;">&#9670; single extra row</span></label><input type="number" id="fSpot" value="" min="1" max="2000" step="1" placeholder="optional"/></div>
       <div class="field"><label>Drag Model<span class="help-tip" data-tip="Which drag reference standard your BC number is calibrated against. G1 suits flat-base bullets and slugs; G7 suits boat-tail long-range bullets; GA is shaped specifically for diabolo airgun pellets (the wasp-waisted, hollow-skirt shape most pellets use) and fits their transonic drag rise far better than G1 does. Picking the wrong one changes how accurate the trajectory prediction is." onclick="showHelpTip(this,event)">?</span></label><select id="fDrag" onchange="onDragModelChange()"><option value="g1">G1 (flat-base / pellets)</option><option value="ga">GA (diabolo pellet)</option><option value="g7">G7 (boat-tail / long-range)</option></select></div>
@@ -1968,7 +1972,7 @@ function buildParamsFromPreset(p,mode,forcedMaxYd,forcedMvFps){
   var modeDef=MODE_DEFAULT_RANGE[mode]||MODE_DEFAULT_RANGE.cf;
   var zeroYd=p.zero||modeDef.zero;
   var maxYd=forcedMaxYd||p.max||modeDef.max;
-  var zeroOffsetMils=p.zeroOffsetVal!==undefined?(p.zeroOffsetUnit==='moa'?p.zeroOffsetVal*(1.0472/3.6):p.zeroOffsetVal):0;
+  var zeroOffsetMils=p.zeroOffsetVal!==undefined?zeroOffsetToMils(p.zeroOffsetVal,p.zeroOffsetUnit):0;
 
   var params={
     weightGr:p.wt,bc:effBc.bc,baseBc:effBc.bc,bcEstimated:effBc.estimated,
@@ -2405,8 +2409,39 @@ function setTwistDir(d){twistDir=d;document.getElementById('btnRH').classList.to
 // between mils/MOA/clicks/in/cm after calculating) — Zero Offset needs its own fixed unit at the
 // moment it's entered, since re-interpreting an already-entered number under a different unit
 // later would silently change what it means. Defaults to mils, matching the app's general default.
-function setZeroOffsetUnit(u){zeroOffsetUnit=u;document.getElementById('btnZeroOffsetUnitMils').classList.toggle('active',u==='mils');document.getElementById('btnZeroOffsetUnitMoa').classList.toggle('active',u==='moa');}
-function setZeroOffsetWindageUnit(u){zeroOffsetWindageUnit=u;document.getElementById('btnZeroOffsetWindageUnitMils').classList.toggle('active',u==='mils');document.getElementById('btnZeroOffsetWindageUnitMoa').classList.toggle('active',u==='moa');}
+// Zero Offset's "clicks" option is deliberately just an alternate way to type the number in, not a
+// third independently-persisted unit the way mils/MOA are — it always resolves through the single
+// shared clickSizeMoa global (the same one the Results table's own "clicks" column and the Turret
+// Dial already use), live at whatever moment it's read, exactly like every other "clicks" figure in
+// this app. That means it carries the same well-established tradeoff those already do: if the
+// shooter changes the click-size selector after saving a preset, the same typed click count will
+// resolve to a different angle next time — not a bug, just what "live, never baked" already means
+// everywhere else clicks appears. The click-size select is shown only while "clicks" is the active
+// entry unit, immediately below the field it belongs to.
+function setZeroOffsetUnit(u){zeroOffsetUnit=u;document.getElementById('btnZeroOffsetUnitMils').classList.toggle('active',u==='mils');document.getElementById('btnZeroOffsetUnitMoa').classList.toggle('active',u==='moa');document.getElementById('btnZeroOffsetUnitClicks').classList.toggle('active',u==='clicks');refreshZeroOffsetClickSizeSelects();}
+function setZeroOffsetWindageUnit(u){zeroOffsetWindageUnit=u;document.getElementById('btnZeroOffsetWindageUnitMils').classList.toggle('active',u==='mils');document.getElementById('btnZeroOffsetWindageUnitMoa').classList.toggle('active',u==='moa');document.getElementById('btnZeroOffsetWindageUnitClicks').classList.toggle('active',u==='clicks');refreshZeroOffsetClickSizeSelects();}
+// Keeps both Zero Offset click-size selects in sync with each other and with clickSizeMoa itself —
+// shown/hidden based on whichever field(s) currently have "clicks" active, and re-populated (so the
+// "selected" option is correct) every time either one changes, since there is only one underlying
+// clickSizeMoa shared by both fields (and by the Results table and Turret Dial too).
+// Converts a Zero Offset field's raw entered number plus its selected unit into a canonical
+// mils-equivalent. Shared by calculate() (both the elevation and windage fields) and by Compare
+// Loads' buildParamsFromPreset(), which resolves a saved preset's own zeroOffsetVal/Unit the same
+// way, so the three call sites can't quietly drift out of agreement on what each unit means.
+// 'clicks' resolves through the shared clickSizeMoa global, live at the moment this runs — the raw
+// click count is what actually gets saved to a preset, not a frozen angle, so it's the same
+// never-baked philosophy as every other 'clicks' figure in the app (see toClicks()).
+function zeroOffsetToMils(raw,unit){
+  if(unit==='moa')return raw*(1.0472/3.6);
+  if(unit==='clicks')return raw*clickSizeMoa*(1.0472/3.6);
+  return raw;
+}
+function refreshZeroOffsetClickSizeSelects(){
+  var elEl=document.getElementById('zeroOffsetClickSizeSel');
+  if(elEl){var showEl=zeroOffsetUnit==='clicks';elEl.style.display=showEl?'block':'none';if(showEl)elEl.innerHTML=clickSizeOptionsHtml();}
+  var elWind=document.getElementById('zeroOffsetWindageClickSizeSel');
+  if(elWind){var showWind=zeroOffsetWindageUnit==='clicks';elWind.style.display=showWind?'block':'none';if(showWind)elWind.innerHTML=clickSizeOptionsHtml();}
+}
 // Converts a stored MOA string to a click count using whatever clickSizeMoa is current right now
 // — always called at the point of display rather than baked into a row at calculation time, so
 // switching the click-size selector after Calculate has already run updates every clicks value
@@ -2422,7 +2457,7 @@ function clickSizeOptionsHtml(){
     return '<option value="'+v+'" '+(Math.abs(clickSizeMoa-parseFloat(v))<0.001?'selected':'')+'>'+lbl+'</option>';
   }).join('');
 }
-function setClickSize(v){clickSizeMoa=parseFloat(v)||0.25;if(lastResults)renderResults(lastResults.results,lastResults.params,lastResults.stability);if(lastCompareList)renderCompareResults(lastCompareList,lastCompareRefYd);}
+function setClickSize(v){clickSizeMoa=parseFloat(v)||0.25;if(lastResults)renderResults(lastResults.results,lastResults.params,lastResults.stability);if(lastCompareList)renderCompareResults(lastCompareList,lastCompareRefYd);refreshZeroOffsetClickSizeSelects();}
 function setDropUnit(u){unitDrop=u;if(lastResults)renderResults(lastResults.results,lastResults.params,lastResults.stability);}
 function setTrueUnit(u){trueUnit=u;['Mils','Moa','In','Cm'].forEach(function(k){var el=document.getElementById('btnTrueUnit'+k);if(el)el.classList.toggle('active',u===k.toLowerCase());});}
 
@@ -2619,12 +2654,12 @@ function calculate(){
     // the whole table in computeTrajectory(). 1 MOA = 1.0472in/100yd; 1 mil = 3.6in/100yd, so
     // MOA->mils is a fixed ratio of those two constants.
     var zeroOffsetRaw=parseFloat(document.getElementById('fZeroOffset').value)||0;
-    var zeroOffsetMils=zeroOffsetUnit==='moa'?zeroOffsetRaw*(1.0472/3.6):zeroOffsetRaw;
+    var zeroOffsetMils=zeroOffsetToMils(zeroOffsetRaw,zeroOffsetUnit);
     // Windage Zero Offset — same conversion, same rationale, just for a known left/right holdover
     // instead of up/down. Converted to its own canonical mils-equivalent independently of the
     // elevation one above, since the two are entered (and can be in different units) separately.
     var zeroOffsetWindageRaw=parseFloat(document.getElementById('fZeroOffsetWindage').value)||0;
-    var zeroOffsetWindageMils=zeroOffsetWindageUnit==='moa'?zeroOffsetWindageRaw*(1.0472/3.6):zeroOffsetWindageRaw;
+    var zeroOffsetWindageMils=zeroOffsetToMils(zeroOffsetWindageRaw,zeroOffsetWindageUnit);
 
     var effBc=effectiveBc();
     var rawBc=effBc.bc;
