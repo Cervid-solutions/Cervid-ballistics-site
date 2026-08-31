@@ -523,6 +523,7 @@
       </label>
       <span class="compare-wind-readout" id="reticleWindReadout"></span>
     </div>
+    <div id="reticleWindTargetNote" style="display:none;background:rgba(79,142,247,.10);border:1px solid rgba(79,142,247,.35);border-radius:6px;padding:6px 10px;margin-top:-8px;margin-bottom:14px;font-size:11px;color:var(--accent);line-height:1.4;"></div>
     <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:10px;">
       <label style="font-size:12px;color:var(--muted);margin:0;">Velocity (optional &mdash; overrides today's calculated velocity for this reticle)</label>
       <a href="#" onclick="resetReticleVelocity();return false;" class="link-btn">Reset</a>
@@ -2121,7 +2122,12 @@ function runCompare(){
       // Calculate() ran on the Inputs tab, silently ignoring this slot's own Compare velocity
       // override while every other (non-live) slot correctly picked it up via
       // buildParamsFromPreset() below.
-      params=Object.assign({},lastResults.params,{maxYd:refYd,maxNative:refYd,intervalNative:null,windMph:readCompareWindMph(),windClock:compareWindClockVal,mvFps:compareVelocityOverrides[compareRefKey(x.ref)]||lastResults.params.mvFps});
+      // windTargetRefYd pinned to the live load's ORIGINAL max range, same reasoning and same fix
+      // as HUD's identical situation (see windTargetRefYd's comment in computeTrajectory()) — this
+      // slot's maxYd is overridden to the shared Compare distance (refYd) just below, which would
+      // otherwise silently reinterpret a Wind at Target reading meant for the original table length
+      // against whatever the current comparison distance happens to be.
+      params=Object.assign({},lastResults.params,{maxYd:refYd,maxNative:refYd,intervalNative:null,windMph:readCompareWindMph(),windClock:compareWindClockVal,mvFps:compareVelocityOverrides[compareRefKey(x.ref)]||lastResults.params.mvFps,windTargetRefYd:lastResults.params.maxYd});
       if(params.zeroYd>=params.maxYd)params.maxYd=params.zeroYd+20;
     } else {
       params=buildParamsFromPreset(x.p,x.ref.mode,refYd,compareVelocityOverrides[compareRefKey(x.ref)]);
@@ -2321,7 +2327,18 @@ function computeTrajectory(p,dense){
   var hasWindTarget=p.windTargetMph!==undefined&&p.windTargetMph!==null;
   var windFpsTarget=hasWindTarget?p.windTargetMph*1.46667*Math.sin((p.windTargetClock/6)*Math.PI):windFps;
   var rangeWindFpsTarget=hasWindTarget?p.windTargetMph*1.46667*Math.cos((p.windTargetClock/6)*Math.PI):rangeWindFps;
-  function windFracAt(xFt){if(!hasWindTarget||p.maxYd<=0)return 0;var f=(xFt/3)/p.maxYd;return f<0?0:f>1?1:f;}
+  // The blend fraction's denominator is deliberately its own field, windTargetRefYd, rather than
+  // always p.maxYd directly — some callers override maxYd for a reason that has nothing to do with
+  // what "the target" meant when Wind at Target was entered. HUD, for instance, overrides maxYd to
+  // whatever specific distance is currently ranged in its own range field, which can be far shorter
+  // (or longer) than the table's actual max range the shooter had in mind when they entered a
+  // target-range wind reading on the Inputs tab — without this indirection, HUD would silently
+  // reinterpret "the target" as "whatever distance HUD happens to be showing right now," giving a
+  // wrong blend rather than an incomplete one. Callers that don't need this distinction (the main
+  // Inputs-tab calculate() path, Reticle View, non-live Compare Loads slots) simply never set it,
+  // so it falls back to p.maxYd and behaves exactly as before.
+  var windTargetRefYd=(p.windTargetRefYd!==undefined&&p.windTargetRefYd!==null&&p.windTargetRefYd>0)?p.windTargetRefYd:p.maxYd;
+  function windFracAt(xFt){if(!hasWindTarget||windTargetRefYd<=0)return 0;var f=(xFt/3)/windTargetRefYd;return f<0?0:f>1?1:f;}
   function headwindFpsAt(xFt){return hasWindTarget?rangeWindFps+(rangeWindFpsTarget-rangeWindFps)*windFracAt(xFt):rangeWindFps;}
   function crosswindFpsAt(xFt){return hasWindTarget?windFps+(windFpsTarget-windFps)*windFracAt(xFt):windFps;}
   var angR=p.angleDeg*Math.PI/180,cosA=Math.cos(angR),tanA=Math.tan(angR);
@@ -3559,7 +3576,12 @@ function renderHud(){
   var hudWindMph=readHudWindMph();
   var hudVelocityFps=readHudVelocityFps()||lastResults.params.mvFps;
   var safeMaxYd=Math.max(targetYd,lastResults.params.zeroYd+20);
-  var effParams=Object.assign({},lastResults.params,{windMph:hudWindMph,windClock:hudWindClockVal,mvFps:hudVelocityFps,maxYd:safeMaxYd,maxNative:safeMaxYd,intervalNative:null});
+  // windTargetRefYd is pinned to the ORIGINAL table's max range (from the last Inputs-tab
+  // Calculate), not safeMaxYd above — otherwise a Wind at Target reading meant for, say, 1000yd
+  // would get silently reinterpreted against whatever short distance HUD happens to be ranging
+  // right now, blending in most of the target-side wind almost immediately. See windTargetRefYd's
+  // own comment in computeTrajectory() for the general explanation.
+  var effParams=Object.assign({},lastResults.params,{windMph:hudWindMph,windClock:hudWindClockVal,mvFps:hudVelocityFps,maxYd:safeMaxYd,maxNative:safeMaxYd,intervalNative:null,windTargetRefYd:lastResults.params.maxYd});
   var effResults=computeTrajectory(effParams,true);
   if(!effResults||!effResults.length)return;
   var row=effResults.find(function(r){return r.yd===targetYd;})||effResults[effResults.length-1];
@@ -3739,6 +3761,22 @@ function renderReticleView(){
   var reticleWindMph=readReticleWindMph();
   var reticleVelocityFps=readReticleVelocityFps()||lastResults.params.mvFps;
   var effParams=Object.assign({},lastResults.params,{windMph:reticleWindMph,windClock:reticleWindClockVal,mvFps:reticleVelocityFps});
+  // Visible cue for Wind at Target: this override row only ever adjusts the near/shooter-side
+  // wind (windMph/windClock above) — effParams still carries whatever windTargetMph/windTargetClock
+  // was entered on the Inputs tab unchanged, since maxYd isn't overridden here (unlike HUD/Compare,
+  // Reticle View reuses the original table's own max range, so no windTargetRefYd fix is needed for
+  // correctness — see that field's comment in computeTrajectory()). Without this note there was
+  // nothing on screen explaining why the windage figure below might not match what the single
+  // override dial implies.
+  var wtNote=document.getElementById('reticleWindTargetNote');
+  if(effParams.windTargetMph!==undefined&&effParams.windTargetMph!==null){
+    var wtMet=unitSystem==='metric';
+    var wtDisp=wtMet?(effParams.windTargetMph*1.60934).toFixed(1)+'km/h':effParams.windTargetMph+'mph';
+    wtNote.textContent='Wind at Target is active: '+wtDisp+' @'+effParams.windTargetClock+" o'clock further downrange. The override above only adjusts the near/shooter-side wind.";
+    wtNote.style.display='block';
+  } else {
+    wtNote.style.display='none';
+  }
   var effResults=computeTrajectory(effParams)||lastResults.results;
   var row=effResults.find(function(r){return r.yd===yd;});
   if(!row)return;
