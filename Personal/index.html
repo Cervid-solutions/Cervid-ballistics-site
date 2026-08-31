@@ -405,11 +405,11 @@
       </div>
       <div class="row2" style="align-items:start;">
         <div class="field"><label id="lblWind">Wind Speed (mph)</label><input type="number" id="fWind" value="10" min="0" max="200" step="1"/></div>
-        <div class="field"><label>Wind Clock (hr)<span class="help-tip" data-tip="This clock position drives two separate effects. The crosswind component (3 or 9 o'clock = full effect, 12 or 6 o'clock = none) deflects the trajectory sideways. The head/tailwind component (12 or 6 o'clock = full effect, 3 or 9 o'clock = none) very slightly changes drag: a headwind adds a touch more drop and time of flight, a tailwind takes a touch off both. That second effect is real but small &mdash; for a typical rifle load it's a fraction of the crosswind's effect at the same wind speed, though it's proportionally larger for slower, lower-BC projectiles like air rifle pellets." onclick="showHelpTip(this,event)">?</span></label><input type="number" id="fWindDir" value="3" min="1" max="12" step="1"/><small style="color:var(--muted);font-size:12px;">3=full R, 9=full L</small></div>
+        <div class="field"><label>Wind Clock (hr)<span class="help-tip" data-tip="Enter the clock position the wind is blowing FROM, same as reading a Kestrel or any other wind meter with the vane-into-the-wind technique - point it at the target (12 o'clock), turn it until the impeller stalls, and read whichever hour the back of the meter faces. This one field drives two separate effects. The crosswind component (3 or 9 o'clock = full effect, 12 or 6 o'clock = none) deflects the trajectory sideways - a wind FROM 3 o'clock (your right) pushes it left. The head/tailwind component (12 or 6 o'clock = full effect, 3 or 9 o'clock = none) very slightly changes drag: a wind FROM 12 o'clock (a headwind) adds a touch more drop and time of flight, a wind FROM 6 o'clock (a tailwind) takes a touch off both. That second effect is real but small &mdash; for a typical rifle load it's a fraction of the crosswind's effect at the same wind speed, though it's proportionally larger for slower, lower-BC projectiles like air rifle pellets." onclick="showHelpTip(this,event)">?</span></label><input type="number" id="fWindDir" value="3" min="1" max="12" step="1"/><small style="color:var(--muted);font-size:12px;">3=from R (push L), 9=from L (push R)</small></div>
       </div>
       <div class="row2" style="align-items:start;">
         <div class="field"><label>Wind at Target (<span id="lblWindTargetUnit">mph</span>, optional)<span class="help-tip" data-tip="Optional second wind reading for when the wind at your target differs from the Wind Speed/Clock above (e.g. calm at the muzzle but gusting near the target). When set, the model blends smoothly between the two readings across the shot instead of assuming one uniform wind for the whole flight. Leave blank to use a single uniform wind everywhere (the default)." onclick="showHelpTip(this,event)">?</span> <a href="#" onclick="resetWindTarget();return false;" class="link-btn">Reset</a></label><input type="number" id="fWindTarget" value="" placeholder="e.g. 15" min="0" max="200" step="1"/></div>
-        <div class="field"><label>Wind at Target Clock (hr)</label><input type="number" id="fWindTargetDir" value="" placeholder="e.g. 9" min="1" max="12" step="1"/><small style="color:var(--muted);font-size:12px;">3=full R, 9=full L</small></div>
+        <div class="field"><label>Wind at Target Clock (hr)</label><input type="number" id="fWindTargetDir" value="" placeholder="e.g. 9" min="1" max="12" step="1"/><small style="color:var(--muted);font-size:12px;">3=from R (push L), 9=from L (push R)</small></div>
       </div>
       <button class="btn btn-secondary" onclick="autoFillPressure()" style="margin-bottom:6px;font-size:12px;padding:6px;">&#128205; Pressure from altitude</button>
     </div>
@@ -2300,7 +2300,24 @@ function computeTrajectory(p,dense){
   var eotv_k=2*OMEGA*Math.cos(latR)*Math.sin(azR);
   var cor_h=2*OMEGA*Math.sin(latR),cor_v=2*OMEGA*Math.cos(latR)*Math.cos(azR);
   var stepFt=3,sos=speedOfSound(p.tempC),rho=airDensityRatio(p.altFt,p.tempC,p.humidPct,p.presHPa);
-  var windFps=p.windMph*1.46667*Math.sin((p.windClock/6)*Math.PI);
+  // Wind Clock convention (2026-08-31): the clock value is the direction the wind is blowing FROM,
+  // matching how a Kestrel (or any other wind meter used with the vane-into-the-wind technique)
+  // reports it — turn the meter until the impeller stalls, then read whichever hour the back of the
+  // meter is pointing at, with the target fixed at 12. That's the "origin" convention. Before this
+  // fix, this crosswind term used a bare +sin() with no negation, which actually implemented the
+  // opposite "destination" convention (clock = the direction the wind blows TOWARD) — entering "3"
+  // pushed the bullet right, when a real 3 o'clock Kestrel reading (wind hitting the shooter's right
+  // side) should push it left. The leading minus sign below corrects that. Note this only affects
+  // the crosswind (sin) term: the head/tailwind (cos) term just below was already self-consistent
+  // with the origin convention (a positive value there was already documented and behaving as a
+  // headwind at 12 o'clock, i.e. wind FROM the target's direction), so it needs no change — before
+  // this fix the two axes actually disagreed with each other about which convention they used,
+  // which is now resolved by only touching this one term. This also brings the crosswind sign into
+  // agreement with the live-weather auto-fill above (fetchLiveWeather down near the bottom of this
+  // file), which was always deriving fWindDir from Open-Meteo's wind_direction_10m — an explicitly
+  // "degrees true, where wind comes FROM" meteorological bearing — so that feature's crosswind
+  // output was quietly backwards until now too.
+  var windFps=-p.windMph*1.46667*Math.sin((p.windClock/6)*Math.PI);
   // Along-shot (head/tail) component of the same wind, using cos() instead of sin() — zero at the
   // pure-crosswind clock positions (3/9, same as windFps is zero at 12/6), maximal at 12 o'clock
   // (headwind, opposing the shot, positive) and 6 o'clock (tailwind, aiding it, negative). Used
@@ -2325,7 +2342,8 @@ function computeTrajectory(p,dense){
   // zero-solve loops just below, so a zero solved at a shorter range than the table's max
   // correctly sees only a partial blend toward the target reading, not the full target wind.
   var hasWindTarget=p.windTargetMph!==undefined&&p.windTargetMph!==null;
-  var windFpsTarget=hasWindTarget?p.windTargetMph*1.46667*Math.sin((p.windTargetClock/6)*Math.PI):windFps;
+  // Same origin-convention fix as windFps above, applied to the target-side crosswind reading.
+  var windFpsTarget=hasWindTarget?-p.windTargetMph*1.46667*Math.sin((p.windTargetClock/6)*Math.PI):windFps;
   var rangeWindFpsTarget=hasWindTarget?p.windTargetMph*1.46667*Math.cos((p.windTargetClock/6)*Math.PI):rangeWindFps;
   // The blend fraction's denominator is deliberately its own field, windTargetRefYd, rather than
   // always p.maxYd directly — some callers override maxYd for a reason that has nothing to do with
@@ -3886,14 +3904,18 @@ function buildReticleSvg(patternKey,elevVal,windVal,windMph,windClock,met){
   svg+='<circle cx="'+mx+'" cy="'+my+'" r="6" fill="none" stroke="#e06c3a" stroke-width="2.5"/><circle cx="'+mx+'" cy="'+my+'" r="1.5" fill="#e06c3a"/>';
   if(offReticle)svg+='<text x="'+mx+'" y="'+(my<center?my-10:my+16)+'" fill="#e06c3a" font-size="9" text-anchor="middle" font-weight="700">OFF RETICLE</text>';
   // Wind indicator: a small compass-style arrow in the top-left corner — well outside frameR, so it
-  // can't overlap any pattern's dots/ticks/labels — pointing toward the entered clock position,
-  // using the exact same "3=full R, 9=full L" analog-clock convention the Wind Clock input field
-  // already states (12=up, each hour +30° clockwise), so a user already familiar with that field
-  // reads the arrow the same way without learning a second convention. This is a static readout of
-  // the wind condition the drawn hold already accounts for, not an interactive control — drawn in
-  // muted grey rather than the orange used for the aim-point marker, so it can't be mistaken for a
-  // second target. windMph is undefined when called without wind context; skip drawing entirely
-  // rather than rendering a broken/zero indicator in that case.
+  // can't overlap any pattern's dots/ticks/labels — pointing at the entered clock position itself
+  // (12=up, each hour +30° clockwise), same analog-clock layout the Wind Clock input field already
+  // uses, so a user already familiar with that field reads the arrow's position the same way
+  // without learning a second layout. Since the Wind Clock convention (2026-08-31) is "the clock
+  // position the wind is blowing FROM" (Kestrel-style, see computeTrajectory's windFps comment),
+  // this arrow now doubles as a small weathervane: it points at the entered clock number, i.e. at
+  // where the wind is actually coming from, the same thing a Kestrel's own back-of-meter reading
+  // shows. The PUSH/R-L labelling below is a separate, deliberately distinct readout of the
+  // resulting *effect* rather than the arrow's own direction — see the note further down for why
+  // those are no longer the same sign. Drawn in muted grey rather than the orange used for the
+  // aim-point marker, so it can't be mistaken for a second target. windMph is undefined when called
+  // without wind context; skip drawing entirely rather than rendering a broken/zero indicator then.
   if(windMph!==undefined){
     var hubX=44,hubY=44,armLen=28;
     if(windMph>0){
@@ -3915,17 +3937,18 @@ function buildReticleSvg(patternKey,elevVal,windVal,windMph,windClock,met){
       svg+='<line x1="'+hubX+'" y1="'+hubY+'" x2="'+tipX+'" y2="'+tipY+'" stroke="#7a7f99" stroke-width="1.6" stroke-linecap="round"/>';
       svg+='<polygon points="'+tipX+','+tipY+' '+leftX+','+leftY+' '+rightX+','+rightY+'" fill="#7a7f99"/>';
       svg+='<circle cx="'+hubX+'" cy="'+hubY+'" r="2.5" fill="#7a7f99"/>';
-      // "PUSH" reframes the arrow explicitly as "which way the correction pushes point of impact,"
-      // not a literal weathervane reading — a bare directional arrow is genuinely ambiguous, since
-      // some people instinctively read it as "wind is coming from there" (the meteorological/
-      // weathervane convention) and others as "wind is blowing toward there," and this arrow is
-      // neither: it's drawn to agree with the app's own effect ("3=full R" on the Wind Clock field
-      // causes rightward drift, and this arrow points right at clock=3), so labelling it by effect
-      // avoids the reader importing either outside convention. The trailing R/L letter on the speed
-      // line gives the same crosswind-side readout a second, non-graphical way (useful at a glance
-      // without having to judge the arrow's exact angle), derived from the same sign wdx already
-      // carries — positive means rightward push, matching "positive drift = right" elsewhere in the
-      // app; omitted entirely for a pure head/tailwind (12/6 o'clock) where there's no crosswind side.
+      // "PUSH" reframes the rest of this readout explicitly as "which way the correction pushes
+      // point of impact" — not a repeat of the arrow's own weathervane reading above. The arrow
+      // points at the raw entered clock position, i.e. at where the wind is coming FROM (Kestrel-
+      // style, see computeTrajectory's Wind Clock comment); the push it actually causes is the
+      // opposite side (a wind FROM 3 o'clock pushes the bullet left), so pushWdx below is
+      // deliberately the negation of the arrow's own wdx rather than the same value. Positive
+      // pushWdx means rightward push, matching "positive drift = right" elsewhere in the app. The
+      // trailing R/L letter on the speed line gives this push-side readout a second, non-graphical
+      // way to read it (useful at a glance without judging the arrow's exact angle against a rule
+      // that's now reversed from it); omitted entirely for a pure head/tailwind (12/6 o'clock)
+      // where there's no crosswind side to report.
+      var pushWdx=-wdx;
       // Text anchor is direction-aware rather than a fixed offset: a fixed hubY+armLen-based offset
       // assumes the worst case (arrow pointing straight down), which is safe for a down arrow but
       // leaves an oversized, ever-tightened gap for horizontal/upward arrows — the repeated gap
@@ -3939,13 +3962,13 @@ function buildReticleSvg(patternKey,elevVal,windVal,windMph,windClock,met){
       // "PUSH" only makes sense when there's actually a sideways push to report — for a pure
       // head/tailwind (12/6 o'clock) the arrow still points up or down, but that's not a crosswind
       // deflection this indicator is framing, just the much smaller head/tailwind drag effect
-      // already folded into elevation elsewhere. Reuses the exact |wdx|>0.05 threshold the R/L
-      // letter below already uses to decide the same thing, so the two stay in agreement. When
-      // omitted, the speed label moves up into the caption's own slot rather than leaving a blank
-      // gap above it.
-      var hasCrosswind=Math.abs(wdx)>0.05;
+      // already folded into elevation elsewhere. Uses the same |·|>0.05 threshold on pushWdx (not
+      // the arrow's own wdx — see the note above) that the R/L letter below also uses, so the two
+      // stay in agreement. When omitted, the speed label moves up into the caption's own slot
+      // rather than leaving a blank gap above it.
+      var hasCrosswind=Math.abs(pushWdx)>0.05;
       if(hasCrosswind)svg+='<text x="'+hubX+'" y="'+pushY+'" fill="#7a7f99" font-size="8" font-weight="700" letter-spacing="1" text-anchor="middle">PUSH</text>';
-      var sideLetter=wdx>0.05?' R':wdx<-0.05?' L':'';
+      var sideLetter=pushWdx>0.05?' R':pushWdx<-0.05?' L':'';
       var speedLabel=(met?(windMph*1.60934).toFixed(1)+'km/h':windMph+'mph')+sideLetter;
       svg+='<text x="'+hubX+'" y="'+(hasCrosswind?speedY:pushY)+'" fill="#7a7f99" font-size="12" font-weight="600" text-anchor="middle">'+speedLabel+'</text>';
     } else {
