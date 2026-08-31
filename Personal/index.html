@@ -407,6 +407,10 @@
         <div class="field"><label id="lblWind">Wind Speed (mph)</label><input type="number" id="fWind" value="10" min="0" max="200" step="1"/></div>
         <div class="field"><label>Wind Clock (hr)<span class="help-tip" data-tip="This clock position drives two separate effects. The crosswind component (3 or 9 o'clock = full effect, 12 or 6 o'clock = none) deflects the trajectory sideways. The head/tailwind component (12 or 6 o'clock = full effect, 3 or 9 o'clock = none) very slightly changes drag: a headwind adds a touch more drop and time of flight, a tailwind takes a touch off both. That second effect is real but small &mdash; for a typical rifle load it's a fraction of the crosswind's effect at the same wind speed, though it's proportionally larger for slower, lower-BC projectiles like air rifle pellets." onclick="showHelpTip(this,event)">?</span></label><input type="number" id="fWindDir" value="3" min="1" max="12" step="1"/><small style="color:var(--muted);font-size:12px;">3=full R, 9=full L</small></div>
       </div>
+      <div class="row2" style="align-items:start;">
+        <div class="field"><label>Wind at Target (<span id="lblWindTargetUnit">mph</span>, optional)<span class="help-tip" data-tip="Optional second wind reading for when the wind at your target differs from the Wind Speed/Clock above (e.g. calm at the muzzle but gusting near the target). When set, the model blends smoothly between the two readings across the shot instead of assuming one uniform wind for the whole flight. Leave blank to use a single uniform wind everywhere (the default)." onclick="showHelpTip(this,event)">?</span></label><input type="number" id="fWindTarget" value="" placeholder="e.g. 15" min="0" max="200" step="1"/></div>
+        <div class="field"><label>Wind at Target Clock (hr)</label><input type="number" id="fWindTargetDir" value="" placeholder="e.g. 9" min="1" max="12" step="1"/><small style="color:var(--muted);font-size:12px;">3=full R, 9=full L</small></div>
+      </div>
       <button class="btn btn-secondary" onclick="autoFillPressure()" style="margin-bottom:6px;font-size:12px;padding:6px;">&#128205; Pressure from altitude</button>
     </div>
 
@@ -725,8 +729,8 @@ function loadPrefs(){return safeLS(function(){return JSON.parse(localStorage.get
 function savePrefs(p){safeLS(function(){var cur=loadPrefs();for(var k in p)cur[k]=p[k];localStorage.setItem(PREF_KEY,JSON.stringify(cur));});}
 
 var LABELS={
-  imperial:{lblMV:'Muzzle Vel. (fps)',lblSH:'Scope Height (in)',lblZero:'Zero Range (yd)',lblMax:'Max Range (yd)',lblAlt:'Altitude (ft)',lblTemp:'Temp (°C)',lblPress:'Pressure (inHg)',lblWind:'Wind Speed (mph)',lblDia:'Diameter (in)',lblLen:'Length (in)',lblInterval:'Interval (yd)',lblSpotUnit:'yd',lblTwist:'Twist 1:X (in)'},
-  metric:  {lblMV:'Muzzle Vel. (m/s)',lblSH:'Scope Height (cm)',lblZero:'Zero Range (m)',lblMax:'Max Range (m)',lblAlt:'Altitude (m)',lblTemp:'Temp (°C)',lblPress:'Pressure (hPa)',lblWind:'Wind Speed (km/h)',lblDia:'Diameter (mm)',lblLen:'Length (mm)',lblInterval:'Interval (m)',lblSpotUnit:'m',lblTwist:'Twist 1:X (mm)'}
+  imperial:{lblMV:'Muzzle Vel. (fps)',lblSH:'Scope Height (in)',lblZero:'Zero Range (yd)',lblMax:'Max Range (yd)',lblAlt:'Altitude (ft)',lblTemp:'Temp (°C)',lblPress:'Pressure (inHg)',lblWind:'Wind Speed (mph)',lblWindTargetUnit:'mph',lblDia:'Diameter (in)',lblLen:'Length (in)',lblInterval:'Interval (yd)',lblSpotUnit:'yd',lblTwist:'Twist 1:X (in)'},
+  metric:  {lblMV:'Muzzle Vel. (m/s)',lblSH:'Scope Height (cm)',lblZero:'Zero Range (m)',lblMax:'Max Range (m)',lblAlt:'Altitude (m)',lblTemp:'Temp (°C)',lblPress:'Pressure (hPa)',lblWind:'Wind Speed (km/h)',lblWindTargetUnit:'km/h',lblDia:'Diameter (mm)',lblLen:'Length (mm)',lblInterval:'Interval (m)',lblSpotUnit:'m',lblTwist:'Twist 1:X (mm)'}
 };
 
 function updateLabels(){
@@ -741,11 +745,12 @@ var BASE_BOUNDS={
   fMV:{min:1,max:5000,step:1},fSH:{min:0.1,max:20,step:0.1},
   fZero:{min:1,max:1000,step:5},fMax:{min:10,max:2000,step:25},
   fAlt:{min:0,max:20000,step:100},fWind:{min:0,max:200,step:1},
+  fWindTarget:{min:0,max:200,step:1},
   fDia:{min:0.1,max:30,step:0.001},fLen:{min:0.1,max:100,step:0.001},
   fInterval:{min:1,max:500,step:5},fSpot:{min:1,max:2000,step:1},
   fTwist:{min:4,max:36,step:0.5}
 };
-var BOUND_FACTORS={fMV:0.3048,fSH:2.54,fZero:0.9144,fMax:0.9144,fAlt:0.3048,fWind:1.60934,fDia:25.4,fLen:25.4,fInterval:0.9144,fSpot:0.9144,fTwist:25.4};
+var BOUND_FACTORS={fMV:0.3048,fSH:2.54,fZero:0.9144,fMax:0.9144,fAlt:0.3048,fWind:1.60934,fWindTarget:1.60934,fDia:25.4,fLen:25.4,fInterval:0.9144,fSpot:0.9144,fTwist:25.4};
 function roundClean(v){return Math.round(v*1000)/1000;}
 function applyBounds(sys){
   var met=sys==='metric';
@@ -782,6 +787,8 @@ function setUnitSystem(sys){
     document.getElementById('fMax').value=Math.round(max*0.9144);
     document.getElementById('fAlt').value=Math.round(alt*0.3048);
     document.getElementById('fWind').value=(wind*1.60934).toFixed(1);
+    var windTgt=parseFloat(document.getElementById('fWindTarget').value)||0;
+    if(windTgt>0)document.getElementById('fWindTarget').value=(windTgt*1.60934).toFixed(1);
     document.getElementById('fDia').value=(dia*25.4).toFixed(2);
     document.getElementById('fLen').value=(len*25.4).toFixed(2);
     document.getElementById('fPress').value=(press*33.8639).toFixed(1);
@@ -824,6 +831,8 @@ function setUnitSystem(sys){
     document.getElementById('fMax').value=Math.round(max/0.9144);
     document.getElementById('fAlt').value=Math.round(alt/0.3048);
     document.getElementById('fWind').value=(wind/1.60934).toFixed(1);
+    var windTgt2=parseFloat(document.getElementById('fWindTarget').value)||0;
+    if(windTgt2>0)document.getElementById('fWindTarget').value=(windTgt2/1.60934).toFixed(1);
     document.getElementById('fDia').value=(dia/25.4).toFixed(4);
     document.getElementById('fLen').value=(len/25.4).toFixed(4);
     document.getElementById('fPress').value=(press/33.8639).toFixed(2);
@@ -2295,6 +2304,26 @@ function computeTrajectory(p,dense){
   // on a centrefire rifle at 500yd, since wind speed is a much bigger fraction of a pellet's
   // (much lower) muzzle velocity. See the "Head/tailwind" guide topic for the fuller comparison.
   var rangeWindFps=p.windMph*1.46667*Math.cos((p.windClock/6)*Math.PI);
+  // Wind at Target: an optional second wind reading (speed+clock), distinct from the wind at the
+  // shooter above, for when conditions genuinely differ at the target (e.g. calm at the muzzle,
+  // gusting further out). p.windTargetMph is left undefined by calculate() whenever the field is
+  // blank, which is the "off" state — everything below then collapses back to the single uniform
+  // wind used everywhere else in the app. When set, the shooter's own crosswind/headwind
+  // components (windFps/rangeWindFps above) and the target's own components are blended by
+  // straight-line downrange fraction (0 at the muzzle, 1 at the table's max range) rather than by
+  // interpolating the raw speed+clock reading directly — a 3 o'clock wind blended with a 9
+  // o'clock wind should pass through "no crosswind" partway, not average to a meaningless clock
+  // position, and interpolating the two Cartesian components (crosswind, headwind) separately is
+  // what actually gives that. windFracAt/headwindFpsAt/crosswindFpsAt are then sampled at the
+  // bullet's own current downrange position at each integration step below — including inside the
+  // zero-solve loops just below, so a zero solved at a shorter range than the table's max
+  // correctly sees only a partial blend toward the target reading, not the full target wind.
+  var hasWindTarget=p.windTargetMph!==undefined&&p.windTargetMph!==null;
+  var windFpsTarget=hasWindTarget?p.windTargetMph*1.46667*Math.sin((p.windTargetClock/6)*Math.PI):windFps;
+  var rangeWindFpsTarget=hasWindTarget?p.windTargetMph*1.46667*Math.cos((p.windTargetClock/6)*Math.PI):rangeWindFps;
+  function windFracAt(xFt){if(!hasWindTarget||p.maxYd<=0)return 0;var f=(xFt/3)/p.maxYd;return f<0?0:f>1?1:f;}
+  function headwindFpsAt(xFt){return hasWindTarget?rangeWindFps+(rangeWindFpsTarget-rangeWindFps)*windFracAt(xFt):rangeWindFps;}
+  function crosswindFpsAt(xFt){return hasWindTarget?windFps+(windFpsTarget-windFps)*windFracAt(xFt):windFps;}
   var angR=p.angleDeg*Math.PI/180,cosA=Math.cos(angR),tanA=Math.tan(angR);
   var tbl=p.dragModel==='g7'?G7:p.dragModel==='ga'?GA:G1;
   function decel(v){return rho*2.085e-4*getCd(v/sos,tbl)*v*v/p.bc;}
@@ -2308,10 +2337,10 @@ function computeTrajectory(p,dense){
   function rk4(y,vx,vy,t,dx){var k1=derivX(vx,vy),k2=derivX(vx+.5*dx*k1.dvx,vy+.5*dx*k1.dvy),k3=derivX(vx+.5*dx*k2.dvx,vy+.5*dx*k2.dvy),k4=derivX(vx+dx*k3.dvx,vy+dx*k3.dvy),w=dx/6;return{y:y+w*(k1.dy+2*k2.dy+2*k3.dy+k4.dy),vx:vx+w*(k1.dvx+2*k2.dvx+2*k3.dvx+k4.dvx),vy:vy+w*(k1.dvy+2*k2.dvy+2*k3.dvy+k4.dvy),t:t+w*(k1.dt+2*k2.dt+2*k3.dt+k4.dt)};}
   var maxFt=p.maxYd*3,zeroFt=p.zeroYd*3;
   var p1vx=p.mvFps*cosA,p1vy=0,p1x=0,p1t=0,t0=0,p1ly=-1;
-  while(p1x<=zeroFt+stepFt*4){var p1yd=Math.round(p1x/3);if(p1yd===p.zeroYd&&p1ly!==p.zeroYd){t0=p1t;break;}p1ly=p1yd;var p1s=rk4(0,p1vx,p1vy,p1t,stepFt);p1vx=Math.max(p1s.vx,1);p1vy=p1s.vy;p1t=p1s.t;p1x+=stepFt;}
+  while(p1x<=zeroFt+stepFt*4){var p1yd=Math.round(p1x/3);if(p1yd===p.zeroYd&&p1ly!==p.zeroYd){t0=p1t;break;}p1ly=p1yd;rangeWindFps=headwindFpsAt(p1x);var p1s=rk4(0,p1vx,p1vy,p1t,stepFt);p1vx=Math.max(p1s.vx,1);p1vy=p1s.vy;p1t=p1s.t;p1x+=stepFt;}
   var vyB=t0>0.001?(p.scopeInch/12+zeroFt*tanA+0.5*g*t0*t0)/t0-p.mvFps*Math.sin(angR):0;
-  for(var bi=0;bi<8;bi++){var bivx=p.mvFps*cosA,bivy=p.mvFps*Math.sin(angR)+vyB,bix=0,biy=-p.scopeInch/12,bily=-1,ref=false;while(bix<=zeroFt+stepFt*4){var biyd=Math.round(bix/3);if(biyd===p.zeroYd&&bily!==p.zeroYd){var gap=bix*tanA-biy;if(Math.abs(gap*12)<0.005){ref=true;break;}vyB+=gap/t0*0.85;break;}bily=biyd;var bis=rk4(biy,bivx,bivy,0,stepFt);biy=bis.y;bivx=Math.max(bis.vx,1);bivy=bis.vy;bix+=stepFt;}if(ref)break;}
-  var vx=p.mvFps*cosA,vy=p.mvFps*Math.sin(angR)+vyB,x=0,y=-p.scopeInch/12,t=0,wc=0,vwc=0;
+  for(var bi=0;bi<8;bi++){var bivx=p.mvFps*cosA,bivy=p.mvFps*Math.sin(angR)+vyB,bix=0,biy=-p.scopeInch/12,bily=-1,ref=false;while(bix<=zeroFt+stepFt*4){var biyd=Math.round(bix/3);if(biyd===p.zeroYd&&bily!==p.zeroYd){var gap=bix*tanA-biy;if(Math.abs(gap*12)<0.005){ref=true;break;}vyB+=gap/t0*0.85;break;}bily=biyd;rangeWindFps=headwindFpsAt(bix);var bis=rk4(biy,bivx,bivy,0,stepFt);biy=bis.y;bivx=Math.max(bis.vx,1);bivy=bis.vy;bix+=stepFt;}if(ref)break;}
+  var vx=p.mvFps*cosA,vy=p.mvFps*Math.sin(angR)+vyB,x=0,y=-p.scopeInch/12,t=0,wc=0,vwc=0,driftAccum=0;
   // Sample points at clean marks in whatever unit is actually displayed, not always in whole
   // yards. The physics loop below only has 1-yard resolution (stepFt=3ft), so a metric "10m"
   // interval used to get rounded to the nearest yard (11yd) and applied repeatedly - each step
@@ -2325,7 +2354,19 @@ function computeTrajectory(p,dense){
   var rec=new Set();for(var nv=0;nv<=maxNative+1e-9;nv+=nativeStep)rec.add(toYd(nv));rec.add(p.zeroYd);
   if(p.spotYd&&p.spotYd>0&&p.spotYd<=p.maxYd)rec.add(p.spotYd);
   var raw=[],lastYd=-1;
-  while(x<=maxFt+stepFt){var v=Math.sqrt(vx*vx+vy*vy),xyd=Math.round(x/3);if((dense||rec.has(xyd))&&xyd!==lastYd){raw.push({xYd:xyd,xFt:x,y:y,v:v,mach:v/sos,t:t,wc:wc});lastYd=xyd;}if(x>maxFt+stepFt*2)break;var s=rk4(y,vx,vy,t,stepFt);y=s.y;vx=Math.max(s.vx,1);vy=s.vy;t=s.t;var dt=stepFt/Math.max(vx,1);vwc+=(cor_h*vx-cor_v*vy)*dt;wc+=vwc*dt;x+=stepFt;}
+  while(x<=maxFt+stepFt){var v=Math.sqrt(vx*vx+vy*vy),xyd=Math.round(x/3);if((dense||rec.has(xyd))&&xyd!==lastYd){raw.push({xYd:xyd,xFt:x,y:y,v:v,mach:v/sos,t:t,wc:wc,driftAccum:driftAccum});lastYd=xyd;}if(x>maxFt+stepFt*2)break;rangeWindFps=headwindFpsAt(x);var tOld=t;var s=rk4(y,vx,vy,t,stepFt);y=s.y;vx=Math.max(s.vx,1);vy=s.vy;t=s.t;var dt=stepFt/Math.max(vx,1);vwc+=(cor_h*vx-cor_v*vy)*dt;wc+=vwc*dt;
+    // Crosswind drift, generalized for a range-varying wind: the classic closed-form lag-time
+    // formula (drift = windFps*(t - xFt/mvFps)*12) only works because a CONSTANT windFps factors
+    // straight out of that subtraction. Once crosswind can vary with position, that factoring is
+    // no longer valid, so this accumulates the same lag-time relationship incrementally instead —
+    // each step contributes whatever crosswind was locally in effect (crosswindFpsAt(x), sampled
+    // at this step's own starting position) times the extra flight time (beyond a no-wind/no-drag
+    // reference) accrued during just that step. Summed over the whole flight this telescopes back
+    // to the exact original formula whenever crosswindFpsAt is constant (windTargetMph unset), so
+    // the uniform-wind case is unaffected by this change other than ordinary floating-point summation
+    // noise far below display precision.
+    var dLag=(t-tOld)-(stepFt/p.mvFps);driftAccum+=crosswindFpsAt(x)*dLag*12;
+    x+=stepFt;}
   var zr=raw.find(function(r){return r.xYd===p.zeroYd;}),zoff=zr?zr.y:0,zxft=zr?zr.xFt:zeroFt,zLOS=zoff-zxft*tanA,cosA2=cosA*cosA;
   return raw.map(function(r){
     var dIn=(r.y-r.xFt*tanA-zLOS)*12,eKE=r.v*r.v*(p.weightGr/7000)/(2*32.174),eJ=eKE*1.35582;
@@ -2342,7 +2383,10 @@ function computeTrajectory(p,dense){
     if(p.zeroOffsetMils)dIn-=p.zeroOffsetMils*r.xYd*0.036/cosA2;
     var moa=r.xYd>0?-dIn*cosA2/(r.xYd/100*1.0472):0;
     var mils=r.xYd>0?-dIn*cosA2/(r.xYd*0.036):0;
-    var drift=windFps*(r.t-r.xFt/p.mvFps)*12;
+    // r.driftAccum is the incrementally-accumulated equivalent of windFps*(r.t-r.xFt/p.mvFps)*12
+    // (see the main flight loop above) — identical to that closed form when Wind at Target is
+    // unset, and the physically-correct generalization when it's set (see hasWindTarget above).
+    var drift=r.driftAccum;
     // Windage Zero Offset: the same constant-angular-shift idea as the elevation Zero Offset above,
     // just applied to windage instead of drop. Unlike dIn, "drift" is not already self-cancelling
     // to 0 at the zero yard by construction — crosswind drift at short zero ranges is normally
@@ -2666,6 +2710,16 @@ function calculate(){
     // elevation one above, since the two are entered (and can be in different units) separately.
     var zeroOffsetWindageRaw=parseFloat(document.getElementById('fZeroOffsetWindage').value)||0;
     var zeroOffsetWindageMils=zeroOffsetToMils(zeroOffsetWindageRaw,zeroOffsetWindageUnit);
+    // Wind at Target: an optional second wind reading, distinct from the (mandatory) Wind Speed/
+    // Clock fields above, for when the wind at the target genuinely differs from the wind at the
+    // shooter (e.g. calm at the muzzle, gusting near the target). Left as undefined (not 0) when
+    // the field is blank, so computeTrajectory() can tell "no second reading given, use one
+    // uniform wind for the whole flight" apart from "shooter deliberately entered a calm (0mph)
+    // wind at the target" — those are different situations. See computeTrajectory() for how the
+    // two readings are blended across the flight.
+    var windTargetRawStr=document.getElementById('fWindTarget').value;
+    var windTargetMph=windTargetRawStr!==''?(met?(parseFloat(windTargetRawStr)||0)/1.60934:(parseFloat(windTargetRawStr)||0)):undefined;
+    var windTargetClock=windTargetRawStr!==''?(parseFloat(document.getElementById('fWindTargetDir').value)||3):undefined;
 
     var effBc=effectiveBc();
     var rawBc=effBc.bc;
@@ -2678,6 +2732,7 @@ function calculate(){
       humidPct:parseFloat(document.getElementById('fHumid').value)||50,
       presHPa:presHPa,
       windMph:windMph,windClock:parseFloat(document.getElementById('fWindDir').value)||3,
+      windTargetMph:windTargetMph,windTargetClock:windTargetClock,
       angleDeg:parseFloat(document.getElementById('fAngle').value)||0,
       latDeg:parseFloat(document.getElementById('fLat').value)||0,
       azimuthDeg:parseFloat(document.getElementById('fAzimuth').value)||0,
@@ -2818,6 +2873,19 @@ function renderResults(results,params,stability){
     '<div class="stat-card"><div class="label">Spin Drift at '+rLRange+'</div><div class="value" style="font-size:16px;">'+spinAtMax+'</div><div class="unit">'+spinDir+' &middot; Sg '+params.Sg.toFixed(2)+'</div></div>':
     '<div class="stat-card"><div class="label">Spin Drift</div><div class="value" style="font-size:14px;color:var(--muted);">Enter dia &amp; len</div></div>';
   var windSpeedDisp=met?(params.windMph*1.60934).toFixed(1)+'km/h':params.windMph+'mph';
+  // Wind at Target indicator: when the optional second wind reading is active, show both the
+  // shooter-side and target-side readings on the existing "Wind at <range>" stat card rather than
+  // only the blended drift figure — otherwise there's no visible confirmation that both readings
+  // were actually picked up (the exact kind of silent gap that hit Compare Loads' windage offset
+  // earlier in this project before it was flagged and fixed).
+  var windTargetActive=params.windTargetMph!==undefined&&params.windTargetMph!==null;
+  var windUnitLine;
+  if(windTargetActive){
+    var windTargetSpeedDisp=met?(params.windTargetMph*1.60934).toFixed(1)+'km/h':params.windTargetMph+'mph';
+    windUnitLine=windSpeedDisp+' @'+params.windClock+' &rarr; '+windTargetSpeedDisp+' @'+params.windTargetClock+' (target)';
+  } else {
+    windUnitLine=windSpeedDisp+" @ "+params.windClock+"o'clock";
+  }
 
   var truingBadge=Math.abs(bcMultiplier-1)>0.001?'<span style="background:rgba(224,108,58,.15);border:1px solid rgba(224,108,58,.4);color:var(--accent2);border-radius:4px;padding:2px 8px;font-size:11px;font-weight:700;">'+bulletIcon(11)+' Trued &times;'+bcMultiplier.toFixed(3)+'</span>':'';
   // Distinct from the Trued badge above — this doesn't mean the BC/drag model was touched at all,
@@ -2877,7 +2945,7 @@ function renderResults(results,params,stability){
     '<div class="stat-card"><div class="label">Velocity at '+rLRange+'</div><div class="value" style="font-size:16px;">'+velAtMax+'</div></div>'+
     '<div class="stat-card"><div class="label">Energy at '+rLRange+'</div><div class="value" style="font-size:16px;">'+eAtMax+'</div></div>'+
     '<div class="stat-card"><div class="label">Drop at '+rLRange+'</div><div class="value" style="font-size:16px;">'+dropAtMax+'</div></div>'+
-    '<div class="stat-card"><div class="label">Wind at '+rLRange+'</div><div class="value" style="font-size:16px;">'+windAtMax+'</div><div class="unit">'+windSpeedDisp+" @ "+params.windClock+"o'clock</div></div>"+
+    '<div class="stat-card"><div class="label">Wind at '+rLRange+'</div><div class="value" style="font-size:16px;">'+windAtMax+'</div><div class="unit">'+windUnitLine+'</div></div>'+
     spinCard+
     (Math.abs(bcMultiplier-1)>0.001?'<div class="stat-card" style="border-color:rgba(224,108,58,.4);"><div class="label" style="color:var(--accent2);">'+bulletIcon(11)+' BC Truing</div><div class="value" style="font-size:16px;color:var(--accent2);">&times;'+bcMultiplier.toFixed(3)+'</div><div class="unit">'+params.baseBc.toFixed(4)+' &rarr; '+params.bc.toFixed(4)+'</div></div>':'')+
     '<div class="stat-card"><div class="label">Subsonic at</div><div class="value" style="font-size:16px;">'+subTxt+'</div><div class="unit">Sound: '+(met?(speedOfSound(params.tempC)*0.3048).toFixed(0)+' m/s':speedOfSound(params.tempC).toFixed(0)+' fps')+'</div></div>'+

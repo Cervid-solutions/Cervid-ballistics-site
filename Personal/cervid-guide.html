@@ -253,6 +253,14 @@ footer{border-top:1px solid var(--border);padding:24px;text-align:center;color:v
 </div>
 
 <div class="topic">
+<h3>Wind at Target <span class="badge advanced">Advanced</span></h3>
+<p>Wind Speed &amp; Wind Clock above describe conditions at the shooter, and by default the app assumes that same wind holds for the whole flight. <span class="field-ref">Wind at Target</span> is an optional second speed+clock reading for when the wind genuinely differs out at the target &mdash; calm at the muzzle but gusting further out, say. Leave it blank and nothing changes; fill it in and the app blends smoothly between the two readings across the shot instead of assuming one uniform wind everywhere.</p>
+<p>The blend is by straight-line downrange fraction &mdash; 0% of the way there at the muzzle, 100% at the table's max range &mdash; applied separately to the crosswind and head/tailwind parts of each reading rather than to the raw speed-and-clock numbers themselves. That matters because averaging clock positions directly can be meaningless (a 3 o'clock wind and a 9 o'clock wind don't blend to "no wind" by any sensible physical reasoning), whereas blending the sideways and along-the-shot components separately always behaves sensibly, including when the two readings come from very different directions.</p>
+<div class="callout note">Wind read near the target matters more to total drift than the same wind read near the muzzle. The bullet decelerates over its flight, so it spends more <em>time</em> &mdash; not just more distance &mdash; exposed to whatever crosswind is blowing during the slower, back half of the trajectory. A crosswind that only picks up close to the target will still move the point of impact meaningfully; the same crosswind confined to just the first stretch out of the muzzle moves it noticeably less. This is exactly the "read the wind at the target, not just at the firing line" habit taught for long-range work &mdash; the app's math bears it out.</div>
+<p>Wind at Target is a standing field like Wind Speed/Wind Clock themselves &mdash; it describes today's conditions, not a property of the load, so it is not saved into presets and is left untouched when clearing or switching loads. When active, the Results header's "Wind at &lt;range&gt;" card shows both readings (shooter &rarr; target) so it's always visible which two conditions are actually driving the figures.</p>
+</div>
+
+<div class="topic">
 <h3>Latitude &amp; Azimuth (Coriolis) <span class="badge advanced">Advanced</span></h3>
 <p>These two feed the Coriolis and Eötvös corrections &mdash; the Earth's own rotation measurably deflecting very long shots. They only become practically relevant at longer centrefire distances, which is why they're optional rather than defaulted silently. <span class="field-ref">Azimuth</span> is the compass bearing of the shot, measured from true north.</p>
 </div>
@@ -546,7 +554,7 @@ footer{border-top:1px solid var(--border);padding:24px;text-align:center;color:v
 </section>
 
 <footer>
-Cervid Ballistics User Guide &middot; matches the application as of August 30, 2026 &middot; this guide is a single offline file, just like the calculator itself
+Cervid Ballistics User Guide &middot; matches the application as of August 31, 2026 &middot; this guide is a single offline file, just like the calculator itself
 </footer>
 </main>
 </div>
