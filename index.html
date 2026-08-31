@@ -412,7 +412,7 @@
         <div class="field"><label>Wind Clock (hr)<span class="help-tip" data-tip="This clock position drives two separate effects. The crosswind component (3 or 9 o'clock = full effect, 12 or 6 o'clock = none) deflects the trajectory sideways. The head/tailwind component (12 or 6 o'clock = full effect, 3 or 9 o'clock = none) very slightly changes drag: a headwind adds a touch more drop and time of flight, a tailwind takes a touch off both. That second effect is real but small &mdash; for a typical rifle load it's a fraction of the crosswind's effect at the same wind speed, though it's proportionally larger for slower, lower-BC projectiles like air rifle pellets." onclick="showHelpTip(this,event)">?</span></label><input type="number" id="fWindDir" value="3" min="1" max="12" step="1"/><small style="color:var(--muted);font-size:12px;">3=full R, 9=full L</small></div>
       </div>
       <div class="row2" style="align-items:start;">
-        <div class="field"><label>Wind at Target (<span id="lblWindTargetUnit">mph</span>, optional)<span class="help-tip" data-tip="Optional second wind reading for when the wind at your target differs from the Wind Speed/Clock above (e.g. calm at the muzzle but gusting near the target). When set, the model blends smoothly between the two readings across the shot instead of assuming one uniform wind for the whole flight. Leave blank to use a single uniform wind everywhere (the default)." onclick="showHelpTip(this,event)">?</span></label><input type="number" id="fWindTarget" value="" placeholder="e.g. 15" min="0" max="200" step="1"/></div>
+        <div class="field"><label>Wind at Target (<span id="lblWindTargetUnit">mph</span>, optional)<span class="help-tip" data-tip="Optional second wind reading for when the wind at your target differs from the Wind Speed/Clock above (e.g. calm at the muzzle but gusting near the target). When set, the model blends smoothly between the two readings across the shot instead of assuming one uniform wind for the whole flight. Leave blank to use a single uniform wind everywhere (the default)." onclick="showHelpTip(this,event)">?</span> <a href="#" onclick="resetWindTarget();return false;" class="link-btn">Reset</a></label><input type="number" id="fWindTarget" value="" placeholder="e.g. 15" min="0" max="200" step="1"/></div>
         <div class="field"><label>Wind at Target Clock (hr)</label><input type="number" id="fWindTargetDir" value="" placeholder="e.g. 9" min="1" max="12" step="1"/><small style="color:var(--muted);font-size:12px;">3=full R, 9=full L</small></div>
       </div>
       <button class="btn btn-secondary" onclick="autoFillPressure()" style="margin-bottom:6px;font-size:12px;padding:6px;">&#128205; Pressure from altitude</button>
@@ -2766,6 +2766,15 @@ function renderPlausibilityWarning(msgs){
 }
 function dismissPlausibilityWarning(){var el=document.getElementById('plausibilityWarning');if(el)el.style.display='none';}
 
+// Clears both Wind at Target fields back to blank (the "off" state — see windFracAt() in
+// computeTrajectory()) and recalculates if a result is already on screen, sparing the shooter
+// from manually zeroing out two fields by hand. Mirrors the placement/behaviour of the other
+// field-adjacent Reset links already in the app (Reticle View wind, HUD wind, Turret Dial).
+function resetWindTarget(){
+  document.getElementById('fWindTarget').value='';
+  document.getElementById('fWindTargetDir').value='';
+  if(lastResults)calculate();
+}
 function calculate(){
   try{
     var met=unitSystem==='metric';
