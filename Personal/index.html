@@ -932,24 +932,37 @@ function dismissBcWarning(){
 }
 
 // ── Presets ─────────────────────────────────────────────────────────────────
+// Updated 2026-08-31 from the user's own exported preset backup (cervid_presets_2026-08-31.json):
+// several original entries had a real BC/velocity/scope-height correction folded in (verified
+// against the user's own field-trued figures, not just a range/interval tweak) and several brand
+// new loads were promoted from that export into the shipped defaults. Superseded original values
+// are noted inline; two original entries (JSB Jumbo Beast .22's twist and ZAN .25 45gr) were left
+// completely untouched, since the export carried no amended replacement for them.
 var PRESETS={
   air:[
-    {name:'JSB Exact .177 8.44gr',        calibr:'.177 JSB',    wt:8.44,  bc:0.019,mv:789, sh:2.0, zero:30,dia:0.177, len:0.220,twist:17.7,drag:'g1'},
-    {name:'JSB Exact Heavy .177 10.34gr', calibr:'.177 JSB',    wt:10.34, bc:0.031,mv:734, sh:2.0, zero:30,dia:0.177, len:0.240,twist:17.7,drag:'g1'},
-    {name:'ZAN Hyperline .22 34.6gr',     calibr:'.22 ZAN',     wt:34.6,  bc:0.180,mv:938, sh:3.25,zero:50,dia:0.2175,len:0.405,twist:18,  drag:'g1',max:200},
-    {name:'ZAN ELR .22 33gr',             calibr:'.22 ZAN',     wt:33.0,  bc:0.175,mv:921, sh:3.25,zero:50,dia:0.2175,len:0.440,twist:18,  drag:'g1',max:200},
-    {name:'JSB Hades .22 15.89gr',        calibr:'.22 JSB',     wt:15.89, bc:0.016,mv:681, sh:2.0, zero:30,dia:0.2175,len:0.253,twist:17.7,drag:'g1'},
-    {name:'JSB Exact Monster .22 25.4gr', calibr:'.22 JSB',     wt:25.4,  bc:0.084,mv:850, sh:3.25,zero:50,dia:0.2175,len:0.315,twist:18,  drag:'g1',max:200},
-    {name:'FX .25 34gr',                  calibr:'.25 FX',      wt:34.0,  bc:0.330,mv:855, sh:3.0, zero:50,dia:0.250, len:0.330,twist:16,  drag:'g1',max:200},
-    {name:'H&N Heavy Slug .25 38gr',      calibr:'.25 H&N',     wt:38.0,  bc:0.094,mv:923, sh:3.0, zero:50,dia:0.250, len:0.340,twist:16,  drag:'g1',max:200},
-    {name:'ZAN .25 45gr',                 calibr:'.25 ZAN',     wt:45.0,  bc:0.138,mv:900, sh:3.0, zero:50,dia:0.250, len:0.421,twist:16,  drag:'g1',max:200}
+    {name:'FX .177 10.3gr',               calibr:'FX .177 10.3gr',               wt:10.3,  bc:0.028,mv:732,sh:2.0, zero:30,max:75, interval:1,zeroOffsetVal:1.5,zeroOffsetUnit:'mils',dia:0.177, len:0.242,twist:17.7,drag:'ga',shape:'diabolo'},
+    {name:'JSB Exact .177 8.44gr',        calibr:'.177 JSB',                      wt:8.44,  bc:0.019,mv:789,sh:2.0, zero:30,max:75, interval:1,dia:0.177, len:0.220,twist:17.7,drag:'g1'},
+    {name:'JSB Exact Heavy .177 10.34gr', calibr:'.177 JSB',                      wt:10.34, bc:0.031,mv:734,sh:2.0, zero:30,max:75, interval:1,zeroOffsetVal:1.5,zeroOffsetUnit:'mils',dia:0.177, len:0.240,twist:17.7,drag:'ga',shape:'diabolo'},
+    {name:'Jugg .22 25.39',               calibr:'Range Master Juggernaut  25.39',wt:25.39, bc:0.086,mv:828,sh:3.25,zero:30,max:100,                                                     dia:0.220, len:0.280,twist:16,  drag:'g1'},
+    {name:'JSB Jumbo Beast.22',           calibr:'JSB Exact Jumbo Beast.22 ',     wt:33.956,bc:0.051,mv:848,sh:3.25,zero:30,max:150,                                                     dia:0.220, len:0.421,twist:0,   drag:'ga',shape:'diabolo'},
+    {name:'ZAN Hyperline .22 34.6gr',     calibr:'.22 ZAN',                       wt:34.6,  bc:0.180,bc7:0.0947,mv:938,sh:3.25,zero:50,max:200,interval:5,                                dia:0.2175,len:0.405,twist:18,  drag:'g7',shape:'boattail'},
+    {name:'ZAN ELR .22 33gr',             calibr:'.22 ZAN',                       wt:33.0,  bc:0.175,mv:921,sh:3.25,zero:50,max:100,interval:5,                                            dia:0.2175,len:0.440,twist:18,  drag:'g1'},
+    {name:'JSB Hades .22 15.89gr',        calibr:'.22 JSB',                       wt:15.89, bc:0.016,mv:681,sh:2.0, zero:30,max:100,interval:5,                                            dia:0.2175,len:0.253,twist:17.7,drag:'g1'},
+    {name:'JSB Exact Monster .22 25.4gr', calibr:'.22 JSB',                       wt:25.4,  bc:0.059,mv:850,sh:3.25,zero:50,max:200,                                                       dia:0.2175,len:0.315,twist:18,  drag:'g1'}, // was bc:0.084
+    {name:'JSB KO Slug 25.39gr',          calibr:'.22 JSB KO 25.39',              wt:25.39, bc:0.084,mv:940,sh:3.25,zero:50,max:200,interval:5,                                            dia:0.216, len:0.280,twist:17.7,drag:'g1'},
+    {name:'.22 Frangible 40.1gr',         calibr:'.22 Frag  40.1gr',              wt:40.1,  bc:null, bc7:0.063,mv:900,sh:3.25,zero:50,max:400,interval:10,zeroOffsetVal:0.3,zeroOffsetUnit:'mils',angularUnit:'mils',dia:0.2175,len:0.400,twist:17.7,drag:'g7',shape:'boattail'},
+    {name:'FX .25 34gr',                  calibr:'.25 FX',                        wt:34.0,  bc:0.103,mv:887,sh:3.0, zero:50,max:200,                                                       dia:0.250, len:0.330,twist:16,  drag:'g1'}, // was bc:0.330,mv:855
+    {name:'FX Hybrid Slug',               calibr:'FX Hybrid Slug',                wt:26.0,  bc:0.071,mv:930,sh:3.0, zero:50,max:100,zeroOffsetVal:0.1,zeroOffsetUnit:'mils',                dia:0.250, len:0.350,twist:16,  drag:'ga'},
+    {name:'H&N Heavy Slug .25 38gr',      calibr:'.25 H&N',                       wt:38.0,  bc:0.112,mv:937,sh:3.25,zero:50,max:200,                                                       dia:0.250, len:0.340,twist:16,  drag:'g1'}, // was bc:0.094,mv:923,sh:3.0
+    {name:'ZAN .25 45gr',                 calibr:'.25 ZAN',                       wt:45.0,  bc:0.138,mv:900,sh:3.0, zero:50,max:200,                                                       dia:0.250, len:0.421,twist:16,  drag:'g1'}
   ],
   cf:[
-    {name:'.243 Win 100gr',      calibr:'.243 Win',      wt:100,bc:0.257,mv:2938,sh:2.0,zero:100,dia:0.243,len:1.008,twist:10,max:500},
-    {name:'.264 CM 130gr',       calibr:'6.5 Creedmoor', wt:130,bc:0.469,mv:2718,sh:2.0,zero:100,dia:0.264,len:1.126,twist:8,max:1000},
-    {name:'.264 CM 129gr',       calibr:'6.5 Creedmoor', wt:129,bc:0.265,mv:2950,sh:2.0,zero:100,dia:0.264,len:1.335,twist:8,max:1000},
-    {name:'.264 CM ABLR 129gr',  calibr:'6.5 CM ABLR',   wt:129,bc:0.440,mv:2707,sh:2.0,zero:100,dia:0.264,len:1.350,twist:8,max:1000},
-    {name:'.308 Win 150gr',      calibr:'.308 Win',      wt:150,bc:0.397,mv:2650,sh:2.0,zero:100,dia:0.308,len:1.228,twist:10}
+    {name:'.243 Win 100gr',      calibr:'.243 Win',      wt:100,bc:0.257,mv:2938,sh:2.0,zero:100,max:500, interval:10,dia:0.243,len:1.008,twist:10,drag:'g1'},
+    {name:'.243 Win Norma',      calibr:'.243 Win',      wt:100,bc:0.302,mv:2922,sh:2.0,zero:100,max:500,             dia:0.243,len:1.008,twist:10,drag:'g1'},
+    {name:'.264 CM 129gr',       calibr:'6.5 Creedmoor', wt:129,bc:0.265,mv:2950,sh:2.0,zero:100,max:1500,interval:50,dia:0.264,len:1.335,twist:8, drag:'g1'},
+    {name:'.264 CM 130gr',       calibr:'6.5 Creedmoor', wt:130,bc:0.469,mv:2718,sh:2.0,zero:100,max:1000,            dia:0.264,len:1.126,twist:8, drag:'g1'},
+    {name:'.264 CM ABLR 129gr',  calibr:'6.5 CM ABLR',   wt:129,bc:0.440,mv:2707,sh:2.0,zero:100,max:1500,interval:50,dia:0.264,len:1.350,twist:8, drag:'g1'},
+    {name:'.308 Win 150gr',      calibr:'.308 Win',      wt:150,bc:0.397,mv:2650,sh:2.0,zero:100,                     dia:0.308,len:1.228,twist:10,drag:'g1'}
   ],
   // Starts empty — no built-in rimfire loads shipped yet. Rather than guess at plausible-looking
   // .22LR/.17HMR/etc figures, this stays blank until real, verified factory or chronographed data
@@ -967,7 +980,16 @@ var currentMode='air',editingCustomIdx=null,editingBuiltinIdx=null;
 // Verified by name (not just index) at save time since custom preset order/contents can
 // change between load and save (matches how getOrderedPresets() already resolves by name).
 var loadedPresetRef=null;
-var CUSTOM_KEY='ballistics_custom_v1',HIDDEN_KEY='ballistics_hidden_v1';
+// Bumped to _v2 (2026-08-31), alongside ORDER_KEY below, when the shipped built-in PRESETS array
+// was reordered/expanded from the user's own preset export. HIDDEN_KEY stores built-in entries by
+// array INDEX, not name, so a stale v1 hidden-set from before this change would silently point at
+// the wrong (unrelated) new entries once the array's shape changed underneath it — bumping the key
+// makes any existing v1 data simply unreadable (loadHidden's ||{} fallback), starting every browser
+// clean against the new array rather than risking a corrupted, misaligned hidden set. CUSTOM_KEY is
+// bumped for the same update, since several of the custom presets this array was built from would
+// otherwise now show up twice — once as a newly-baked-in built-in, once as the old identical/near-
+// identical custom entry still sitting in v1 storage.
+var CUSTOM_KEY='ballistics_custom_v2',HIDDEN_KEY='ballistics_hidden_v2';
 function safeLS(fn){try{return fn();}catch(e){return null;}}
 // Rebuilds the {air,cf,rf} shape key-by-key (rather than a single ||{} fallback on the whole
 // object) so existing users' localStorage from before Rimfire existed — which has air/cf but no
@@ -976,7 +998,8 @@ function loadCustom(){var d=safeLS(function(){return JSON.parse(localStorage.get
 function saveCustom(d){safeLS(function(){localStorage.setItem(CUSTOM_KEY,JSON.stringify(d));});}
 function loadHidden(){var r=safeLS(function(){return JSON.parse(localStorage.getItem(HIDDEN_KEY));})||{};return{air:new Set(r.air),cf:new Set(r.cf),rf:new Set(r.rf)};}
 function saveHidden(d){safeLS(function(){localStorage.setItem(HIDDEN_KEY,JSON.stringify({air:[...d.air],cf:[...d.cf],rf:[...d.rf]}));});}
-var ORDER_KEY='ballistics_order_v1';
+// Bumped alongside CUSTOM_KEY/HIDDEN_KEY above (2026-08-31) — see the note there.
+var ORDER_KEY='ballistics_order_v2';
 function loadOrder(){return safeLS(function(){return JSON.parse(localStorage.getItem(ORDER_KEY));})||{air:null,cf:null,rf:null};}
 function saveOrder(d){safeLS(function(){localStorage.setItem(ORDER_KEY,JSON.stringify(d));});}
 // 'manual' (drag-and-drop order, persisted via loadOrder/saveOrder) or 'calibre' (computed
