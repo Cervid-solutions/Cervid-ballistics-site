@@ -473,6 +473,48 @@
         <button type="button" class="btn" style="background:var(--accent);margin-top:2px;" onclick="verifyTruing()">Verify Second Point</button>
         <div id="verifyStatus" style="font-size:11px;color:var(--muted);margin-top:6px;min-height:14px;line-height:1.4;"></div>
       </div>
+
+      <!-- Doppler / multi-point BC fit: a much stronger alternative to the single-point True
+           Trajectory above, for shooters who have a Doppler radar chronograph (e.g. LabRadar) that
+           measured actual velocity at many points down range from a single shot. All the points come
+           from one shot under one set of conditions, so — unlike trying to combine several separate
+           range-day observations, which would each need their own logged weather to mean anything —
+           this needs no extra condition bookkeeping: it reuses whatever's already been Calculated,
+           exactly like the single-point Truing above. Deliberately kept visually separate and marked
+           Advanced rather than merged into the single-point flow above it, since it's aimed at a
+           narrow slice of shooters with specific gear, not a workflow most users would ever open. -->
+      <div style="border-top:1px solid var(--border);margin-top:12px;padding-top:10px;">
+        <div class="preset-section-hdr" style="margin-bottom:6px;">
+          <div class="section-title" style="font-size:13px;color:var(--accent2);">Fit BC from Doppler Data <span style="background:rgba(224,108,58,.15);border:1px solid rgba(224,108,58,.4);color:var(--accent2);border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:4px;">Advanced</span></div>
+        </div>
+        <p style="font-size:11px;color:var(--muted);margin-bottom:8px;line-height:1.5;">If a Doppler radar chronograph measured this bullet's actual velocity at many points down range from a single shot, paste that data below to fit the single most accurate BC across the whole string &mdash; a far stronger fit than one holdover reading, since every point comes from the same shot under the same conditions. This sets the same BC multiplier as True Trajectory above (only one can be in effect at a time) and uses whichever conditions are currently Calculated, exactly like it.</p>
+        <div class="row2">
+          <div class="field"><label>Distance Unit</label>
+            <select id="fDopplerDistUnit" style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:8px;font-size:16px;">
+              <option value="yd">yards</option><option value="m">meters</option>
+            </select>
+          </div>
+          <div class="field"><label>Velocity Unit</label>
+            <select id="fDopplerVelUnit" style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:8px;font-size:16px;">
+              <option value="fps">fps</option><option value="mps">m/s</option>
+            </select>
+          </div>
+        </div>
+        <div class="field">
+          <label>Column Order (as pasted below)</label>
+          <div class="unit-toggle" style="width:100%;">
+            <button class="active" id="btnDopplerColDV" onclick="setDopplerColOrder('dv')" style="flex:1;">Distance, Velocity</button>
+            <button id="btnDopplerColVD" onclick="setDopplerColOrder('vd')" style="flex:1;">Velocity, Distance</button>
+          </div>
+        </div>
+        <div class="field">
+          <label>Paste Data <span style="font-weight:400;color:var(--muted);">(one pair per line &mdash; comma, tab, or space separated)</span></label>
+          <textarea id="fDopplerData" rows="6" placeholder="10, 2840&#10;50, 2705&#10;100, 2560&#10;150, 2420" style="width:100%;font-family:monospace;font-size:13px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:8px;resize:vertical;"></textarea>
+        </div>
+        <button type="button" class="btn" style="background:var(--accent2);margin-top:2px;" onclick="fitBcFromDoppler()">Fit BC from Data</button>
+        <div id="dopplerStatus" style="font-size:11px;color:var(--muted);margin-top:6px;min-height:14px;line-height:1.4;"></div>
+        <div id="dopplerResidualWrap" style="display:none;margin-top:8px;"></div>
+      </div>
     </div>
   </div>
 
@@ -2544,7 +2586,14 @@ function computeTrajectory(p,dense){
     // the shooter's own interest rather than being replaced by this combined figure.
     var totalWindMoa=driftMoa+sdMoa+corMoa,totalWindMils=driftMils+sdMils+corMils;
     return{
-      yd:r.xYd,fps:Math.round(r.v),mach:r.mach.toFixed(2),
+      yd:r.xYd,fps:Math.round(r.v),
+      // Unrounded velocity, alongside the display-rounded fps above — same "keep a raw field next
+      // to the display-rounded one" precedent as energyFtLbRaw/energyJRaw (added for smooth chart
+      // plotting). Used by the Doppler multi-point BC fit below, which needs to compare a model's
+      // predicted velocity against a real chronograph reading precisely enough to run a regression
+      // across many closely-spaced points, not just whole fps.
+      fpsRaw:r.v,
+      mach:r.mach.toFixed(2),
       dropIn:dIn.toFixed(2),dropCm:(dIn*2.54).toFixed(1),
       // Deliberately no baked "clicks" field here (moa/clickSizeMoa) — clickSizeMoa can be changed
       // by the user after Calculate has already run and these row objects are cached, and a value
@@ -2640,6 +2689,13 @@ function clickSizeOptionsHtml(){
 function setClickSize(v){clickSizeMoa=parseFloat(v)||0.25;if(lastResults)renderResults(lastResults.results,lastResults.params,lastResults.stability);if(lastCompareList)renderCompareResults(lastCompareList,lastCompareRefYd);refreshZeroOffsetClickSizeSelects();}
 function setDropUnit(u){unitDrop=u;if(lastResults)renderResults(lastResults.results,lastResults.params,lastResults.stability);}
 function setTrueUnit(u){trueUnit=u;['Mils','Moa','In','Cm'].forEach(function(k){var el=document.getElementById('btnTrueUnit'+k);if(el)el.classList.toggle('active',u===k.toLowerCase());});}
+// 'dv' = each pasted line reads distance-then-velocity; 'vd' = velocity-then-distance. Kept as its
+// own toggle rather than trying to auto-detect column meaning from magnitude (a very short distance
+// entered in yards and a very slow velocity in m/s could plausibly overlap), since a silently wrong
+// guess here would swap two physically different quantities into a regression without any obvious
+// symptom until the fitted BC turns out implausible.
+var dopplerColOrder='dv';
+function setDopplerColOrder(order){dopplerColOrder=order;document.getElementById('btnDopplerColDV').classList.toggle('active',order==='dv');document.getElementById('btnDopplerColVD').classList.toggle('active',order==='vd');}
 
 // ── Trajectory Truing ────────────────────────────────────────────────────────
 function applyTruing(){
@@ -2745,6 +2801,142 @@ function verifyTruing(){
   statusEl.innerHTML='<span style="color:'+cls+';">'+verdict+'</span> &middot; at '+distYd+(met?'m':'yd')+': predicted '+predicted.toFixed(2)+' '+unitLabel+' vs observed '+obsVal.toFixed(2)+' '+unitLabel+' (&Delta; '+(diff>=0?'+':'')+diff.toFixed(2)+(pct!==null?' / '+pct.toFixed(0)+'%':'')+')'+untruedNote;
 }
 
+// ── Doppler / multi-point BC fit ────────────────────────────────────────────
+// Parses freeform pasted text into {yd,fps} pairs in the app's own canonical units, tolerant of
+// comma-, tab-, or space-separated lines (real device exports vary) and of a header row or other
+// junk line (silently skipped, counted, and reported back rather than surfaced as a hard error —
+// a pasted CSV nearly always has a "Distance,Velocity" header line above the numbers). Deliberately
+// does not try to guess the device/format automatically (see the Column Order toggle's own comment)
+// — this is a generic parser by design, not one built against a specific chronograph's export, per
+// the decision to keep this working across devices rather than matching one exactly.
+function parseDopplerData(text,distUnit,velUnit,colOrder){
+  var lines=(text||'').split(/\r?\n/);
+  var points=[],skipped=0;
+  for(var i=0;i<lines.length;i++){
+    var line=lines[i].trim();
+    if(!line)continue;
+    var parts=line.split(/[,\t]+|\s+/).filter(function(s){return s!=='';});
+    if(parts.length<2){skipped++;continue;}
+    var a=parseFloat(parts[0]),b=parseFloat(parts[1]);
+    if(isNaN(a)||isNaN(b)){skipped++;continue;} // most likely a header row
+    var distRaw=colOrder==='dv'?a:b,velRaw=colOrder==='dv'?b:a;
+    if(!(distRaw>0)||!(velRaw>0)){skipped++;continue;}
+    points.push({yd:distUnit==='m'?distRaw/0.9144:distRaw,fps:velUnit==='mps'?velRaw/0.3048:velRaw});
+  }
+  return{points:points,skipped:skipped};
+}
+// Standard golden-section search for the minimum of a unimodal function f over [a,b] — no
+// derivatives needed, same "simple numeric method over anything requiring calculus" preference as
+// applyTruing()'s own bisection search just above. Each iteration reuses one of the two previously-
+// computed function values, so it costs exactly one new evaluation of f per iteration.
+function goldenSectionMin(f,a,b,maxIter){
+  var gr=(Math.sqrt(5)-1)/2;
+  var c=b-gr*(b-a),d=a+gr*(b-a),fc=f(c),fd=f(d);
+  for(var i=0;i<maxIter&&(b-a)>1e-6;i++){
+    if(fc<fd){b=d;d=c;fd=fc;c=b-gr*(b-a);fc=f(c);}
+    else{a=c;c=d;fc=fd;d=a+gr*(b-a);fd=f(d);}
+  }
+  return(a+b)/2;
+}
+// Fits a single BC multiplier against every Doppler point at once, minimizing the sum of squared
+// velocity residuals — a genuine regression, unlike applyTruing()'s exact single-point solve just
+// above (one point, one unknown, always solvable exactly; many points, one unknown, generally
+// can't all be satisfied exactly, so the best fit is whichever multiplier minimizes the total
+// error). Velocity (not drop/holdover) is the fitted quantity throughout, since that's what a
+// Doppler unit actually measures directly — comparing it needs no zeroing/sight-in geometry at all,
+// unlike drop, which makes this a cleaner regression target than reusing applyTruing()'s own
+// holdover-based comparison would have been.
+// Internally extends its own working max range to cover the farthest entered point, independent of
+// whatever the results table itself is currently configured to show — so a Doppler string that
+// reaches further downrange than the table's own max range still gets used in full rather than
+// silently dropping points past it.
+// A coarse 60-point scan runs first, and golden-section search only refines the neighbourhood of
+// whichever coarse sample already had the lowest error — a guard against the (unlikely, but
+// possible with noisy multi-point data) case of the summed squared-error curve not being cleanly
+// unimodal across the whole search range, since golden section on its own only guarantees finding
+// the true minimum when that assumption holds.
+function fitBcMultiplierToDoppler(points,baseParams,baseBc){
+  var maxObsYd=0;for(var i=0;i<points.length;i++)if(points[i].yd>maxObsYd)maxObsYd=points[i].yd;
+  var fitMaxYd=Math.ceil(maxObsYd)+20;
+  function lookupFnFor(bcMult){
+    var p2=Object.assign({},baseParams,{bc:baseBc*bcMult,stepYd:null,spotYd:null,maxYd:fitMaxYd,maxNative:fitMaxYd,intervalNative:null});
+    var res=computeTrajectory(p2,true); // dense: every yard, so any entered distance has a close sample
+    return function(targetYd){
+      var best=null,bestDiff=Infinity;
+      for(var j=0;j<res.length;j++){var d=Math.abs(res[j].yd-targetYd);if(d<bestDiff){bestDiff=d;best=res[j];}}
+      return best?best.fpsRaw:null;
+    };
+  }
+  function sse(bcMult){
+    var lookup=lookupFnFor(bcMult),s=0;
+    for(var k=0;k<points.length;k++){
+      var pred=lookup(points[k].yd);
+      if(pred===null)return Infinity;
+      var d=pred-points[k].fps;
+      s+=d*d;
+    }
+    return s;
+  }
+  var lo=0.3,hi=2.5,steps=60,bestMult=1.0,bestSse=Infinity;
+  for(var i2=0;i2<=steps;i2++){
+    var m=lo+(hi-lo)*i2/steps,v=sse(m);
+    if(v<bestSse){bestSse=v;bestMult=m;}
+  }
+  var span=(hi-lo)/steps;
+  var refined=goldenSectionMin(sse,Math.max(lo,bestMult-span),Math.min(hi,bestMult+span),40);
+  return{bcMultiplier:refined,lookup:lookupFnFor(refined)};
+}
+// Main handler for the "Fit BC from Data" button. Sets the same bcMultiplier applyTruing() does
+// (only one BC-truing method is ever in effect at once — whichever ran most recently), so every
+// downstream consumer (Results badge, Save to preset, Reset) needs no awareness this method exists.
+function fitBcFromDoppler(){
+  var statusEl=document.getElementById('dopplerStatus');
+  var residualWrap=document.getElementById('dopplerResidualWrap');
+  residualWrap.style.display='none';residualWrap.innerHTML='';
+  if(!lastResults){statusEl.textContent='Run Calculate first.';statusEl.style.color='var(--yellow)';return;}
+  var text=document.getElementById('fDopplerData').value;
+  var distUnit=document.getElementById('fDopplerDistUnit').value;
+  var velUnit=document.getElementById('fDopplerVelUnit').value;
+  var parsed=parseDopplerData(text,distUnit,velUnit,dopplerColOrder);
+  if(parsed.points.length<2){
+    statusEl.textContent='Need at least 2 valid data points (found '+parsed.points.length+'). Check the pasted data and column order.';
+    statusEl.style.color='var(--yellow)';
+    return;
+  }
+  var baseBc=effectiveBc().bc||lastResults.params.bc/bcMultiplier;
+  var fit=fitBcMultiplierToDoppler(parsed.points,lastResults.params,baseBc);
+  bcMultiplier=fit.bcMultiplier;
+  var newBc=(baseBc*bcMultiplier).toFixed(4);
+
+  // Residual table built from the already-fitted lookup function, so the displayed numbers are an
+  // exact match to what was just fitted rather than a second, separately-rounded computation.
+  var sorted=parsed.points.slice().sort(function(x,y){return x.yd-y.yd;});
+  var rows=sorted.map(function(p){var pred=fit.lookup(p.yd);return{yd:p.yd,obs:p.fps,pred:pred,diff:pred-p.fps};});
+  var rmse=Math.sqrt(rows.reduce(function(s,r){return s+r.diff*r.diff;},0)/rows.length);
+  var met=unitSystem==='metric';
+  var distLbl=met?'m':'yd',velLbl=met?'m/s':'fps';
+  function dispDist(yd){return met?Math.round(yd*0.9144):Math.round(yd);}
+  function dispVel(fps){return(met?fps*0.3048:fps).toFixed(1);}
+  var tableHtml='<div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Fit residuals (RMS error: '+dispVel(rmse)+' '+velLbl+'):</div>'+
+    '<div class="tbl-wrap"><table style="font-size:11px;"><thead><tr><th>'+distLbl+'</th><th>Observed</th><th>Predicted</th><th>&Delta;</th></tr></thead><tbody>'+
+    rows.map(function(r){
+      var absDiff=Math.abs(r.diff);
+      var style=absDiff<3?'':(absDiff<8?' style="color:var(--yellow);"':' style="color:var(--red);"');
+      return '<tr><td>'+dispDist(r.yd)+'</td><td>'+dispVel(r.obs)+'</td><td>'+dispVel(r.pred)+'</td><td'+style+'>'+(r.diff>=0?'+':'')+dispVel(r.diff)+'</td></tr>';
+    }).join('')+
+    '</tbody></table></div>';
+  residualWrap.innerHTML=tableHtml;
+  residualWrap.style.display='';
+
+  var skipNote=parsed.skipped>0?(' &middot; '+parsed.skipped+' line'+(parsed.skipped===1?'':'s')+' skipped (not readable as two numbers, e.g. a header row)'):'';
+  document.getElementById('trueStatus').innerHTML='<span style="color:var(--green);">&#10003; Trued</span> (from '+rows.length+'-point Doppler fit) &middot; BC &times;'+bcMultiplier.toFixed(3)+' &middot; '+baseBc.toFixed(3)+' &rarr; '+newBc;
+  statusEl.innerHTML='Fit used '+rows.length+' point'+(rows.length===1?'':'s')+skipNote+'.';
+  statusEl.style.color='var(--muted)';
+  document.getElementById('btnResetTruing').style.display='';
+  updateSaveTruingButton();
+  calculate();
+}
+
 // Truing (bcMultiplier) is calibrated against one specific load's validation range/observed
 // holdover. It must not silently carry over when a different load is opened — clears the
 // multiplier plus the validation-range/observed-holdover inputs so a new load always starts untrued.
@@ -2758,6 +2950,13 @@ function clearTruingState(){
   document.getElementById('fVerifyRange').value='';
   document.getElementById('fVerifyObs').value='';
   document.getElementById('verifyStatus').textContent='';
+  // Doppler fit shares the single bcMultiplier cleared above, so it must reset alongside the
+  // single-point fields — otherwise a pasted string from one load would sit there unused-but-
+  // present after switching to a different load, or after Reset, looking like it's still active.
+  document.getElementById('fDopplerData').value='';
+  document.getElementById('dopplerStatus').textContent='';
+  document.getElementById('dopplerResidualWrap').style.display='none';
+  document.getElementById('dopplerResidualWrap').innerHTML='';
 }
 function resetTruing(){
   clearTruingState();

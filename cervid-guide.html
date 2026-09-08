@@ -357,6 +357,14 @@ footer{border-top:1px solid var(--border);padding:24px;text-align:center;color:v
 <h3>Verifying the fit <span class="badge advanced">Advanced</span></h3>
 <p>Once trued, enter a <em>second</em>, independent observation &mdash; a different distance you also have real data for &mdash; into <span class="field-ref">Verify At</span> and <span class="field-ref">Observed Holdover</span>, then press <strong>Verify Second Point</strong>. You'll get the model's prediction, your observed value, the difference, and a plain verdict: holding up well, some drift, or diverging. A growing gap at the second point usually means a different input is wrong (muzzle velocity is the most common culprit) rather than the BC fit itself.</p>
 </div>
+
+<div class="topic">
+<h3>Fit BC from Doppler Data <span class="badge advanced">Advanced</span></h3>
+<p>If you own a Doppler radar chronograph (a LabRadar or similar unit that measures actual velocity at many points down range from a single shot, not just a single muzzle-velocity reading), you can feed that whole string into the app for a far stronger BC correction than a single holdover reading gives you above. Every point in a Doppler string comes from the same shot under the same conditions, so there's no need to log separate weather for each one the way combining several different range-day observations would &mdash; it reuses whatever's already Calculated, exactly like True Trajectory does.</p>
+<p>Paste your data &mdash; one distance/velocity pair per line, comma, tab, or space separated &mdash; into the box under <strong>Fit BC from Doppler Data</strong>, set the <span class="field-ref">Distance Unit</span>, <span class="field-ref">Velocity Unit</span>, and <span class="field-ref">Column Order</span> to match your device's export, and press <strong>Fit BC from Data</strong>. The app doesn't try to guess your device's exact column layout automatically &mdash; a silently wrong guess would swap two different physical quantities into the fit with no obvious symptom until the resulting BC looked implausible, so it asks you to confirm the order instead. A header row above your numbers (e.g. "Distance,Velocity") is fine; it's detected and skipped automatically rather than needing to be deleted first.</p>
+<p>Unlike the single-point pass above, which solves one observation exactly, fitting against many points generally can't satisfy every one of them perfectly &mdash; so the app finds whichever single BC comes closest to <em>all</em> of them at once, and shows you a residual table (each distance, its observed and predicted velocity, and the difference) so you can judge the fit's quality yourself rather than trusting a bare number. A point that's badly off from the others in that table is worth a second look &mdash; a misread velocity, an odd flier, or a data-entry slip &mdash; before trusting the fit.</p>
+<div class="callout note">This sets the same BC multiplier as True Trajectory above &mdash; only one method's result can be in effect at a time, whichever ran most recently. <strong>Reset</strong>, <strong>&#128190; Save to preset</strong>, and the Results page's "Trued" badge all work identically regardless of which method produced the correction.</div>
+</div>
 </section>
 
 <section id="zero-offset">
@@ -561,7 +569,7 @@ footer{border-top:1px solid var(--border);padding:24px;text-align:center;color:v
 </section>
 
 <footer>
-Cervid Ballistics User Guide &middot; matches the application as of September 8, 2026 &middot; this guide is a single offline file, just like the calculator itself
+Cervid Ballistics User Guide &middot; matches the application as of September 9, 2026 &middot; this guide is a single offline file, just like the calculator itself
 </footer>
 </main>
 </div>
