@@ -519,6 +519,33 @@
         <div id="dopplerStatus" style="font-size:11px;color:var(--muted);margin-top:6px;min-height:14px;line-height:1.4;"></div>
         <div id="dopplerResidualWrap" style="display:none;margin-top:8px;"></div>
       </div>
+
+      <!-- FX True Ballistics Chronograph (and similar) shot-log import: a structurally different
+           kind of chronograph data from the Doppler block above — no downrange distance at all, just
+           several independent shots, each carrying the device's OWN already-computed BC estimate
+           (T-BC) alongside its velocity. There's nothing to regress here: the device did that work
+           already, so this just parses and averages several of its independent answers into one more
+           reliable number, the same logic as averaging ordinary chronograph shots into a trustworthy
+           muzzle velocity, just applied to BC too. Kept as its own block rather than folded into the
+           Doppler one above, since the data shape and the math are both genuinely different (no
+           regression, no residual-vs-range table, no distance/velocity unit pickers). -->
+      <div style="border-top:1px solid var(--border);margin-top:12px;padding-top:10px;">
+        <div class="preset-section-hdr" style="margin-bottom:6px;">
+          <div class="section-title" style="font-size:13px;color:var(--accent2);">Import Chronograph Shot Log <span style="background:rgba(224,108,58,.15);border:1px solid rgba(224,108,58,.4);color:var(--accent2);border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:4px;">Advanced</span></div>
+        </div>
+        <p style="font-size:11px;color:var(--muted);margin-bottom:8px;line-height:1.5;">Paste a full shot-string export from a chronograph that reports its own per-shot BC estimate alongside velocity (currently recognises the FX True Ballistics Chronograph's own log format — a per-shot "T-BC(model): value" reading, any number of shots). Every shot in the log is averaged into one Muzzle Velocity and one BC figure, the same way averaging several ordinary chronograph readings gives a more reliable velocity than trusting any single shot.</p>
+        <div class="field">
+          <label>Paste Full Log <span style="font-weight:400;color:var(--muted);">(header, weather line, and all &mdash; only the shot rows are read)</span></label>
+          <textarea id="fFxChronoData" rows="6" placeholder="Paste the full exported log here" style="width:100%;font-family:monospace;font-size:12px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:8px;resize:vertical;"></textarea>
+        </div>
+        <button type="button" class="btn" style="background:var(--accent2);margin-top:2px;" onclick="parseFxChronoLogUI()">Parse Chronograph Log</button>
+        <div id="fxChronoStatus" style="font-size:11px;color:var(--muted);margin-top:6px;min-height:14px;line-height:1.4;"></div>
+        <div id="fxChronoTableWrap" style="display:none;margin-top:8px;"></div>
+        <div id="fxChronoActions" style="display:none;margin-top:8px;flex-direction:column;gap:6px;">
+          <button type="button" class="btn btn-secondary" style="width:auto;" onclick="applyFxChronoVelocity()" id="btnFxApplyVelocity"></button>
+          <button type="button" class="btn btn-secondary" style="width:auto;" onclick="applyFxChronoBc()" id="btnFxApplyBc"></button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -3013,6 +3040,124 @@ function fitBcFromDoppler(){
   calculate();
 }
 
+// ── FX chronograph shot-log import (average velocity + average per-shot BC) ────────────────────
+// Genuinely different data shape from the Doppler block above: no downrange distance at all, just
+// several independent shots, each already carrying the device's OWN computed BC estimate
+// ("T-BC(model): value") alongside its velocity. There is nothing to regress — the device already
+// did that calculation — so this only parses and averages several of its independent answers,
+// exactly the same logic as averaging several ordinary chronograph shots into one trustworthy
+// muzzle velocity, just applied to the device's own BC figure too.
+// Deliberately tolerant of the surrounding header/weather/summary lines a real export includes —
+// only lines shaped like an actual shot row are recognised, everything else is ignored rather than
+// requiring the pasted text to be trimmed down to just the data rows first. Handles any shot count
+// (the sample this was built against had 6, but nothing here assumes that specific number — every
+// per-shot line is parsed and averaged individually, and a declared "Shot count: N" header line, if
+// present, is cross-checked against how many were actually parsed as a soft consistency check).
+function parseFxChronoLog(text){
+  var lines=(text||'').split(/\r?\n/);
+  var shots=[],declaredCount=null;
+  for(var i=0;i<lines.length;i++){
+    var line=lines[i];
+    var scm=line.match(/Shot count:\s*(\d+)/i);
+    if(scm){declaredCount=parseInt(scm[1],10);continue;}
+    if(line.indexOf(',')===-1)continue; // quick reject for prose/header lines
+    var fields=line.split(',').map(function(s){return s.trim();});
+    var fps=null,bc=null,dragModel=null;
+    for(var j=0;j<fields.length-1;j++){
+      // First "<number>,FPS" pair on the line is taken as the shot's velocity — the sample format
+      // repeats it a second time later on the same line, so only the first is used rather than
+      // averaging or double-counting the same reading.
+      if(fps===null&&/^\d+(\.\d+)?$/.test(fields[j])&&/^fps$/i.test(fields[j+1]||'')){
+        fps=parseFloat(fields[j]);
+      }
+      var m=fields[j].match(/^T-BC\(([A-Za-z0-9]+)\):?$/i);
+      if(m&&fields[j+1]!==undefined&&/^\d+(\.\d+)?$/.test(fields[j+1])){
+        dragModel=m[1].toLowerCase();
+        bc=parseFloat(fields[j+1]);
+      }
+    }
+    if(fps!==null&&bc!==null)shots.push({fps:fps,bc:bc,dragModel:dragModel});
+  }
+  return{shots:shots,declaredCount:declaredCount};
+}
+var lastFxChronoResult=null;
+function parseFxChronoLogUI(){
+  var statusEl=document.getElementById('fxChronoStatus');
+  var tableWrap=document.getElementById('fxChronoTableWrap');
+  var actions=document.getElementById('fxChronoActions');
+  tableWrap.style.display='none';tableWrap.innerHTML='';
+  actions.style.display='none';
+  lastFxChronoResult=null;
+  var text=document.getElementById('fFxChronoData').value;
+  var parsed=parseFxChronoLog(text);
+  if(!parsed.shots.length){
+    statusEl.textContent='No recognisable shot rows found. Paste the full exported log, including its shot rows.';
+    statusEl.style.color='var(--yellow)';
+    return;
+  }
+  var n=parsed.shots.length;
+  var avgFps=parsed.shots.reduce(function(s,x){return s+x.fps;},0)/n;
+  var avgBc=parsed.shots.reduce(function(s,x){return s+x.bc;},0)/n;
+  var dragModel=parsed.shots[0].dragModel;
+  var modelConsistent=parsed.shots.every(function(s){return s.dragModel===dragModel;});
+  lastFxChronoResult={shots:parsed.shots,avgFps:avgFps,avgBc:avgBc,dragModel:dragModel,modelConsistent:modelConsistent};
+
+  var met=unitSystem==='metric';
+  function dispVel(fps){return met?(fps*0.3048).toFixed(1)+' m/s':fps.toFixed(0)+' fps';}
+  var rowsHtml=parsed.shots.map(function(s,i){
+    var offBc=Math.abs(s.bc-avgBc),flag=offBc>avgBc*0.15?' style="color:var(--yellow);"':'';
+    return '<tr><td>'+(i+1)+'</td><td>'+dispVel(s.fps)+'</td><td'+flag+'>'+s.bc.toFixed(4)+' ('+s.dragModel.toUpperCase()+')</td></tr>';
+  }).join('');
+  var countNote=(parsed.declaredCount!==null&&parsed.declaredCount!==n)?
+    ' <span style="color:var(--yellow);">&#9888;&#65039; log declares '+parsed.declaredCount+' shots, but '+n+' were readable — check nothing was cut off when pasting.</span>':
+    (parsed.declaredCount!==null?' &middot; matches the log\'s own declared shot count ('+parsed.declaredCount+').':'');
+  var modelNote=modelConsistent?'':' <span style="color:var(--yellow);">&#9888;&#65039; not every shot reported the same drag model &mdash; averaged anyway, but double-check the source data.</span>';
+  tableWrap.innerHTML='<div class="tbl-wrap"><table style="font-size:11px;"><thead><tr><th>Shot</th><th>Velocity</th><th>BC</th></tr></thead><tbody>'+rowsHtml+'</tbody></table></div>'+
+    '<div style="font-size:11px;color:var(--muted);margin-top:6px;line-height:1.4;">Average of '+n+' shot'+(n===1?'':'s')+': '+dispVel(avgFps)+' &middot; BC('+dragModel.toUpperCase()+') '+avgBc.toFixed(4)+modelNote+'</div>';
+  tableWrap.style.display='';
+  statusEl.innerHTML='Parsed '+n+' shot'+(n===1?'':'s')+countNote;
+  statusEl.style.color='var(--muted)';
+
+  document.getElementById('btnFxApplyVelocity').textContent='Apply Avg Velocity ('+dispVel(avgFps)+') to Muzzle Velocity';
+  var bcBtn=document.getElementById('btnFxApplyBc');
+  var currentDrag=document.getElementById('fDrag').value||'g1';
+  if(modelConsistent&&dragModel===currentDrag){
+    bcBtn.disabled=false;
+    bcBtn.style.opacity='1';
+    bcBtn.textContent='Apply Avg BC('+dragModel.toUpperCase()+') ('+avgBc.toFixed(4)+') as Trued BC';
+  } else {
+    bcBtn.disabled=true;
+    bcBtn.style.opacity='0.5';
+    bcBtn.textContent='Set Drag Model to '+dragModel.toUpperCase()+' to apply this BC('+dragModel.toUpperCase()+') reading';
+  }
+  actions.style.display='flex';
+}
+// Directly overwrites the Muzzle Velocity field, the same way any manual edit to that field would —
+// unlike bcMultiplier, there's no separate "layer" for velocity, so this has no bearing on the
+// Trued badge, Save to preset, or Reset above, and needs none of that machinery.
+function applyFxChronoVelocity(){
+  if(!lastFxChronoResult)return;
+  var met=unitSystem==='metric';
+  document.getElementById('fMV').value=met?(lastFxChronoResult.avgFps*0.3048).toFixed(1):Math.round(lastFxChronoResult.avgFps);
+  if(lastResults)calculate();
+}
+// Sets the same bcMultiplier the single-point and Doppler methods above do — deliberately gated to
+// only run when the currently selected Drag Model matches the drag model the device's own BC
+// reading was computed against (T-BC(G1) is specific to the G1 curve; applying it while, say, G7 is
+// selected would silently mix two different drag models together).
+function applyFxChronoBc(){
+  if(!lastFxChronoResult||!lastResults)return;
+  var currentDrag=document.getElementById('fDrag').value||'g1';
+  if(!lastFxChronoResult.modelConsistent||lastFxChronoResult.dragModel!==currentDrag)return;
+  var baseBc=effectiveBc().bc||lastResults.params.bc/bcMultiplier;
+  bcMultiplier=lastFxChronoResult.avgBc/baseBc;
+  var newBc=(baseBc*bcMultiplier).toFixed(4);
+  document.getElementById('trueStatus').innerHTML='<span style="color:var(--green);">&#10003; Trued</span> (from '+lastFxChronoResult.shots.length+'-shot chronograph log average) &middot; BC &times;'+bcMultiplier.toFixed(3)+' &middot; '+baseBc.toFixed(3)+' &rarr; '+newBc;
+  document.getElementById('btnResetTruing').style.display='';
+  updateSaveTruingButton();
+  calculate();
+}
+
 // Truing (bcMultiplier) is calibrated against one specific load's validation range/observed
 // holdover. It must not silently carry over when a different load is opened — clears the
 // multiplier plus the validation-range/observed-holdover inputs so a new load always starts untrued.
@@ -3033,6 +3178,14 @@ function clearTruingState(){
   document.getElementById('dopplerStatus').textContent='';
   document.getElementById('dopplerResidualWrap').style.display='none';
   document.getElementById('dopplerResidualWrap').innerHTML='';
+  // FX chronograph log import shares the same reasoning — a pasted log from one load's chronograph
+  // session must not linger, visually active, after switching to a different load or resetting.
+  lastFxChronoResult=null;
+  document.getElementById('fFxChronoData').value='';
+  document.getElementById('fxChronoStatus').textContent='';
+  document.getElementById('fxChronoTableWrap').style.display='none';
+  document.getElementById('fxChronoTableWrap').innerHTML='';
+  document.getElementById('fxChronoActions').style.display='none';
 }
 function resetTruing(){
   clearTruingState();
