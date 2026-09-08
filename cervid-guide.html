@@ -383,6 +383,13 @@ footer{border-top:1px solid var(--border);padding:24px;text-align:center;color:v
 </div>
 
 <div class="topic">
+<h3>Aerodynamic Jump <span class="badge advanced">Advanced</span></h3>
+<p>A crosswind doesn't just push a bullet sideways &mdash; it also causes a small VERTICAL shift in point of impact, via a completely different mechanism from Spin Drift or Wind Deflection above. As the bullet exits the muzzle into a crosswind, it briefly yaws slightly off the flight path; because it's spinning, gyroscopic precession converts that sideways yaw into an upward or downward nudge within the first few calibers of travel, well before it settles into normal flight. The direction depends on twist: a right-hand-twist bullet jumps <em>up</em> for a crosswind from the right and <em>down</em> for one from the left (reversed for left-hand twist) &mdash; so the same "clock = direction the wind is FROM" reading you already use for Wind Speed &amp; Wind Clock also determines which way this pushes. It's computed automatically once Diameter, Length, and Twist Rate are filled in (the same gate as Spin Drift and Gyroscopic Stability), shown as its own "Aero Jump" stat card, and folded directly into Drop &mdash; the same way a Zero Offset &ndash; Elevation value is (Section 8), rather than needing a separate figure to add in yourself.</p>
+<div class="callout note">Not applied to diabolo-shaped airgun pellets (Projectile Shape = Diabolo). The formula this app uses (Bryan Litz's published rule-of-thumb, from <em>Modern Advancements in Long Range Shooting</em>) was derived and validated against conventional supersonic spitzer/boat-tail bullets &mdash; it has no established accuracy for slow, subsonic, waisted pellet shapes, so the card shows an explicit "N/A" there rather than a number that would just be a guess dressed up as physics. Flat-base and boat-tail airgun slugs (which behave aerodynamically more like small rifle bullets) are not excluded.</div>
+<p>In practical terms this is usually the smallest of the three wind-related corrections in this app &mdash; typically a few hundredths of a MOA per mph of crosswind, smaller than Spin Drift and much smaller than Wind Deflection at the same range &mdash; but it's a genuine, real effect, not a rounding artefact, and it grows with gyroscopic stability (Sg) the same way Spin Drift does. It deliberately ignores a Wind at Target reading (Section&nbsp;&mdash; see "Wind at Target" below): unlike Wind Deflection and Spin Drift, which build up gradually over the whole flight and so genuinely depend on conditions further downrange, Aerodynamic Jump is set entirely by conditions at the muzzle the instant the bullet leaves &mdash; nothing about it changes because the wind happens to differ near the target.</p>
+</div>
+
+<div class="topic">
 <h3>Coriolis &amp; Eötvös <span class="badge advanced">Advanced</span></h3>
 <p>The Earth's rotation deflects a bullet in two distinguishable ways: a vertical Eötvös effect (an eastward shot experiences marginally reduced effective gravity, a westward shot the opposite) and a horizontal Coriolis drift perpendicular to the line of fire. Both depend on your Latitude and the shot's Azimuth (Section 4), and both are genuinely tiny outside long-range centrefire shooting. The vertical Eötvös component is already baked directly into Drop everywhere in the app &mdash; it's not a separate figure you'd ever need to add in yourself. The horizontal component is the one shown as its own "Coriolis" stat/column, the same way Spin Drift is.</p>
 <div class="callout tip">The Coriolis column in the results table follows whichever display unit you've selected &mdash; mils, MOA, clicks, inches, or cm &mdash; the same as Wind and Spin Drift. That column stays wind-only for reference; the horizontal Coriolis figure is folded into Reticle View's and HUD's combined windage hold &mdash; see "Combined windage" under Field Tools below.</div>
@@ -554,7 +561,7 @@ footer{border-top:1px solid var(--border);padding:24px;text-align:center;color:v
 </section>
 
 <footer>
-Cervid Ballistics User Guide &middot; matches the application as of August 31, 2026 &middot; this guide is a single offline file, just like the calculator itself
+Cervid Ballistics User Guide &middot; matches the application as of September 8, 2026 &middot; this guide is a single offline file, just like the calculator itself
 </footer>
 </main>
 </div>

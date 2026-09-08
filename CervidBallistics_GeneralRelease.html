@@ -2117,7 +2117,10 @@ function buildParamsFromPreset(p,mode,forcedMaxYd,forcedMvFps){
     // to opt into here (that mechanism exists purely to avoid drift when a shooter types interval
     // marks in native metric units on the live form) — Compare always samples densely instead.
     stepYd:null,spotYd:null,twistDir:p.twistDir||1,
-    metric:false,intervalNative:null,maxNative:maxYd
+    metric:false,intervalNative:null,maxNative:maxYd,
+    // Same reasoning as the identical line added to calculate()'s own params object: needed so
+    // computeTrajectory() can gate Aerodynamic Jump on shape (excluded for diabolo pellets).
+    shape:p.shape||'flatbase'
   };
   if(params.zeroYd>=params.maxYd)params.maxYd=params.zeroYd+20;
   var rho=airDensityRatio(params.altFt,params.tempC,params.humidPct,params.presHPa);
@@ -2513,6 +2516,48 @@ function computeTrajectory(p,dense){
     var dLag=(t-tOld)-(stepFt/p.mvFps);driftAccum+=crosswindFpsAt(x)*dLag*12;
     x+=stepFt;}
   var zr=raw.find(function(r){return r.xYd===p.zeroYd;}),zoff=zr?zr.y:0,zxft=zr?zr.xFt:zeroFt,zLOS=zoff-zxft*tanA,cosA2=cosA*cosA;
+  // Aerodynamic Jump: a wind-induced VERTICAL shift in point of impact, caused by gyroscopic
+  // precession of the transient yaw a bullet develops responding to a crosswind right at the
+  // muzzle — a different mechanism from both Wind Deflection (crosswind drift accumulated via the
+  // lag-time effect over the whole flight, driftIn below) and Spin Drift (built from ongoing yaw of
+  // repose over the whole flight, sdIn below). Because the responsible yaw develops and precesses
+  // out within the first few calibers of travel, this — per Bryan Litz's published methodology, and
+  // every major ballistic solver's treatment of it — is a single FIXED angular deflection set by
+  // conditions AT THE MUZZLE, not an accumulated-over-range effect. It deliberately reads only
+  // p.windMph/p.windClock below, never windTargetMph/windTargetClock or crosswindFpsAt(x)'s
+  // downrange blend — nothing about the muzzle-exit transient changes because the wind further
+  // downrange happens to differ.
+  //
+  // Magnitude: Litz's published rule-of-thumb (Modern Advancements in Long Range Shooting):
+  //   Y (MOA per mph of crosswind) = 0.01*Sg - 0.0024*L + 0.032
+  // where L is bullet length in calibers (lenIn/diaIn). Gated the same way Spin Drift already is —
+  // only computed when Sg is available (i.e. diameter+length have actually been entered) — and
+  // additionally excluded for shape:'diabolo' (traditional waisted airgun pellets): Litz derived and
+  // validated this formula against supersonic, conventional spitzer/boat-tail-style projectiles, and
+  // it has no established validity for slow, subsonic, dome/diabolo-shaped pellets, so applying it
+  // there would dress up a guess as a real number rather than give an honest one. Clamped at a 0
+  // floor since the formula can go slightly negative for Sg/length combinations well outside the
+  // range Litz fit it to (very low Sg with a very long-for-caliber bullet).
+  //
+  // Direction: verified against Litz's own published convention — a right-hand-twist bullet jumps
+  // UP for a crosswind from the right, DOWN for one from the left (reversed for left-hand twist).
+  // crosswindFromRightMph below is positive when the wind is FROM the right (windClock=3), using the
+  // same sin() term as windFps above (already fixed to the Kestrel/origin convention on 2026-08-31),
+  // so multiplying by twistDir and then subtracting from dIn below (same subtraction the Zero Offset
+  // elevation term above already uses for its own "positive = shoot higher" convention) reproduces
+  // Litz's convention exactly: RH twist (twistDir=1) + wind from the right (positive) -> positive
+  // aeroJumpMils -> dIn decreases -> less drop -> shoots high.
+  var aeroJumpMoaPerMph=0;
+  if(p.Sg!==null&&p.Sg!==undefined&&p.shape!=='diabolo'&&p.diaIn>0&&p.lenIn>0){
+    var aeroJumpL=p.lenIn/p.diaIn;
+    aeroJumpMoaPerMph=Math.max(0,0.01*p.Sg-0.0024*aeroJumpL+0.032);
+  }
+  var crosswindFromRightMph=p.windMph*Math.sin((p.windClock/6)*Math.PI);
+  // Fixed angular correction (mils-equivalent), constant across every row — see the "grows linearly
+  // with range, not accumulated" reasoning in the comment block above and the Zero Offset precedent
+  // it's modeled on. 1.0472/3.6 converts MOA to mils (the inverse of the 3.6/1.0472 MOA<-mils
+  // conversion already used elsewhere in this file, e.g. the Zero Offset badge's own display code).
+  var aeroJumpMilsFixed=aeroJumpMoaPerMph*crosswindFromRightMph*(p.twistDir||1)*(1.0472/3.6);
   return raw.map(function(r){
     var dIn=(r.y-r.xFt*tanA-zLOS)*12,eKE=r.v*r.v*(p.weightGr/7000)/(2*32.174),eJ=eKE*1.35582;
     // Zero Offset: shifts the whole table by a constant angular amount (mils), entered by the
@@ -2526,6 +2571,14 @@ function computeTrajectory(p,dense){
     // multiplication in the moa/mils formulas below, so the requested mils value comes out exactly
     // right regardless of any shot incline angle. Zero (the default) leaves dIn untouched.
     if(p.zeroOffsetMils)dIn-=p.zeroOffsetMils*r.xYd*0.036/cosA2;
+    // Aerodynamic Jump (see the aeroJumpMilsFixed derivation above) — same "grows linearly with
+    // range" treatment as Zero Offset just above (both represent a constant angle imparted once,
+    // rather than an accumulated-over-flight effect like Wind Deflection/Spin Drift below), and the
+    // same subtraction direction (positive = shoots higher, i.e. less drop). ajIn is kept as its own
+    // variable (rather than only the dIn adjustment) so it can also be reported per-row below for
+    // the Results page's Aero Jump headline card.
+    var ajIn=aeroJumpMilsFixed?aeroJumpMilsFixed*r.xYd*0.036/cosA2:0;
+    dIn-=ajIn;
     var moa=r.xYd>0?-dIn*cosA2/(r.xYd/100*1.0472):0;
     var mils=r.xYd>0?-dIn*cosA2/(r.xYd*0.036):0;
     // r.driftAccum is the incrementally-accumulated equivalent of windFps*(r.t-r.xFt/p.mvFps)*12
@@ -2587,6 +2640,14 @@ function computeTrajectory(p,dense){
       energyFtLbRaw:eKE,energyJRaw:eJ,
       driftIn:drift.toFixed(2),driftCm:(drift*2.54).toFixed(1),
       driftMoa:driftMoa.toFixed(2),driftMils:driftMils.toFixed(2),
+      // Aerodynamic Jump, reported the same in/cm/moa/mils way as Wind/Spin Drift/Coriolis, but not
+      // folded into totalWindMoa/totalWindMils below — it's a vertical (elevation) effect, not a
+      // windage one, so it's already reflected in dropIn/dropCm/moa/mils above (see the dIn-=ajIn
+      // line above) rather than needing a combined-figure treatment of its own. Positive = shoots
+      // higher (less drop), matching the "less drop" sign of the dIn subtraction above.
+      aeroJumpIn:ajIn.toFixed(2),aeroJumpCm:(ajIn*2.54).toFixed(1),
+      aeroJumpMoa:(r.xYd>0?ajIn*cosA2/(r.xYd/100*1.0472):0).toFixed(2),
+      aeroJumpMils:(r.xYd>0?ajIn*cosA2/(r.xYd*0.036):0).toFixed(2),
       spinIn:sdIn.toFixed(2),spinCm:(sdIn*2.54).toFixed(1),
       spinMoa:sdMoa.toFixed(2),spinMils:sdMils.toFixed(2),
       coriolisIn:corIn.toFixed(2),coriolisCm:(corIn*2.54).toFixed(1),
@@ -2917,6 +2978,12 @@ function calculate(){
     if(params.zeroYd>=params.maxYd)params.maxYd=params.zeroYd+20;
     var rho=airDensityRatio(params.altFt,params.tempC,params.humidPct,params.presHPa);
     var shape=document.getElementById('fShape').value||'flatbase';
+    // Carried on params (not just the local `shape` var / the `stability` object below) so
+    // computeTrajectory() can gate Aerodynamic Jump on it directly, and so Reticle View/HUD/
+    // Compare's live-slot overrides — which all clone lastResults.params via Object.assign rather
+    // than rebuilding params from scratch — inherit it automatically without any changes to those
+    // three functions themselves.
+    params.shape=shape;
     var shapeFactor=SHAPE_SG_FACTOR[shape]||1.0;
     var rawSg=millerSg(params.weightGr,params.diaIn,params.lenIn,params.twistIn,rho);
     var rawMinTwist=millerMinTwist(params.weightGr,params.diaIn,params.lenIn,rho);
@@ -3044,6 +3111,32 @@ function renderResults(results,params,stability){
   var spinCard=params.Sg!==null&&params.Sg!==undefined?
     '<div class="stat-card"><div class="label">Spin Drift at '+rLRange+'</div><div class="value" style="font-size:16px;">'+spinAtMax+'</div><div class="unit">'+spinDir+' &middot; Sg '+params.Sg.toFixed(2)+'</div>'+cardTag(true)+'</div>':
     '<div class="stat-card"><div class="label">Spin Drift</div><div class="value" style="font-size:14px;color:var(--muted);">Enter dia &amp; len</div>'+cardTag(true)+'</div>';
+  // Aero Jump headline card. Unlike Spin Drift/Wind Deflection, this is a VERTICAL effect, so its
+  // value is already folded directly into Drop (see the ajIn/dIn-=ajIn lines in computeTrajectory())
+  // rather than needing a combined-figure treatment of its own — this card exists purely so the
+  // shooter can see how much of "Drop at range" just above came from this specific effect, the same
+  // way Zero Offset's badge up in the results header shows its own separate contribution to Drop
+  // without a dedicated combined figure either. Three states, mirroring the Gyro Stability/Spin
+  // Drift cards' own two-state pattern plus one more: no dia/len entered yet (Sg unavailable, same
+  // "Enter dia & len" placeholder as those cards, still tagged included since it will be once
+  // populated); Sg available but shape is 'diabolo' (Litz's formula was derived and validated
+  // against conventional spitzer/boat-tail projectiles, not slow subsonic diabolo pellets, so it's
+  // deliberately not applied — shown as an explicit N/A rather than a silent zero, tagged reference
+  // since nothing from this card is actually feeding the dial in that case); and the normal case,
+  // real value plus a direction word derived from the row's own sign (positive aeroJumpIn = shoots
+  // higher, per the direction convention verified and documented in computeTrajectory()).
+  var ajHelp='<span class="help-tip" data-tip="Aerodynamic Jump: a crosswind at the muzzle causes a small VERTICAL shift in point of impact via gyroscopic precession of the bullet\'s transient yaw — different from Spin Drift and Wind Deflection, which are both horizontal. Direction depends on twist: right-hand twist jumps up for a crosswind from the right, down for one from the left (reversed for left-hand twist). Not applied for diabolo-shaped airgun pellets, which the underlying formula (Litz) was never validated against." onclick="showHelpTip(this,event)">?</span>';
+  var ajCard;
+  if(params.Sg===null||params.Sg===undefined){
+    ajCard='<div class="stat-card"><div class="label">Aero Jump'+ajHelp+'</div><div class="value" style="font-size:14px;color:var(--muted);">Enter dia &amp; len</div>'+cardTag(true)+'</div>';
+  } else if(params.shape==='diabolo'){
+    ajCard='<div class="stat-card"><div class="label">Aero Jump'+ajHelp+'</div><div class="value" style="font-size:14px;color:var(--muted);">N/A for diabolo shape</div>'+cardTag(false)+'</div>';
+  } else {
+    var ajAtMax=met?rL.aeroJumpCm+'cm':rL.aeroJumpIn+'"';
+    var ajVal=parseFloat(rL.aeroJumpIn);
+    var ajDir=Math.abs(ajVal)<0.005?'No net effect (pure head/tailwind)':ajVal>0?'Jump &uarr; (shoots high)':'Jump &darr; (shoots low)';
+    ajCard='<div class="stat-card"><div class="label">Aero Jump at '+rLRange+ajHelp+'</div><div class="value" style="font-size:16px;">'+ajAtMax+'</div><div class="unit">'+ajDir+' &middot; '+spinDir+'</div>'+cardTag(true)+'</div>';
+  }
   var windSpeedDisp=met?(params.windMph*1.60934).toFixed(1)+'km/h':params.windMph+'mph';
   // Wind at Target indicator: when the optional second wind reading is active, show both the
   // shooter-side and target-side readings on the existing "Wind at <range>" stat card rather than
@@ -3119,6 +3212,7 @@ function renderResults(results,params,stability){
     '<div class="stat-card"><div class="label">Drop at '+rLRange+'</div><div class="value" style="font-size:16px;">'+dropAtMax+'</div>'+cardTag(true)+'</div>'+
     '<div class="stat-card"><div class="label">Wind at '+rLRange+'</div><div class="value" style="font-size:16px;">'+windAtMax+'</div><div class="unit">'+windUnitLine+'</div>'+cardTag(true)+'</div>'+
     spinCard+
+    ajCard+
     (Math.abs(bcMultiplier-1)>0.001?'<div class="stat-card" style="border-color:rgba(224,108,58,.4);"><div class="label" style="color:var(--accent2);">'+bulletIcon(11)+' BC Truing</div><div class="value" style="font-size:16px;color:var(--accent2);">&times;'+bcMultiplier.toFixed(3)+'</div><div class="unit">'+params.baseBc.toFixed(4)+' &rarr; '+params.bc.toFixed(4)+'</div>'+cardTag(false)+'</div>':'')+
     '<div class="stat-card"><div class="label">Subsonic at</div><div class="value" style="font-size:16px;">'+subTxt+'</div><div class="unit">Sound: '+(met?(speedOfSound(params.tempC)*0.3048).toFixed(0)+' m/s':speedOfSound(params.tempC).toFixed(0)+' fps')+'</div>'+cardTag(false)+'</div>'+
     '<div class="stat-card"><div class="label">Air Density</div><div class="value" style="font-size:16px;">'+(airDensityRatio(params.altFt,params.tempC,params.humidPct,params.presHPa)*100).toFixed(1)+'%</div><div class="unit">of std atmosphere</div>'+cardTag(false)+'</div>'+
