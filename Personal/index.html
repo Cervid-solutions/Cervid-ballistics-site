@@ -65,6 +65,9 @@
   .stat-card.highlight .value{color:var(--accent);}
   .stat-card.warn .value{color:var(--yellow);}
   .stat-card.danger .value{color:var(--red);}
+  .card-tag{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-top:6px;padding-top:5px;border-top:1px solid var(--border);}
+  .card-tag-included{color:var(--green);}
+  .card-tag-ref{color:var(--muted);}
   .tbl-wrap{overflow-x:auto;border-radius:var(--radius);border:1px solid var(--border);}
   table{width:100%;border-collapse:collapse;}
   thead th{background:var(--surface);color:var(--muted);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;padding:10px 14px;text-align:right;white-space:nowrap;position:sticky;top:0;}
@@ -1689,6 +1692,14 @@ function millerSg(w,d,l,tw,rho){if(!d||!l||!tw)return null;var lc=l/d,n=tw/d;ret
 function millerMinTwist(w,d,l,rho){if(!d||!l)return null;var lc=l/d;return Math.sqrt((30*w*rho)/(1.5*d*d*d*lc*(1+lc*lc)))*d;}
 function greenhillTwist(d,l,mv){if(!d||!l)return null;return(mv>=2700?180:150)*d*d/l;}
 function stabStatus(Sg){if(Sg===null)return{label:'—',cls:''};if(Sg<1)return{label:'Unstable',cls:'danger'};if(Sg<1.4)return{label:'Marginal',cls:'warn'};if(Sg<2.5)return{label:'Stable',cls:'highlight'};if(Sg<4)return{label:'Over-stabilised',cls:'warn'};return{label:'Excessively fast',cls:'danger'};}
+// Every headline stat-card on the Results page ends in one of these two small tags, so a shooter
+// never has to guess whether a card's number is actually part of what they dial/hold, or is shown
+// purely for context. "Included in hold" = this figure (or a figure it directly produces, like Spin
+// Drift feeding Total Windage) is baked into the dial/hold numbers on the Range Card / Reticle View
+// / HUD. "Reference only" = informational — useful for load development or a sanity check, but
+// never itself added into a hold. Kept as a single shared function so the wording/styling can't
+// drift apart between cards over time.
+function cardTag(included){return '<div class="card-tag '+(included?'card-tag-included':'card-tag-ref')+'">'+(included?'Included in hold':'Reference only')+'</div>';}
 
 // Miller's formula infers stability purely from length/diameter/weight, which assumes a
 // roughly solid, uniform-density projectile. It has no way to "see" that a boat-tail sheds
@@ -2879,9 +2890,9 @@ function renderResults(results,params,stability){
   var shapeLabels={flatbase:'Flat-base',boattail:'Boat-tail',diabolo:'Diabolo'};
   var shapeNote=(stability.shape&&stability.shape!=='flatbase')?(' &middot; '+shapeLabels[stability.shape]+' &times;'+SHAPE_SG_FACTOR[stability.shape].toFixed(2)):'';
   var sgHelp='<span class="help-tip" data-tip="Gyroscopic stability factor from barrel twist rate. Below 1.0 = unstable, may tumble. 1.0-1.5 = marginal. Above 1.5 = stable. A very high number is not necessarily bad, it just means more spin than strictly required." onclick="showHelpTip(this,event)">?</span>';
-  var sgCard=sg===null?'<div class="stat-card"><div class="label">Gyro Stability (Sg)'+sgHelp+'</div><div class="value" style="font-size:14px;color:var(--muted)">Enter dia &amp; len</div></div>':
-    '<div class="stat-card '+sgSt.cls+'"><div class="label">Gyro Stability (Sg)'+sgHelp+'</div><div class="value">'+sg.toFixed(2)+'</div><div class="unit">'+sgSt.label+shapeNote+'</div></div>'+
-    '<div class="stat-card"><div class="label">Min Twist (Sg 1.5)</div><div class="value" style="font-size:16px;">1:'+(stability.minTwist?stability.minTwist.toFixed(1):'?')+'"</div><div class="unit">Miller &middot; GH 1:'+(stability.ghTwist?stability.ghTwist.toFixed(1):'?')+'"</div></div>';
+  var sgCard=sg===null?'<div class="stat-card"><div class="label">Gyro Stability (Sg)'+sgHelp+'</div><div class="value" style="font-size:14px;color:var(--muted)">Enter dia &amp; len</div>'+cardTag(false)+'</div>':
+    '<div class="stat-card '+sgSt.cls+'"><div class="label">Gyro Stability (Sg)'+sgHelp+'</div><div class="value">'+sg.toFixed(2)+'</div><div class="unit">'+sgSt.label+shapeNote+'</div>'+cardTag(false)+'</div>'+
+    '<div class="stat-card"><div class="label">Min Twist (Sg 1.5)</div><div class="value" style="font-size:16px;">1:'+(stability.minTwist?stability.minTwist.toFixed(1):'?')+'"</div><div class="unit">Miller &middot; GH 1:'+(stability.ghTwist?stability.ghTwist.toFixed(1):'?')+'"</div>'+cardTag(false)+'</div>';
 
   var clickSel=clickSizeOptionsHtml();
 
@@ -2937,8 +2948,8 @@ function renderResults(results,params,stability){
   var spinAtMax=met?rL.spinCm+'cm':rL.spinIn+'"';
   var spinDir=params.twistDir===(-1)?'LH ↺':'RH ↻';
   var spinCard=params.Sg!==null&&params.Sg!==undefined?
-    '<div class="stat-card"><div class="label">Spin Drift at '+rLRange+'</div><div class="value" style="font-size:16px;">'+spinAtMax+'</div><div class="unit">'+spinDir+' &middot; Sg '+params.Sg.toFixed(2)+'</div></div>':
-    '<div class="stat-card"><div class="label">Spin Drift</div><div class="value" style="font-size:14px;color:var(--muted);">Enter dia &amp; len</div></div>';
+    '<div class="stat-card"><div class="label">Spin Drift at '+rLRange+'</div><div class="value" style="font-size:16px;">'+spinAtMax+'</div><div class="unit">'+spinDir+' &middot; Sg '+params.Sg.toFixed(2)+'</div>'+cardTag(true)+'</div>':
+    '<div class="stat-card"><div class="label">Spin Drift</div><div class="value" style="font-size:14px;color:var(--muted);">Enter dia &amp; len</div>'+cardTag(true)+'</div>';
   var windSpeedDisp=met?(params.windMph*1.60934).toFixed(1)+'km/h':params.windMph+'mph';
   // Wind at Target indicator: when the optional second wind reading is active, show both the
   // shooter-side and target-side readings on the existing "Wind at <range>" stat card rather than
@@ -3007,16 +3018,16 @@ function renderResults(results,params,stability){
     '<button class="btn btn-secondary" style="width:auto;padding:5px 14px;font-size:12px;" onclick="showReticleView()">'+bulletIcon(12)+' Reticle View</button>'+
     '<button class="btn btn-secondary" style="width:auto;padding:5px 14px;font-size:12px;" onclick="showHud()">&#128225; HUD</button></div></div>'+
     '<div class="stat-cards">'+
-    '<div class="stat-card '+eSt+'"><div class="label">Muzzle Energy</div><div class="value">'+(met?r0.energyJ:muzzE.toFixed(0))+'</div><div class="unit">'+eAtMuzz+(eTag?'<br><strong>'+eTag+'</strong>':'')+'</div>'+(currentMode==='air'?'<div class="energy-bar"><div class="energy-fill" style="width:'+Math.min(100,muzzE)+'%;background:'+(muzzE>100?'var(--red)':muzzE>80?'var(--yellow)':'var(--green)')+'"></div></div>':'')+'</div>'+
-    '<div class="stat-card"><div class="label">Muzzle Velocity</div><div class="value">'+muzzVel+'</div><div class="unit">'+muzzVelSub+'</div></div>'+
-    '<div class="stat-card"><div class="label">Velocity at '+rLRange+'</div><div class="value" style="font-size:16px;">'+velAtMax+'</div></div>'+
-    '<div class="stat-card"><div class="label">Energy at '+rLRange+'</div><div class="value" style="font-size:16px;">'+eAtMax+'</div></div>'+
-    '<div class="stat-card"><div class="label">Drop at '+rLRange+'</div><div class="value" style="font-size:16px;">'+dropAtMax+'</div></div>'+
-    '<div class="stat-card"><div class="label">Wind at '+rLRange+'</div><div class="value" style="font-size:16px;">'+windAtMax+'</div><div class="unit">'+windUnitLine+'</div></div>'+
+    '<div class="stat-card '+eSt+'"><div class="label">Muzzle Energy</div><div class="value">'+(met?r0.energyJ:muzzE.toFixed(0))+'</div><div class="unit">'+eAtMuzz+(eTag?'<br><strong>'+eTag+'</strong>':'')+'</div>'+(currentMode==='air'?'<div class="energy-bar"><div class="energy-fill" style="width:'+Math.min(100,muzzE)+'%;background:'+(muzzE>100?'var(--red)':muzzE>80?'var(--yellow)':'var(--green)')+'"></div></div>':'')+cardTag(false)+'</div>'+
+    '<div class="stat-card"><div class="label">Muzzle Velocity</div><div class="value">'+muzzVel+'</div><div class="unit">'+muzzVelSub+'</div>'+cardTag(false)+'</div>'+
+    '<div class="stat-card"><div class="label">Velocity at '+rLRange+'</div><div class="value" style="font-size:16px;">'+velAtMax+'</div>'+cardTag(false)+'</div>'+
+    '<div class="stat-card"><div class="label">Energy at '+rLRange+'</div><div class="value" style="font-size:16px;">'+eAtMax+'</div>'+cardTag(false)+'</div>'+
+    '<div class="stat-card"><div class="label">Drop at '+rLRange+'</div><div class="value" style="font-size:16px;">'+dropAtMax+'</div>'+cardTag(true)+'</div>'+
+    '<div class="stat-card"><div class="label">Wind at '+rLRange+'</div><div class="value" style="font-size:16px;">'+windAtMax+'</div><div class="unit">'+windUnitLine+'</div>'+cardTag(true)+'</div>'+
     spinCard+
-    (Math.abs(bcMultiplier-1)>0.001?'<div class="stat-card" style="border-color:rgba(224,108,58,.4);"><div class="label" style="color:var(--accent2);">'+bulletIcon(11)+' BC Truing</div><div class="value" style="font-size:16px;color:var(--accent2);">&times;'+bcMultiplier.toFixed(3)+'</div><div class="unit">'+params.baseBc.toFixed(4)+' &rarr; '+params.bc.toFixed(4)+'</div></div>':'')+
-    '<div class="stat-card"><div class="label">Subsonic at</div><div class="value" style="font-size:16px;">'+subTxt+'</div><div class="unit">Sound: '+(met?(speedOfSound(params.tempC)*0.3048).toFixed(0)+' m/s':speedOfSound(params.tempC).toFixed(0)+' fps')+'</div></div>'+
-    '<div class="stat-card"><div class="label">Air Density</div><div class="value" style="font-size:16px;">'+(airDensityRatio(params.altFt,params.tempC,params.humidPct,params.presHPa)*100).toFixed(1)+'%</div><div class="unit">of std atmosphere</div></div>'+
+    (Math.abs(bcMultiplier-1)>0.001?'<div class="stat-card" style="border-color:rgba(224,108,58,.4);"><div class="label" style="color:var(--accent2);">'+bulletIcon(11)+' BC Truing</div><div class="value" style="font-size:16px;color:var(--accent2);">&times;'+bcMultiplier.toFixed(3)+'</div><div class="unit">'+params.baseBc.toFixed(4)+' &rarr; '+params.bc.toFixed(4)+'</div>'+cardTag(false)+'</div>':'')+
+    '<div class="stat-card"><div class="label">Subsonic at</div><div class="value" style="font-size:16px;">'+subTxt+'</div><div class="unit">Sound: '+(met?(speedOfSound(params.tempC)*0.3048).toFixed(0)+' m/s':speedOfSound(params.tempC).toFixed(0)+' fps')+'</div>'+cardTag(false)+'</div>'+
+    '<div class="stat-card"><div class="label">Air Density</div><div class="value" style="font-size:16px;">'+(airDensityRatio(params.altFt,params.tempC,params.humidPct,params.presHPa)*100).toFixed(1)+'%</div><div class="unit">of std atmosphere</div>'+cardTag(false)+'</div>'+
     sgCard+'</div>'+
     '<div style="margin-bottom:20px;"><canvas id="trajCanvas" height="180"></canvas></div>'+
     '<div class="tbl-wrap"><table><thead><tr>'+
