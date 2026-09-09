@@ -537,7 +537,7 @@
           <label>Paste Full Log <span style="font-weight:400;color:var(--muted);">(header, weather line, and all &mdash; only the shot rows are read)</span></label>
           <textarea id="fFxChronoData" rows="6" placeholder="Paste the full exported log here" style="width:100%;font-family:monospace;font-size:12px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:8px;resize:vertical;"></textarea>
         </div>
-        <button type="button" class="btn" style="background:var(--accent2);margin-top:2px;" onclick="parseFxChronoLogUI()">Parse Chronograph Log</button>
+        <button type="button" class="btn" style="background:var(--accent2);margin-top:2px;" onclick="parseFxChronoLogUI()">Read Chronograph Log</button>
         <div id="fxChronoStatus" style="font-size:11px;color:var(--muted);margin-top:6px;min-height:14px;line-height:1.4;"></div>
         <div id="fxChronoTableWrap" style="display:none;margin-top:8px;"></div>
         <div id="fxChronoActions" style="display:none;margin-top:8px;flex-direction:column;gap:6px;">
@@ -3044,7 +3044,7 @@ function parseFxChronoLogUI(){
   tableWrap.innerHTML='<div class="tbl-wrap"><table style="font-size:11px;"><thead><tr><th>Shot</th><th>Velocity</th><th>BC</th></tr></thead><tbody>'+rowsHtml+'</tbody></table></div>'+
     '<div style="font-size:11px;color:var(--muted);margin-top:6px;line-height:1.4;">Average of '+n+' shot'+(n===1?'':'s')+': '+dispVel(avgFps)+' &middot; BC('+dragModel.toUpperCase()+') '+avgBc.toFixed(4)+modelNote+'</div>';
   tableWrap.style.display='';
-  statusEl.innerHTML='Parsed '+n+' shot'+(n===1?'':'s')+countNote;
+  statusEl.innerHTML='Read '+n+' shot'+(n===1?'':'s')+countNote;
   statusEl.style.color='var(--muted)';
 
   document.getElementById('btnFxApplyVelocity').textContent='Apply Avg Velocity ('+dispVel(avgFps)+') to Muzzle Velocity';
