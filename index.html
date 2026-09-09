@@ -521,14 +521,17 @@
       </div>
 
       <!-- FX True Ballistics Chronograph (and similar) shot-log import: a structurally different
-           kind of chronograph data from the Doppler block above — no downrange distance at all, just
-           several independent shots, each carrying the device's OWN already-computed BC estimate
-           (T-BC) alongside its velocity. There's nothing to regress here: the device did that work
-           already, so this just parses and averages several of its independent answers into one more
-           reliable number, the same logic as averaging ordinary chronograph shots into a trustworthy
-           muzzle velocity, just applied to BC too. Kept as its own block rather than folded into the
-           Doppler one above, since the data shape and the math are both genuinely different (no
-           regression, no residual-vs-range table, no distance/velocity unit pickers). -->
+           kind of chronograph EXPORT from the Doppler block above — not necessarily different
+           underlying hardware (the FX unit is itself Doppler-based and does measure velocity at
+           multiple points down range), just a different exported shape: no downrange distance in
+           the log at all, just several independent shots, each carrying the device's OWN
+           already-computed BC estimate (T-BC) alongside its velocity. There's nothing to regress
+           here: the device did that work already, so this just parses and averages several of its
+           independent answers into one more reliable number, the same logic as averaging ordinary
+           chronograph shots into a trustworthy muzzle velocity, just applied to BC too. Kept as its
+           own block rather than folded into the Doppler one above, since the data shape and the
+           math are both genuinely different (no regression, no residual-vs-range table, no
+           distance/velocity unit pickers). -->
       <div style="border-top:1px solid var(--border);margin-top:12px;padding-top:10px;">
         <div class="preset-section-hdr" style="margin-bottom:6px;">
           <div class="section-title" style="font-size:13px;color:var(--accent2);">Import Chronograph Shot Log <span style="background:rgba(224,108,58,.15);border:1px solid rgba(224,108,58,.4);color:var(--accent2);border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:4px;">Advanced</span></div>
@@ -3041,8 +3044,10 @@ function fitBcFromDoppler(){
 }
 
 // ── FX chronograph shot-log import (average velocity + average per-shot BC) ────────────────────
-// Genuinely different data shape from the Doppler block above: no downrange distance at all, just
-// several independent shots, each already carrying the device's OWN computed BC estimate
+// Genuinely different EXPORTED shape from the Doppler block above, not necessarily different
+// hardware — the FX unit is itself Doppler-based and does measure velocity at multiple points
+// down range, but its own shot log doesn't expose that: no downrange distance in the log at all,
+// just several independent shots, each already carrying the device's OWN computed BC estimate
 // ("T-BC(model): value") alongside its velocity. There is nothing to regress — the device already
 // did that calculation — so this only parses and averages several of its independent answers,
 // exactly the same logic as averaging several ordinary chronograph shots into one trustworthy
