@@ -138,6 +138,7 @@
   .compare-tile strong{display:block;font-size:12px;}
   .compare-tile.selected{background:var(--surface2);}
   .compare-tile.disabled{opacity:.35;cursor:default;}
+  .compare-tile.editing{border-color:var(--accent);}
   .compare-tile .slot-badge{position:absolute;top:6px;right:6px;width:16px;height:16px;border-radius:50%;color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;}
   .compare-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:4px;}
   .compare-table th,.compare-table td{padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;}
@@ -812,7 +813,10 @@
     </div>
 
     <div style="margin-top:10px;margin-bottom:6px;">
-      <label style="font-size:12px;color:var(--muted);">Target size (circular-equivalent diameter)</label>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap;">
+        <label style="font-size:12px;color:var(--muted);">Target size (circular-equivalent diameter) <span class="help-tip" data-tip="Every target here — including the app's own built-in sizes — can be edited or deleted with the ⋯ button on its tile. Nothing is fixed; if you change your mind, 'Reset to defaults' below brings back this discipline's original built-in list." onclick="showHelpTip(this,event)">?</span></label>
+        <span class="restore-link" onclick="resetPhTargets()">Reset to defaults</span>
+      </div>
       <div class="compare-preset-grid" id="phTargetChips" style="margin-top:6px;"></div>
       <div class="compare-range-row" style="margin-top:8px;">
         <label class="compare-range-label">Name
@@ -822,8 +826,10 @@
           <input type="number" id="fPhTargetDiam" min="0.1" step="0.1" style="max-width:70px;"/>
           <span id="phTargetDiamUnitLbl">in</span>
         </label>
-        <button type="button" class="btn" style="width:auto;padding:6px 10px;font-size:12px;" onclick="addPhCustomTarget()">+ Add</button>
+        <button type="button" id="phTargetSaveBtn" class="btn" style="width:auto;padding:6px 10px;font-size:12px;" onclick="saveOrUpdatePhTarget()">+ Add</button>
+        <span class="cancel-edit-link" id="phTargetCancelLink" onclick="cancelPhTargetEdit()">cancel</span>
       </div>
+      <div id="phTargetEditStatus" style="font-size:11px;color:var(--muted);margin-top:4px;min-height:14px;line-height:1.4;"></div>
     </div>
 
     <div id="phEmptyState" style="text-align:center;color:var(--muted);padding:40px 10px;font-size:13px;">Enter a distance to target and pick a target size above.</div>
@@ -2850,20 +2856,58 @@ var phGroupUnit='moa',phGroupSizeVal=1.0,phGroupDistanceVal=100;
 // until the shooter picks a range and a target size the first time this page is opened for the
 // current mode.
 var phRangeYd=null,phTargetDiameterIn=null;
+// Which target chip's "..." menu is open, and which one (if any) is currently loaded into the
+// name/diameter form for editing — both indices into the *current mode's* getTargetList() array,
+// so they're reset to null any time that list's shape changes (add/edit/delete/reset) or the mode
+// switches, rather than risking a stale index pointing at the wrong entry after a re-render.
+var phTargetOpenMenuIdx=null,phTargetEditingIdx=null;
 // Built-in target-size defaults per discipline (circular-equivalent diameter, inches) — deliberately
 // different per mode since a "reasonable target" for air rifle field target is a very different size
-// than a centrefire big-game vital zone. Purely a starting point: every one of these can be
-// overridden per-tap, and the shooter can add their own custom sizes (see addPhCustomTarget()),
-// which are user-selectable rather than a fixed list, per explicit design decision.
+// than a centrefire big-game vital zone. Purely a starting point, not a fixed list: every one of
+// these (and anything the shooter adds) can be renamed, resized, or deleted with the "..." button on
+// its own tile — see saveOrUpdatePhTarget()/deletePhTarget() — and this object is consulted again
+// only to seed a mode's list the first time it's used, and by resetPhTargets() to restore it later.
 var TARGET_SIZE_DEFAULTS={
   air:[{name:'FT Kill Zone',diameterIn:1.57},{name:'10-Ring (Air Pistol)',diameterIn:0.51},{name:'3" Gong',diameterIn:3}],
   rf:[{name:'Rimfire Bullseye',diameterIn:2},{name:'Squirrel / Small Game',diameterIn:3},{name:'Prairie Dog',diameterIn:4}],
   cf:[{name:'Steel Plate (8in)',diameterIn:8},{name:'Big-Game Vital Zone',diameterIn:8},{name:'Varmint',diameterIn:2}]
 };
 var TARGET_KEY='ballistics_targets_v1';
-function loadCustomTargets(){var d=safeLS(function(){return JSON.parse(localStorage.getItem(TARGET_KEY));})||{};return{air:d.air||[],cf:d.cf||[],rf:d.rf||[]};}
-function saveCustomTargets(d){safeLS(function(){localStorage.setItem(TARGET_KEY,JSON.stringify(d));});}
-function getOrderedTargets(mode){return(TARGET_SIZE_DEFAULTS[mode]||[]).concat(loadCustomTargets()[mode]||[]);}
+// Pre-edit/delete versions of this app stored only a per-mode list of *custom additions* under
+// TARGET_KEY, always displayed appended after the (fixed, in-code) built-in defaults. Now that
+// every tile — built-in or custom — can be renamed/resized/deleted, there is no longer a separate
+// "custom" list: TARGET_KEY holds the complete, already-ordered list per mode, and
+// TARGET_SIZE_DEFAULTS is only ever a seed/reset source. migrateTargetsIfNeeded() runs once (a
+// dedicated migration-done flag, not just an empty check, since an intentionally emptied mode list
+// must stay empty rather than being silently reseeded) to fold any pre-existing custom entries into
+// that new combined shape, so nobody's already-added custom targets go missing on first load.
+var TARGET_MIGRATED_KEY='ballistics_targets_migrated_v2';
+function loadTargetsRaw(){return safeLS(function(){return JSON.parse(localStorage.getItem(TARGET_KEY));})||{};}
+function saveTargetsRaw(raw){safeLS(function(){localStorage.setItem(TARGET_KEY,JSON.stringify(raw));});}
+function cloneTargetDefaults(mode){return(TARGET_SIZE_DEFAULTS[mode]||[]).map(function(t){return{name:t.name,diameterIn:t.diameterIn};});}
+function migrateTargetsIfNeeded(){
+  if(safeLS(function(){return localStorage.getItem(TARGET_MIGRATED_KEY);}))return;
+  var raw=loadTargetsRaw();
+  ['air','rf','cf'].forEach(function(mode){
+    var oldCustom=Array.isArray(raw[mode])?raw[mode]:[];
+    raw[mode]=cloneTargetDefaults(mode).concat(oldCustom);
+  });
+  saveTargetsRaw(raw);
+  safeLS(function(){localStorage.setItem(TARGET_MIGRATED_KEY,'1');});
+}
+function getTargetList(mode){
+  migrateTargetsIfNeeded();
+  var raw=loadTargetsRaw();
+  return Array.isArray(raw[mode])?raw[mode]:[];
+}
+function saveTargetListForMode(mode,list){var raw=loadTargetsRaw();raw[mode]=list;saveTargetsRaw(raw);}
+function resetPhTargets(){
+  if(!confirm('Reset '+currentMode.toUpperCase()+' target sizes to the built-in defaults? This removes any targets you\'ve added, renamed, resized, or deleted for this discipline.'))return;
+  saveTargetListForMode(currentMode,cloneTargetDefaults(currentMode));
+  phTargetOpenMenuIdx=null;
+  cancelPhTargetEdit(); // clears any in-progress edit and re-renders the chip list
+  renderProbHit();
+}
 function setTwistDir(d){twistDir=d;document.getElementById('btnRH').classList.toggle('active',d===1);document.getElementById('btnLH').classList.toggle('active',d===-1);}
 // Independent of unitDrop (the results-table display toggle, which the shooter can freely flip
 // between mils/MOA/clicks/in/cm after calculating) — Zero Offset needs its own fixed unit at the
@@ -4653,35 +4697,117 @@ function phShooterMoa(){
 }
 
 // Target size — user-selectable rather than a fixed list (explicit design decision), with different
-// built-in defaults per discipline (TARGET_SIZE_DEFAULTS above) plus any custom sizes the shooter
-// adds, persisted per-mode via loadCustomTargets/saveCustomTargets. Deliberately lighter-weight than
-// the main preset system above (no drag-reorder, no hide/restore) — this is a small, flat list.
+// built-in defaults per discipline (TARGET_SIZE_DEFAULTS above) seeding a per-mode list that the
+// shooter can then freely rename, resize, or delete entries from — see getTargetList()/
+// saveOrUpdatePhTarget()/deletePhTarget()/resetPhTargets() above. Deliberately lighter-weight than
+// the main preset system further up this file (no drag-reorder) — this is a small, flat list, and
+// unlike that system there's no separate built-in-vs-custom distinction left to preserve: every
+// tile behaves identically, and "Reset to defaults" is the one way back once a built-in is changed.
+function phEscHtml(s){return String(s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 function renderPhTargetChips(){
   var container=document.getElementById('phTargetChips');
   if(!container)return;
-  var list=getOrderedTargets(currentMode),met=unitSystem==='metric';
-  container.innerHTML=list.map(function(t){
+  var list=getTargetList(currentMode),met=unitSystem==='metric';
+  container.innerHTML='';
+  list.forEach(function(t,idx){
     var selected=phTargetDiameterIn!==null&&Math.abs(phTargetDiameterIn-t.diameterIn)<0.001;
     var disp=met?(t.diameterIn*2.54).toFixed(1)+'cm':t.diameterIn.toFixed(1)+'in';
-    return '<button type="button" class="compare-tile'+(selected?' selected':'')+'" onclick="selectPhTarget('+t.diameterIn+')"><strong>'+t.name+'</strong>'+disp+'</button>';
-  }).join('')||'<p style="color:var(--muted);font-size:12px;">No target sizes yet — add one below.</p>';
+    var tile=document.createElement('button');
+    tile.type='button';
+    tile.className='compare-tile'+(selected?' selected':'')+(phTargetEditingIdx===idx?' editing':'');
+    tile.innerHTML='<strong>'+phEscHtml(t.name)+'</strong>'+disp;
+    tile.onclick=function(){selectPhTarget(t.diameterIn);};
+    var menuBtn=document.createElement('button');
+    menuBtn.type='button';menuBtn.className='preset-menu-toggle';menuBtn.textContent='⋯';menuBtn.title='Edit or delete this target';
+    menuBtn.onclick=function(e){e.stopPropagation();phTargetOpenMenuIdx=(phTargetOpenMenuIdx===idx)?null:idx;renderPhTargetChips();};
+    tile.appendChild(menuBtn);
+    if(phTargetOpenMenuIdx===idx){
+      var menu=document.createElement('div');menu.className='preset-menu';
+      var editRow=document.createElement('button');editRow.textContent='Edit';
+      editRow.onclick=function(e){e.stopPropagation();phTargetOpenMenuIdx=null;startEditPhTarget(idx);};
+      menu.appendChild(editRow);
+      var delRow=document.createElement('button');delRow.className='danger';delRow.textContent='Delete';
+      delRow.onclick=function(e){e.stopPropagation();phTargetOpenMenuIdx=null;deletePhTarget(idx);};
+      menu.appendChild(delRow);
+      tile.appendChild(menu);
+    }
+    container.appendChild(tile);
+  });
+  if(!list.length)container.innerHTML='<p style="color:var(--muted);font-size:12px;">No target sizes yet — add one below.</p>';
   var unitLbl=document.getElementById('phTargetDiamUnitLbl');
   if(unitLbl)unitLbl.textContent=met?'cm':'in';
 }
 function selectPhTarget(diameterIn){phTargetDiameterIn=diameterIn;renderPhTargetChips();renderProbHit();}
-function addPhCustomTarget(){
+// Loads an existing target's name/diameter into the same name/diameter/button row used for adding
+// a new one — the button relabels to "Update" and a "cancel" link appears, mirroring exactly how
+// editing a saved load preset re-purposes that section's own Save row further up this file.
+function startEditPhTarget(idx){
+  var list=getTargetList(currentMode),t=list[idx];
+  if(!t)return;
+  phTargetEditingIdx=idx;
+  document.getElementById('fPhTargetName').value=t.name;
+  document.getElementById('fPhTargetDiam').value=(unitSystem==='metric'?(t.diameterIn*2.54):t.diameterIn).toFixed(1);
+  var btn=document.getElementById('phTargetSaveBtn');if(btn)btn.textContent='✓ Update';
+  var cancelLink=document.getElementById('phTargetCancelLink');if(cancelLink)cancelLink.style.display='';
+  var status=document.getElementById('phTargetEditStatus');if(status)status.textContent='Editing "'+t.name+'" — Save will update it.';
+  renderPhTargetChips();
+}
+function cancelPhTargetEdit(){
+  phTargetEditingIdx=null;
+  var nameEl=document.getElementById('fPhTargetName'),diamEl=document.getElementById('fPhTargetDiam');
+  if(nameEl)nameEl.value='';
+  if(diamEl)diamEl.value='';
+  var btn=document.getElementById('phTargetSaveBtn');if(btn)btn.textContent='+ Add';
+  var cancelLink=document.getElementById('phTargetCancelLink');if(cancelLink)cancelLink.style.display='none';
+  var status=document.getElementById('phTargetEditStatus');if(status)status.textContent='';
+  renderPhTargetChips();
+}
+// Single handler for both the "+ Add" and "✓ Update" states of the name/diameter row — which one
+// applies is entirely tracked by phTargetEditingIdx, exactly like the main preset Save row above
+// distinguishes a fresh save from updating the currently-loaded custom preset.
+function saveOrUpdatePhTarget(){
   var nameEl=document.getElementById('fPhTargetName'),diamEl=document.getElementById('fPhTargetDiam');
   var name=(nameEl.value||'').trim(),diamRaw=parseFloat(diamEl.value)||0;
   if(!name||diamRaw<=0)return;
   var diameterIn=unitSystem==='metric'?diamRaw/2.54:diamRaw;
-  var d=loadCustomTargets();
-  d[currentMode]=d[currentMode]||[];
-  d[currentMode].push({name:name,diameterIn:diameterIn});
-  saveCustomTargets(d);
+  var list=getTargetList(currentMode).slice();
+  if(phTargetEditingIdx!==null&&list[phTargetEditingIdx]){
+    var old=list[phTargetEditingIdx];
+    // If the tile being edited is the one currently driving the calculation, carry the edit
+    // straight into phTargetDiameterIn too — otherwise the page would keep silently showing a
+    // result for the old, now-renamed/resized target instead of the one just saved.
+    var wasSelected=phTargetDiameterIn!==null&&Math.abs(phTargetDiameterIn-old.diameterIn)<0.001;
+    list[phTargetEditingIdx]={name:name,diameterIn:diameterIn};
+    if(wasSelected)phTargetDiameterIn=diameterIn;
+  } else {
+    list.push({name:name,diameterIn:diameterIn});
+    phTargetDiameterIn=diameterIn;
+  }
+  saveTargetListForMode(currentMode,list);
+  phTargetEditingIdx=null;
   nameEl.value='';diamEl.value='';
-  phTargetDiameterIn=diameterIn;
+  var btn=document.getElementById('phTargetSaveBtn');if(btn)btn.textContent='+ Add';
+  var cancelLink=document.getElementById('phTargetCancelLink');if(cancelLink)cancelLink.style.display='none';
+  var status=document.getElementById('phTargetEditStatus');if(status)status.textContent='';
   renderPhTargetChips();
   renderProbHit();
+}
+function deletePhTarget(idx){
+  var list=getTargetList(currentMode),t=list[idx];
+  if(!t)return;
+  if(!confirm('Delete target "'+t.name+'"?'))return;
+  var newList=list.slice();newList.splice(idx,1);
+  saveTargetListForMode(currentMode,newList);
+  // Deliberately does NOT clear phTargetDiameterIn even if the deleted tile was the selected one —
+  // the page keeps showing whatever result it last computed rather than the numbers jumping to
+  // "nothing selected" as a side effect of tidying up an unrelated list, exactly the same
+  // "live, but never surprising" tradeoff already made throughout this app (e.g. clicks/mils
+  // stay whatever they were until something explicitly changes them). No tile will show as
+  // selected afterward, which is the only visible consequence.
+  if(phTargetEditingIdx===idx)cancelPhTargetEdit();
+  else if(phTargetEditingIdx!==null&&phTargetEditingIdx>idx)phTargetEditingIdx--;
+  phTargetOpenMenuIdx=null;
+  renderPhTargetChips();
 }
 
 function onPhRangeChange(){phRangeYd=readPhRangeYd();renderProbHit();}
@@ -4698,10 +4824,11 @@ function showProbHit(){
   document.getElementById('phRangeUnitLbl').textContent=unitSystem==='metric'?'m':'yd';
   if(phRangeYd)document.getElementById('fPhRange').value=unitSystem==='metric'?Math.round(phRangeYd*0.9144):phRangeYd;
   if(phTargetDiameterIn===null){
-    var defaults=TARGET_SIZE_DEFAULTS[currentMode];
-    if(defaults&&defaults.length)phTargetDiameterIn=defaults[0].diameterIn;
+    var list=getTargetList(currentMode);
+    if(list.length)phTargetDiameterIn=list[0].diameterIn;
   }
-  renderPhTargetChips();
+  phTargetOpenMenuIdx=null;
+  cancelPhTargetEdit(); // resets any stale in-progress edit from a previous visit and re-renders
   renderProbHit();
   document.getElementById('phModal').style.display='block';
 }
