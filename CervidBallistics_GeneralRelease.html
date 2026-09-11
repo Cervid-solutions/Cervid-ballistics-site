@@ -772,11 +772,23 @@
     </div>
 
     <div style="margin-top:10px;">
-      <label style="font-size:12px;color:var(--muted);">Shooter proficiency (your own dispersion, applies to every load)</label>
-      <div class="compare-range-row" style="margin-top:4px;margin-bottom:14px;">
+      <label style="font-size:12px;color:var(--muted);">Shooter proficiency (your own dispersion, applies to every load) <span class="help-tip" data-tip="Your own dispersion, independent of the rifle, wind, or load — a global setting shared by every rifle, not tied to any one preset. Enter it directly in mils/MOA, or as a linear group size (inches/cm) measured at a stated distance — the app converts it to an angle for you." onclick="showHelpTip(this,event)">?</span></label>
+      <div class="unit-toggle" style="margin-top:4px;">
+        <button id="btnPhShooterUnitMils" onclick="setPhShooterUnit('mils')">mils</button>
+        <button id="btnPhShooterUnitMoa" onclick="setPhShooterUnit('moa')">MOA</button>
+        <button id="btnPhShooterUnitIn" onclick="setPhShooterUnit('in')">inches</button>
+        <button id="btnPhShooterUnitCm" onclick="setPhShooterUnit('cm')">cm</button>
+      </div>
+      <div class="compare-range-row" style="margin-top:6px;margin-bottom:4px;">
         <label class="compare-range-label">Proficiency
-          <input type="number" id="fPhShooterMoa" min="0" step="0.05" oninput="onPhShooterMoaChange()"/>
-          <span>MOA</span>
+          <input type="number" id="fPhShooterVal" min="0" step="0.05" oninput="onPhShooterChange()"/>
+          <span id="phShooterUnitLbl">MOA</span>
+        </label>
+      </div>
+      <div class="compare-range-row" id="phShooterDistanceRow" style="margin-bottom:14px;display:none;">
+        <label class="compare-range-label">Measured at
+          <input type="number" id="fPhShooterDistance" min="1" step="1" oninput="onPhShooterChange()"/>
+          <span id="phShooterDistanceUnitLbl">yd</span>
         </label>
       </div>
     </div>
@@ -2898,8 +2910,11 @@ var phWindUncertaintyMph=3,phVelocitySdFps=10,phVelocitySdSource='manual';
 // Shooter proficiency is a GLOBAL setting — it describes the shooter, not any one rifle/load, so
 // (per explicit design decision) it is never tied to a preset and can be changed at any time
 // regardless of what's loaded. Persisted via savePrefs/loadPrefs exactly like unitSystem/currentMode
-// (see the startup restore block near the end of this file).
-var phShooterProficiencyMoa=1.0;
+// (see the startup restore block near the end of this file). Given the exact same mils/MOA/inches/cm
+// entry options as rifle mechanical precision below (same groupSizeToMoa() conversion, same
+// measured-at-a-distance handling for the two linear units) — the only difference is that these
+// three are never saved into a preset, since they describe the shooter rather than any one rifle.
+var phShooterUnit='moa',phShooterSizeVal=1.0,phShooterDistanceVal=100;
 // Rifle mechanical precision (group size), by contrast, IS a property of a specific rifle+ammo
 // combination, so it's saved per-preset (see buildPresetEntryFromForm/loadPreset below) rather than
 // globally. Mirrors Trajectory Truing's own trueUnit/setTrueUnit angular-unit-toggle pattern, plus
@@ -2917,7 +2932,7 @@ var phRangeYd=null,phTargetDiameterIn=null;
 // overridden per-tap, and the shooter can add their own custom sizes (see addPhCustomTarget()),
 // which are user-selectable rather than a fixed list, per explicit design decision.
 var TARGET_SIZE_DEFAULTS={
-  air:[{name:'FT Kill Zone',diameterIn:1.57},{name:'10-Ring (Air Pistol)',diameterIn:0.51},{name:'Squirrel-size',diameterIn:3}],
+  air:[{name:'FT Kill Zone',diameterIn:1.57},{name:'10-Ring (Air Pistol)',diameterIn:0.51},{name:'3" Gong',diameterIn:3}],
   rf:[{name:'Rimfire Bullseye',diameterIn:2},{name:'Squirrel / Small Game',diameterIn:3},{name:'Prairie Dog',diameterIn:4}],
   cf:[{name:'Steel Plate (8in)',diameterIn:8},{name:'Big-Game Vital Zone',diameterIn:8},{name:'Varmint',diameterIn:2}]
 };
@@ -4652,15 +4667,6 @@ function onPhVelocitySdChange(){
   renderProbHit();
 }
 
-// Shooter proficiency — a GLOBAL setting per explicit design decision (describes the shooter, not
-// any one rifle/load), persisted via savePrefs/loadPrefs exactly like unitSystem/currentMode.
-function onPhShooterMoaChange(){
-  var el=document.getElementById('fPhShooterMoa');
-  phShooterProficiencyMoa=Math.max(0,parseFloat(el.value)||0);
-  savePrefs({shooterMoa:phShooterProficiencyMoa});
-  renderProbHit();
-}
-
 // Rifle mechanical precision (group size) — saved per-preset (see buildPresetEntryFromForm/
 // loadPreset), unlike shooter proficiency above. Mirrors Trajectory Truing's trueUnit/setTrueUnit
 // toggle pattern for the angular-vs-linear unit buttons themselves.
@@ -4671,6 +4677,10 @@ function setPhGroupUnit(u){
   if(lbl)lbl.textContent=u==='mils'?'mils':u==='moa'?'MOA':u;
   var distRow=document.getElementById('phGroupDistanceRow');
   if(distRow)distRow.style.display=(u==='in'||u==='cm')?'':'none';
+  // Switching the unit alone (before touching the value) changes the interpreted angle just as much
+  // as editing the number does — e.g. "1.0" means something very different as MOA vs. mils — so this
+  // needs the same live recompute onGroupChange() already triggers, not just a UI-label update.
+  renderProbHit();
 }
 function readPhGroupDistanceYd(){
   var el=document.getElementById('fPhGroupDistance');
@@ -4691,6 +4701,49 @@ function refreshPhGroupFields(){
   var distEl=document.getElementById('fPhGroupDistance'),distLbl=document.getElementById('phGroupDistanceUnitLbl');
   if(distEl)distEl.value=phGroupDistanceVal;
   if(distLbl)distLbl.textContent=unitSystem==='metric'?'m':'yd';
+}
+
+// Shooter proficiency — identical entry mechanism to rifle mechanical precision above (same
+// mils/MOA/inches/cm toggle, same groupSizeToMoa() conversion for the two linear units), the only
+// difference being these three fields are a GLOBAL setting: never captured by
+// buildPresetEntryFromForm/loadPreset, and instead persisted directly via savePrefs/loadPrefs here,
+// exactly like unitSystem/currentMode.
+function setPhShooterUnit(u){
+  phShooterUnit=u;
+  ['Mils','Moa','In','Cm'].forEach(function(k){var el=document.getElementById('btnPhShooterUnit'+k);if(el)el.classList.toggle('active',u===k.toLowerCase());});
+  var lbl=document.getElementById('phShooterUnitLbl');
+  if(lbl)lbl.textContent=u==='mils'?'mils':u==='moa'?'MOA':u;
+  var distRow=document.getElementById('phShooterDistanceRow');
+  if(distRow)distRow.style.display=(u==='in'||u==='cm')?'':'none';
+  savePrefs({shooterUnit:phShooterUnit});
+  renderProbHit();
+}
+function readPhShooterDistanceYd(){
+  var el=document.getElementById('fPhShooterDistance');
+  var raw=el?(parseFloat(el.value)||0):phShooterDistanceVal;
+  if(raw<=0)return 0;
+  return unitSystem==='metric'?Math.round(raw/0.9144):Math.round(raw);
+}
+function onPhShooterChange(){
+  phShooterSizeVal=parseFloat(document.getElementById('fPhShooterVal').value)||0;
+  var distEl=document.getElementById('fPhShooterDistance');
+  if(distEl)phShooterDistanceVal=parseFloat(distEl.value)||phShooterDistanceVal;
+  savePrefs({shooterSizeVal:phShooterSizeVal,shooterDistanceVal:phShooterDistanceVal});
+  renderProbHit();
+}
+function refreshPhShooterFields(){
+  setPhShooterUnit(phShooterUnit);
+  var valEl=document.getElementById('fPhShooterVal');
+  if(valEl)valEl.value=phShooterSizeVal;
+  var distEl=document.getElementById('fPhShooterDistance'),distLbl=document.getElementById('phShooterDistanceUnitLbl');
+  if(distEl)distEl.value=phShooterDistanceVal;
+  if(distLbl)distLbl.textContent=unitSystem==='metric'?'m':'yd';
+}
+// Resolves the shooter's currently-entered proficiency to a canonical MOA figure, on demand — same
+// "read current state, don't cache a derived value" approach phGroupUnit/phGroupSizeVal already use,
+// so a mid-session unit or value change is always reflected exactly, never a stale conversion.
+function phShooterMoa(){
+  return groupSizeToMoa(phShooterSizeVal,phShooterUnit,(phShooterUnit==='in'||phShooterUnit==='cm')?readPhShooterDistanceYd():0);
 }
 
 // Target size — user-selectable rather than a fixed list (explicit design decision), with different
@@ -4734,7 +4787,7 @@ function showProbHit(){
   updatePhVelocitySuggestion();
   writePhWindUncMph(phWindUncertaintyMph);
   writePhVelocitySdFps(phVelocitySdFps);
-  document.getElementById('fPhShooterMoa').value=phShooterProficiencyMoa;
+  refreshPhShooterFields();
   refreshPhGroupFields();
   document.getElementById('phRangeUnitLbl').textContent=unitSystem==='metric'?'m':'yd';
   if(phRangeYd)document.getElementById('fPhRange').value=unitSystem==='metric'?Math.round(phRangeYd*0.9144):phRangeYd;
@@ -4859,7 +4912,7 @@ function renderProbHit(){
 
   var rifleMoa=groupSizeToMoa(phGroupSizeVal,phGroupUnit,(phGroupUnit==='in'||phGroupUnit==='cm')?readPhGroupDistanceYd():0);
   var rifleIn=moaToInchesAtRange(rifleMoa,targetYd);
-  var shooterIn=moaToInchesAtRange(phShooterProficiencyMoa,targetYd);
+  var shooterIn=moaToInchesAtRange(phShooterMoa(),targetYd);
 
   var sigmaElevIn=Math.sqrt(velSens.elevIn*velSens.elevIn+windSens.elevIn*windSens.elevIn+rifleIn*rifleIn+shooterIn*shooterIn);
   var sigmaWindIn=Math.sqrt(velSens.windIn*velSens.windIn+windSens.windIn*windSens.windIn+rifleIn*rifleIn+shooterIn*shooterIn);
@@ -5326,7 +5379,15 @@ if(_prefs.mode==='cf')setMode('cf');else if(_prefs.mode==='rf')setMode('rf');
 else{document.getElementById('fDrag').value='ga';lastDragModel='ga';syncBcPrimaryLabel();} // air
 // is the default mode and isn't routed through setMode() here, so mirror its GA default by hand.
 // Shooter proficiency (Probability of Hit) is a global setting, restored the same way as unit/mode.
-if(_prefs.shooterMoa!==undefined&&_prefs.shooterMoa!==null&&!isNaN(parseFloat(_prefs.shooterMoa)))phShooterProficiencyMoa=parseFloat(_prefs.shooterMoa);
+if(_prefs.shooterUnit==='mils'||_prefs.shooterUnit==='moa'||_prefs.shooterUnit==='in'||_prefs.shooterUnit==='cm')phShooterUnit=_prefs.shooterUnit;
+if(_prefs.shooterSizeVal!==undefined&&_prefs.shooterSizeVal!==null&&!isNaN(parseFloat(_prefs.shooterSizeVal)))phShooterSizeVal=parseFloat(_prefs.shooterSizeVal);
+else if(_prefs.shooterMoa!==undefined&&_prefs.shooterMoa!==null&&!isNaN(parseFloat(_prefs.shooterMoa))){
+  // Migration from the pre-unit-toggle version of this setting, which only ever stored a bare MOA
+  // number under 'shooterMoa' — carry that forward as-is under the new 'moa' unit rather than
+  // discarding a shooter's already-configured proficiency the first time they open this update.
+  phShooterUnit='moa';phShooterSizeVal=parseFloat(_prefs.shooterMoa);
+}
+if(_prefs.shooterDistanceVal!==undefined&&_prefs.shooterDistanceVal!==null&&!isNaN(parseFloat(_prefs.shooterDistanceVal)))phShooterDistanceVal=parseFloat(_prefs.shooterDistanceVal);
 updateSortModeLink();
 updateSimpleModeUI();
 renderPresets();
