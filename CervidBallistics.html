@@ -3596,10 +3596,16 @@ function calculate(){
     lastResults={results:results,params:params,stability:stability,chartResults:chartResults};
     // A fresh calculation is the Reticle View's wind/velocity overrides' natural "start over"
     // boundary — same role clearing the selection back to empty plays for Compare's own latch.
+    // Probability of Hit's own phWindCustomized/phVelocityCustomized are reset here too, for the
+    // same reason and despite their own comment already claiming this "mirrors HUD's own pattern
+    // exactly" — that mirroring was incomplete until now, since these two were never actually
+    // included in this reset block.
     reticleWindCustomized=false;
     reticleVelocityCustomized=false;
     hudWindCustomized=false;
     hudVelocityCustomized=false;
+    phWindCustomized=false;
+    phVelocityCustomized=false;
     renderResults(results,params,stability);
     if(window.innerWidth<=900)setMobileTab('results');
   }catch(err){
@@ -5387,6 +5393,16 @@ function fetchWeather(){
       // Latitude for Coriolis
       document.getElementById('fLat').value=lat.toFixed(2);
 
+      // A live weather fetch is itself an explicit shooter action (they tapped the button), so —
+      // unlike an ordinary field edit — it's treated as its own trigger for a fresh Calculate(),
+      // exactly like resetTruing()/resetWindTarget()/applyFxChronoVelocity() already do with the
+      // same if(lastResults)calculate() guard: only recompute if a load has already been calculated
+      // at least once this session (nothing to usefully recompute before that), never on first load.
+      // Without this, HUD/Reticle View/Probability of Hit would keep showing whatever wind was
+      // frozen in lastResults.params from before the fetch, since they deliberately read from that
+      // snapshot rather than the live fWind/fWindDir fields (see updateHudWindSuggestion() etc.).
+      if(lastResults){calculate();refreshOpenAdvancedPagesAfterCalc();}
+
       var now=new Date();
       statusEl.textContent='✓ Live data · '+now.toLocaleTimeString()+' · '+lat.toFixed(2)+'°, '+lon.toFixed(2)+'°';
       statusEl.style.color='var(--green)';
@@ -5403,6 +5419,24 @@ function fetchWeather(){
     statusEl.style.color='var(--red)';
     btn.disabled=false;btn.textContent='🌍 Live Weather';
   },{enableHighAccuracy:false,timeout:12000,maximumAge:60000});
+}
+// calculate() only ever touches the Results page (renderResults()) — it has no idea HUD, Reticle
+// View, or Probability of Hit even exist, let alone whether one of them happens to already be open.
+// That's fine for an ordinary "edit a field, press Calculate" flow, since a shooter already looking
+// at the Results page doesn't need those other pages refreshed until they explicitly open one (at
+// which point showHud()/showReticleView()/showProbHit() already call their own update*Suggestion()
+// + render*() pair). But a Calculate() triggered indirectly — currently only by fetchWeather()'s own
+// auto-recalculate above — could fire while a shooter is already looking at one of those pages, and
+// without this, that page would keep showing numbers computed from the stale pre-fetch wind even
+// though lastResults has already moved on. Checked via the same style.display!=='none' pattern
+// phVelocitySdSource's own setter already uses for exactly this "is this modal currently up" check.
+function refreshOpenAdvancedPagesAfterCalc(){
+  var hudEl=document.getElementById('hudModal');
+  if(hudEl&&hudEl.style.display!=='none'){updateHudWindSuggestion();updateHudVelocitySuggestion();renderHud();}
+  var reticleEl=document.getElementById('reticleModal');
+  if(reticleEl&&reticleEl.style.display!=='none'){updateReticleWindSuggestion();updateReticleVelocitySuggestion();renderReticleView();}
+  var phEl=document.getElementById('phModal');
+  if(phEl&&phEl.style.display!=='none'){updatePhWindSuggestion();updatePhVelocitySuggestion();renderProbHit();}
 }
 
 // Restore last-used mode/unit system, if any were saved, before the first render.
