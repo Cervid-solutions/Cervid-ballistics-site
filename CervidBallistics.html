@@ -543,6 +543,7 @@
         <div id="fxChronoActions" style="display:none;margin-top:8px;flex-direction:column;gap:6px;">
           <button type="button" class="btn" style="width:auto;background:var(--accent);" onclick="applyFxChronoVelocity()" id="btnFxApplyVelocity"></button>
           <button type="button" class="btn btn-secondary" style="width:auto;" onclick="applyFxChronoBc()" id="btnFxApplyBc"></button>
+          <button type="button" class="btn btn-secondary" style="width:auto;" onclick="applyFxChronoSd()" id="btnFxApplySd"></button>
         </div>
       </div>
     </div>
@@ -707,6 +708,124 @@
         </div>
       </div>
       <div class="tbl-wrap"><table class="compare-table" id="hudStatTable"><tbody></tbody></table></div>
+    </div>
+  </div>
+</div>
+<div id="phModal" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:10000;overflow:auto;">
+  <div style="max-width:440px;margin:0 auto;padding:20px 18px 60px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:10px;">
+      <div>
+        <h2 style="margin:0;font-size:19px;">Probability of Hit <span style="background:rgba(224,108,58,.15);border:1px solid rgba(224,108,58,.4);color:var(--accent2);border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:2px;vertical-align:2px;">Advanced</span></h2>
+        <div id="phSubtitle" style="color:var(--muted);font-size:12px;margin-top:2px;"></div>
+      </div>
+      <button onclick="hideProbHit()" style="background:var(--accent2);color:#fff;border:none;border-radius:6px;padding:8px 14px;font-weight:700;cursor:pointer;touch-action:manipulation;flex-shrink:0;">Close</button>
+    </div>
+
+    <div class="compare-range-row" style="margin-bottom:4px;">
+      <label class="compare-range-label">Distance to target
+        <input type="number" id="fPhRange" min="1" step="1" oninput="onPhRangeChange()" placeholder="e.g. 437"/>
+        <span id="phRangeUnitLbl">yd</span>
+      </label>
+    </div>
+
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:14px;">
+      <label style="font-size:12px;color:var(--muted);margin:0;">Wind (optional &mdash; overrides today's calculated wind for this page)</label>
+      <a href="#" onclick="resetPhWind();return false;" class="link-btn">Reset</a>
+    </div>
+    <div class="compare-wind-row" style="margin-top:4px;margin-bottom:6px;">
+      <div class="wind-dial" id="phWindDial" role="slider" aria-label="Wind direction override for Probability of Hit" tabindex="0"></div>
+      <label class="compare-range-label">Wind
+        <input type="number" id="fPhWind" min="0" step="1" oninput="onPhWindSpeedChange()"/>
+        <span id="phWindUnitLbl">mph</span>
+      </label>
+      <span class="compare-wind-readout" id="phWindReadout"></span>
+    </div>
+    <div class="compare-range-row" style="margin-top:4px;margin-bottom:14px;">
+      <label class="compare-range-label">Wind call uncertainty <span class="help-tip" data-tip="How confident you are in the wind reading above — a bigger number here means a wider probability-of-hit spread from wind alone. This is separate from the wind speed itself." onclick="showHelpTip(this,event)">?</span>
+        <input type="number" id="fPhWindUnc" min="0" step="0.5" oninput="onPhWindUncChange()"/>
+        <span id="phWindUncUnitLbl">mph</span>
+      </label>
+    </div>
+
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:10px;">
+      <label style="font-size:12px;color:var(--muted);margin:0;">Velocity (optional &mdash; overrides today's calculated velocity for this page)</label>
+      <a href="#" onclick="resetPhVelocity();return false;" class="link-btn">Reset</a>
+    </div>
+    <div class="compare-range-row" style="margin-top:4px;margin-bottom:6px;">
+      <label class="compare-range-label">Velocity
+        <button type="button" onclick="stepPhVelocity(-1)" style="width:26px;height:26px;flex:none;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:16px;line-height:1;cursor:pointer;touch-action:manipulation;">&minus;</button>
+        <input type="number" id="fPhVelocity" min="1" step="1" oninput="onPhVelocityChange()" style="text-align:center;"/>
+        <button type="button" onclick="stepPhVelocity(1)" style="width:26px;height:26px;flex:none;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:16px;line-height:1;cursor:pointer;touch-action:manipulation;">+</button>
+        <span id="phVelocityUnitLbl">fps</span>
+      </label>
+    </div>
+    <div class="compare-range-row" style="margin-top:4px;margin-bottom:14px;">
+      <label class="compare-range-label">Velocity SD (shot-to-shot) <span class="help-tip" data-tip="How much muzzle velocity varies shot-to-shot for this load. Starts as a rough manual estimate; once you read a chronograph log with 2 or more shots on the Trajectory Truing tab and apply it here, this switches to a measured figure from that log." onclick="showHelpTip(this,event)">?</span>
+        <input type="number" id="fPhVelocitySd" min="0" step="1" oninput="onPhVelocitySdChange()"/>
+        <span id="phVelocitySdUnitLbl">fps</span>
+      </label>
+      <div style="font-size:10px;color:var(--muted);margin-top:2px;" id="phVelocitySdSourceLbl"></div>
+    </div>
+
+    <div style="margin-top:10px;">
+      <label style="font-size:12px;color:var(--muted);">Shooter proficiency (your own dispersion, applies to every load)</label>
+      <div class="compare-range-row" style="margin-top:4px;margin-bottom:14px;">
+        <label class="compare-range-label">Proficiency
+          <input type="number" id="fPhShooterMoa" min="0" step="0.05" oninput="onPhShooterMoaChange()"/>
+          <span>MOA</span>
+        </label>
+      </div>
+    </div>
+
+    <div style="margin-top:10px;">
+      <label style="font-size:12px;color:var(--muted);">Rifle mechanical precision (group size, saved with this load) <span class="help-tip" data-tip="This rifle+ammo combination's own group size, independent of you and the wind. Enter it directly in mils/MOA, or as a linear group size (inches/cm) measured at a stated distance — the app converts it to an angle for you." onclick="showHelpTip(this,event)">?</span></label>
+      <div class="unit-toggle" style="margin-top:4px;">
+        <button id="btnPhGroupUnitMils" onclick="setPhGroupUnit('mils')">mils</button>
+        <button id="btnPhGroupUnitMoa" onclick="setPhGroupUnit('moa')">MOA</button>
+        <button id="btnPhGroupUnitIn" onclick="setPhGroupUnit('in')">inches</button>
+        <button id="btnPhGroupUnitCm" onclick="setPhGroupUnit('cm')">cm</button>
+      </div>
+      <div class="compare-range-row" style="margin-top:6px;margin-bottom:4px;">
+        <label class="compare-range-label">Group size
+          <input type="number" id="fPhGroupVal" min="0" step="0.05" oninput="onPhGroupChange()"/>
+          <span id="phGroupUnitLbl">MOA</span>
+        </label>
+      </div>
+      <div class="compare-range-row" id="phGroupDistanceRow" style="margin-bottom:14px;display:none;">
+        <label class="compare-range-label">Measured at
+          <input type="number" id="fPhGroupDistance" min="1" step="1" oninput="onPhGroupChange()"/>
+          <span id="phGroupDistanceUnitLbl">yd</span>
+        </label>
+      </div>
+    </div>
+
+    <div style="margin-top:10px;margin-bottom:6px;">
+      <label style="font-size:12px;color:var(--muted);">Target size (circular-equivalent diameter)</label>
+      <div class="compare-preset-grid" id="phTargetChips" style="margin-top:6px;"></div>
+      <div class="compare-range-row" style="margin-top:8px;">
+        <label class="compare-range-label">Name
+          <input type="text" id="fPhTargetName" placeholder="e.g. My steel plate" style="flex:1;"/>
+        </label>
+        <label class="compare-range-label">Diameter
+          <input type="number" id="fPhTargetDiam" min="0.1" step="0.1" style="max-width:70px;"/>
+          <span id="phTargetDiamUnitLbl">in</span>
+        </label>
+        <button type="button" class="btn" style="width:auto;padding:6px 10px;font-size:12px;" onclick="addPhCustomTarget()">+ Add</button>
+      </div>
+    </div>
+
+    <div id="phEmptyState" style="text-align:center;color:var(--muted);padding:40px 10px;font-size:13px;">Enter a distance to target and pick a target size above.</div>
+    <div id="phSolution" style="display:none;">
+      <div class="hud-hero-row">
+        <div class="hud-hero" style="flex:1;">
+          <div class="hud-hero-label">Probability of Hit</div>
+          <div class="hud-hero-value" id="phHitProbValue">&mdash;</div>
+          <div class="hud-hero-unit">at selected target size &amp; range</div>
+        </div>
+      </div>
+      <div id="phBiggestContributor" style="font-size:12px;color:var(--muted);margin:8px 0;text-align:center;"></div>
+      <div class="tbl-wrap"><table class="compare-table" id="phBudgetTable"><thead><tr><th>Error source</th><th>Elevation</th><th>Windage</th></tr></thead><tbody></tbody></table></div>
+      <div style="font-size:10px;color:var(--muted);margin-top:10px;line-height:1.4;">Assumes a circular target and treats group size / shooter proficiency as one-sigma dispersion figures. Range-estimation error and atmospheric uncertainty aren't modelled yet. This is a planning estimate, not a guarantee.</div>
     </div>
   </div>
 </div>
@@ -1427,6 +1546,15 @@ function buildPresetEntryFromForm(name,priorEntry){
     entry.len=parseFloat(document.getElementById('fLen').value)||0;
     entry.twist=parseFloat(document.getElementById('fTwist').value)||0;
   }
+  // Rifle mechanical precision (group size) for the Probability of Hit page — a property of this
+  // specific rifle+ammo combination, saved per-preset like BC/weight above. Read from the live
+  // in-memory phGroup* state rather than a DOM field, since there's no dedicated Inputs-tab control
+  // for this (it's edited from the Probability of Hit page itself, which may not even be open when
+  // Save/Update is pressed) — same "read current state, not necessarily a visible field" approach
+  // bcMultiplier's own truing layer already uses.
+  entry.groupUnit=phGroupUnit;
+  entry.groupSizeVal=phGroupSizeVal;
+  if(phGroupUnit==='in'||phGroupUnit==='cm')entry.groupDistanceVal=phGroupDistanceVal;
   return entry;
 }
 function saveCurrentAsPreset(){
@@ -1726,6 +1854,17 @@ function loadPreset(p,ref){
   }
   if(p.dia)document.getElementById('fDia').value=met?(p.dia*25.4).toFixed(2):p.dia;
   if(p.len)document.getElementById('fLen').value=met?(p.len*25.4).toFixed(2):p.len;
+  // Rifle mechanical precision (group size) — this preset's own saved figure if it has one, or a
+  // sensible untried default (1 MOA) otherwise. Never carried over from whatever preset was loaded
+  // immediately before this one, same "definite, preset-specific state on every load" rule Zero
+  // Offset follows above.
+  if(p.groupSizeVal!==undefined){
+    phGroupUnit=p.groupUnit||'moa';phGroupSizeVal=p.groupSizeVal;phGroupDistanceVal=p.groupDistanceVal||100;
+  } else {
+    phGroupUnit='moa';phGroupSizeVal=1.0;phGroupDistanceVal=met?90:100;
+  }
+  var phModalEl=document.getElementById('phModal');
+  if(phModalEl&&phModalEl.style.display!=='none')refreshPhGroupFields();
   clearTruingState(); // a new load starts untrued — truing from a previous load must not carry over
   calculate();
 }
@@ -2663,6 +2802,49 @@ function computeTrajectory(p,dense){
 
 // ── Calculate ───────────────────────────────────────────────────────────────
 var lastResults=null,unitDrop='mils',clickSizeMoa=0.25,twistDir=1,bcMultiplier=1.0,trueUnit='mils',zeroOffsetUnit='mils',zeroOffsetWindageUnit='mils';
+// ── Probability of Hit state ─────────────────────────────────────────────────
+// Wind/velocity overrides mirror HUD's own pattern exactly (phWindCustomized/phVelocityCustomized,
+// auto-suggesting from lastResults.params until the shooter deliberately overrides them here) — see
+// hudWindCustomized/hudVelocityCustomized above for the full reasoning, which applies unchanged.
+var phWindCustomized=false,phWindClockVal=3,phVelocityCustomized=false;
+// Wind-call uncertainty and velocity SD are new figures this page introduces — how confident the
+// shooter is in the wind reading above, and this load's own round-to-round muzzle velocity spread.
+// Neither can be legitimately derived from anything else already in the app (there's no formula
+// linking BC/weight/velocity/drag model to an empirical SD), so velocity SD starts as a rough
+// manual placeholder and is only ever replaced by a real figure once a chronograph log is read and
+// applied (see applyFxChronoSd() near the FX import code) — same manual-vs-measured honesty
+// distinction as the BC-estimated flag and Aero Jump's N/A case elsewhere in this app.
+var phWindUncertaintyMph=3,phVelocitySdFps=10,phVelocitySdSource='manual';
+// Shooter proficiency is a GLOBAL setting — it describes the shooter, not any one rifle/load, so
+// (per explicit design decision) it is never tied to a preset and can be changed at any time
+// regardless of what's loaded. Persisted via savePrefs/loadPrefs exactly like unitSystem/currentMode
+// (see the startup restore block near the end of this file).
+var phShooterProficiencyMoa=1.0;
+// Rifle mechanical precision (group size), by contrast, IS a property of a specific rifle+ammo
+// combination, so it's saved per-preset (see buildPresetEntryFromForm/loadPreset below) rather than
+// globally. Mirrors Trajectory Truing's own trueUnit/setTrueUnit angular-unit-toggle pattern, plus
+// two extra states ('in'/'cm') for a genuine linear group measured at a real, stated distance —
+// see groupSizeToMoa() for why those two need their own conversion helper instead of reusing
+// zeroOffsetToMils() (which only ever handles already-angular values).
+var phGroupUnit='moa',phGroupSizeVal=1.0,phGroupDistanceVal=100;
+// Selected evaluation range and target diameter — both start unset (no sensible universal default)
+// until the shooter picks a range and a target size the first time this page is opened for the
+// current mode.
+var phRangeYd=null,phTargetDiameterIn=null;
+// Built-in target-size defaults per discipline (circular-equivalent diameter, inches) — deliberately
+// different per mode since a "reasonable target" for air rifle field target is a very different size
+// than a centrefire big-game vital zone. Purely a starting point: every one of these can be
+// overridden per-tap, and the shooter can add their own custom sizes (see addPhCustomTarget()),
+// which are user-selectable rather than a fixed list, per explicit design decision.
+var TARGET_SIZE_DEFAULTS={
+  air:[{name:'FT Kill Zone',diameterIn:1.57},{name:'10-Ring (Air Pistol)',diameterIn:0.51},{name:'Squirrel-size',diameterIn:3}],
+  rf:[{name:'Rimfire Bullseye',diameterIn:2},{name:'Squirrel / Small Game',diameterIn:3},{name:'Prairie Dog',diameterIn:4}],
+  cf:[{name:'Steel Plate (8in)',diameterIn:8},{name:'Big-Game Vital Zone',diameterIn:8},{name:'Varmint',diameterIn:2}]
+};
+var TARGET_KEY='ballistics_targets_v1';
+function loadCustomTargets(){var d=safeLS(function(){return JSON.parse(localStorage.getItem(TARGET_KEY));})||{};return{air:d.air||[],cf:d.cf||[],rf:d.rf||[]};}
+function saveCustomTargets(d){safeLS(function(){localStorage.setItem(TARGET_KEY,JSON.stringify(d));});}
+function getOrderedTargets(mode){return(TARGET_SIZE_DEFAULTS[mode]||[]).concat(loadCustomTargets()[mode]||[]);}
 function setTwistDir(d){twistDir=d;document.getElementById('btnRH').classList.toggle('active',d===1);document.getElementById('btnLH').classList.toggle('active',d===-1);}
 // Independent of unitDrop (the results-table display toggle, which the shooter can freely flip
 // between mils/MOA/clicks/in/cm after calculating) — Zero Offset needs its own fixed unit at the
@@ -2694,6 +2876,52 @@ function zeroOffsetToMils(raw,unit){
   if(unit==='moa')return raw*(1.0472/3.6);
   if(unit==='clicks')return raw*clickSizeMoa*(1.0472/3.6);
   return raw;
+}
+// Converts a rifle group-size measurement into a canonical MOA angular figure, for Probability of
+// Hit's rifle-precision input. Unlike zeroOffsetToMils above, 'in'/'cm' here are genuine LINEAR
+// measurements taken at a real, stated distance (a group fired on paper, or a spotter's reticle
+// subtension) rather than a pre-converted angular click count — so this needs the distance too.
+// Uses the same MOA = inches/(yards*0.010472) relationship computeTrajectory()'s own moa/mils
+// fields are built from (see the r.xYd>0?... lines there), just solved for a standalone measurement
+// instead of a trajectory row. distanceYd is expected already resolved to yards by the caller
+// (readPhGroupDistanceYd() below handles the metric conversion).
+function groupSizeToMoa(raw,unit,distanceYd){
+  if(!raw||raw<=0)return 0;
+  if(unit==='mils')return raw*(3.6/1.0472);
+  if(unit==='moa')return raw;
+  var inches=unit==='cm'?raw/2.54:raw;
+  if(!distanceYd||distanceYd<=0)return 0;
+  return inches/(distanceYd*0.010472);
+}
+// Converts a 1-sigma angular dispersion (MOA) into a 1-sigma linear dispersion (inches) at a given
+// range — the same MOA<->inches relationship as groupSizeToMoa()/computeTrajectory() above, just
+// run forward instead of solved backward. Used to turn rifle group size and shooter proficiency
+// (both entered/stored as MOA) into the inches-at-range figures the RSS error budget combines.
+function moaToInchesAtRange(moa,rangeYd){return moa*(rangeYd/100)*1.0472;}
+// Numerically integrates the (uncorrelated) bivariate-normal impact-point density over a circular
+// target disk to get an actual hit probability. A circular target against an ELLIPTICAL dispersion
+// pattern (sigmaElevIn != sigmaWindIn, generally true here since wind/velocity uncertainty affect
+// elevation and windage differently) has no simple closed form — unlike the simpler circular-
+// dispersion-only case, which reduces to a Rayleigh CDF — so this grids the disk directly rather
+// than reaching for an approximation. Resolution (220 slices across the diameter) is chosen to
+// resolve well inside a few sigma while staying fast enough to run on every input change.
+function phHitProbability(sigmaElevIn,sigmaWindIn,targetDiameterIn){
+  if(!(sigmaElevIn>0)||!(sigmaWindIn>0)||!(targetDiameterIn>0))return null;
+  var R=targetDiameterIn/2,N=220,step=(2*R)/N,sum=0;
+  var normElev=1/(sigmaElevIn*Math.sqrt(2*Math.PI)),normWind=1/(sigmaWindIn*Math.sqrt(2*Math.PI));
+  for(var i=0;i<N;i++){
+    var x=-R+step*(i+0.5); // windage axis
+    var yMax=Math.sqrt(Math.max(0,R*R-x*x));
+    if(yMax<=0)continue;
+    var ny=Math.max(1,Math.round(2*yMax/step)),stepY=(2*yMax)/ny;
+    var densX=normWind*Math.exp(-0.5*(x*x)/(sigmaWindIn*sigmaWindIn));
+    for(var j=0;j<ny;j++){
+      var y=-yMax+stepY*(j+0.5); // elevation axis
+      var densY=normElev*Math.exp(-0.5*(y*y)/(sigmaElevIn*sigmaElevIn));
+      sum+=densX*densY*step*stepY;
+    }
+  }
+  return Math.max(0,Math.min(1,sum));
 }
 function refreshZeroOffsetClickSizeSelects(){
   var elEl=document.getElementById('zeroOffsetClickSizeSel');
@@ -3029,7 +3257,14 @@ function parseFxChronoLogUI(){
   var avgBc=parsed.shots.reduce(function(s,x){return s+x.bc;},0)/n;
   var dragModel=parsed.shots[0].dragModel;
   var modelConsistent=parsed.shots.every(function(s){return s.dragModel===dragModel;});
-  lastFxChronoResult={shots:parsed.shots,avgFps:avgFps,avgBc:avgBc,dragModel:dragModel,modelConsistent:modelConsistent};
+  // Sample standard deviation of shot velocity — the empirical round-to-round spread Probability
+  // of Hit's velocity-SD input needs (see phVelocitySdFps above), and which nothing else in the app
+  // can legitimately estimate (there's no formula linking BC/weight/velocity/drag model to it).
+  // Needs at least 2 shots (n-1 denominator is undefined/meaningless for a single reading); left
+  // null otherwise, and the Apply button below is disabled to match rather than offering a
+  // meaningless "0 fps SD" from one shot.
+  var sdFps=n>=2?Math.sqrt(parsed.shots.reduce(function(s,x){return s+(x.fps-avgFps)*(x.fps-avgFps);},0)/(n-1)):null;
+  lastFxChronoResult={shots:parsed.shots,avgFps:avgFps,avgBc:avgBc,sdFps:sdFps,dragModel:dragModel,modelConsistent:modelConsistent};
 
   var met=unitSystem==='metric';
   function dispVel(fps){return met?(fps*0.3048).toFixed(1)+' m/s':fps.toFixed(0)+' fps';}
@@ -3059,6 +3294,16 @@ function parseFxChronoLogUI(){
     bcBtn.style.opacity='0.5';
     bcBtn.textContent='Set Drag Model to '+dragModel.toUpperCase()+' to apply this BC('+dragModel.toUpperCase()+') reading';
   }
+  var sdBtn=document.getElementById('btnFxApplySd');
+  if(sdFps!==null){
+    sdBtn.disabled=false;
+    sdBtn.style.opacity='1';
+    sdBtn.textContent='Apply Velocity SD ('+dispVel(sdFps)+') to Probability of Hit';
+  } else {
+    sdBtn.disabled=true;
+    sdBtn.style.opacity='0.5';
+    sdBtn.textContent='Read 2+ shots to compute a Velocity SD';
+  }
   actions.style.display='flex';
 }
 // Directly overwrites the Muzzle Velocity field, the same way any manual edit to that field would —
@@ -3085,6 +3330,19 @@ function applyFxChronoBc(){
   document.getElementById('btnResetTruing').style.display='';
   updateSaveTruingButton();
   calculate();
+}
+// Writes this load's measured shot-to-shot velocity SD into Probability of Hit's own velocity-SD
+// input and flips its source label from 'manual' to 'from log' — the honest-measured-vs-guessed
+// distinction phVelocitySdSource exists for (see its declaration above). Unlike applyFxChronoVelocity/
+// applyFxChronoBc, this never calls calculate() — SD doesn't feed the main trajectory at all, only
+// the Probability of Hit error budget, so it only needs to refresh that page if it happens to be open.
+function applyFxChronoSd(){
+  if(!lastFxChronoResult||lastFxChronoResult.sdFps===null||lastFxChronoResult.sdFps===undefined)return;
+  phVelocitySdFps=lastFxChronoResult.sdFps;
+  phVelocitySdSource='log';
+  writePhVelocitySdFps(phVelocitySdFps);
+  var phModalEl=document.getElementById('phModal');
+  if(phModalEl&&phModalEl.style.display!=='none')renderProbHit();
 }
 
 // Truing (bcMultiplier) is calibrated against one specific load's validation range/observed
@@ -3115,6 +3373,14 @@ function clearTruingState(){
   document.getElementById('fxChronoTableWrap').style.display='none';
   document.getElementById('fxChronoTableWrap').innerHTML='';
   document.getElementById('fxChronoActions').style.display='none';
+  // Probability of Hit's velocity SD is a per-load figure, same as bcMultiplier above — a log-
+  // measured reading from the previous load must not linger, mislabeled as still current, once a
+  // different load is opened. Resets to the same rough manual placeholder every fresh load starts
+  // with; the Probability of Hit page (if open) is refreshed to match.
+  phVelocitySdFps=10;
+  phVelocitySdSource='manual';
+  var phModalEl=document.getElementById('phModal');
+  if(phModalEl&&phModalEl.style.display!=='none'){writePhVelocitySdFps(phVelocitySdFps);renderProbHit();}
 }
 function resetTruing(){
   clearTruingState();
@@ -3466,7 +3732,8 @@ function renderResults(results,params,stability){
     '<button class="btn btn-secondary" style="width:auto;padding:5px 14px;font-size:12px;" onclick="exportCSV()">Export CSV</button>'+
     '<button class="btn btn-secondary" style="width:auto;padding:5px 14px;font-size:12px;" onclick="showRangeCard()">&#128203; Range Card</button>'+
     '<button class="btn btn-secondary" style="width:auto;padding:5px 14px;font-size:12px;" onclick="showReticleView()">'+bulletIcon(12)+' Reticle View</button>'+
-    '<button class="btn btn-secondary" style="width:auto;padding:5px 14px;font-size:12px;" onclick="showHud()">&#128225; HUD</button></div></div>'+
+    '<button class="btn btn-secondary" style="width:auto;padding:5px 14px;font-size:12px;" onclick="showHud()">&#128225; HUD</button>'+
+    '<button class="btn btn-secondary" style="width:auto;padding:5px 14px;font-size:12px;border-color:rgba(224,108,58,.4);color:var(--accent2);" onclick="showProbHit()">&#127919; Probability of Hit <span style="background:rgba(224,108,58,.15);border:1px solid rgba(224,108,58,.4);color:var(--accent2);border-radius:4px;padding:1px 6px;font-size:9px;font-weight:700;margin-left:4px;">Advanced</span></button></div></div>'+
     '<div class="stat-cards">'+
     '<div class="stat-card '+eSt+'"><div class="label">Muzzle Energy</div><div class="value">'+(met?r0.energyJ:muzzE.toFixed(0))+'</div><div class="unit">'+eAtMuzz+(eTag?'<br><strong>'+eTag+'</strong>':'')+'</div>'+(currentMode==='air'?'<div class="energy-bar"><div class="energy-fill" style="width:'+Math.min(100,muzzE)+'%;background:'+(muzzE>100?'var(--red)':muzzE>80?'var(--yellow)':'var(--green)')+'"></div></div>':'')+cardTag(false)+'</div>'+
     '<div class="stat-card"><div class="label">Muzzle Velocity</div><div class="value">'+muzzVel+'</div><div class="unit">'+muzzVelSub+'</div>'+cardTag(false)+'</div>'+
@@ -4133,6 +4400,346 @@ function renderHud(){
   }).join('');
 }
 
+// ── Probability of Hit ──────────────────────────────────────────────────────
+// Wind override — identical pattern to HUD's own readHudRangeYd/readHudWindMph/writeHudWindMph/
+// updateHudWindSuggestion/renderHudWindDial/onHudWindSpeedChange/resetHudWind/initHudWindDial (see
+// those for the full reasoning); duplicated rather than shared because this page keeps its own
+// independent override state, exactly like HUD/Reticle/Compare already each keep theirs apart.
+function readPhRangeYd(){
+  var el=document.getElementById('fPhRange');
+  if(!el)return 0;
+  var raw=parseFloat(el.value)||0;
+  if(raw<=0)return 0;
+  return unitSystem==='metric'?Math.round(raw/0.9144):Math.round(raw);
+}
+function readPhWindMph(){
+  var el=document.getElementById('fPhWind');
+  if(!el)return 0;
+  var raw=parseFloat(el.value)||0;
+  if(raw<=0)return 0;
+  return unitSystem==='metric'?raw/1.60934:raw;
+}
+function writePhWindMph(mph){
+  var el=document.getElementById('fPhWind');
+  if(!el)return;
+  var met=unitSystem==='metric';
+  el.value=met?(mph*1.60934).toFixed(1):mph.toFixed(1);
+  var lbl=document.getElementById('phWindUnitLbl');
+  if(lbl)lbl.textContent=met?'kph':'mph';
+}
+function updatePhWindSuggestion(){
+  if(phWindCustomized||!lastResults)return;
+  writePhWindMph(lastResults.params.windMph);
+  phWindClockVal=lastResults.params.windClock||3;
+  renderPhWindDial();
+}
+function renderPhWindDial(){
+  var el=document.getElementById('phWindDial');
+  if(!el)return;
+  var size=72,r=size/2,numR=r-10,html='';
+  for(var h=1;h<=12;h++){
+    var angle=(h*30-90)*Math.PI/180,active=h===phWindClockVal;
+    var tx=r+Math.cos(angle)*(r-4),ty=r+Math.sin(angle)*(r-4);
+    html+='<div class="tick'+(active?' active':'')+'" style="left:'+tx+'px;top:'+ty+'px;"></div>';
+    var nx=r+Math.cos(angle)*numR,ny=r+Math.sin(angle)*numR;
+    html+='<div class="num'+(active?' active':'')+'" style="left:'+nx+'px;top:'+ny+'px;">'+h+'</div>';
+  }
+  html+='<div class="hand" style="height:'+(r-8)+'px;transform:rotate('+(phWindClockVal*30)+'deg);"></div><div class="hub"></div>';
+  el.innerHTML=html;
+  var readout=document.getElementById('phWindReadout');
+  if(readout)readout.textContent=phWindClockVal+" o'clock";
+}
+function onPhWindSpeedChange(){phWindCustomized=true;renderProbHit();}
+function resetPhWind(){phWindCustomized=false;updatePhWindSuggestion();renderProbHit();}
+function initPhWindDial(){
+  var dial=document.getElementById('phWindDial');
+  if(!dial)return;
+  var dragging=false;
+  function setFromEvent(e){
+    var rect=dial.getBoundingClientRect();
+    var cx=rect.left+rect.width/2,cy=rect.top+rect.height/2;
+    var hour=clockHourFromAngle(e.clientX-cx,e.clientY-cy);
+    phWindCustomized=true;
+    if(hour!==phWindClockVal){phWindClockVal=hour;renderPhWindDial();}
+  }
+  function commit(){if(dragging){dragging=false;renderProbHit();}}
+  dial.addEventListener('pointerdown',function(e){dragging=true;if(dial.setPointerCapture)dial.setPointerCapture(e.pointerId);setFromEvent(e);});
+  dial.addEventListener('pointermove',function(e){if(dragging)setFromEvent(e);});
+  dial.addEventListener('pointerup',commit);
+  dial.addEventListener('pointercancel',commit);
+  renderPhWindDial();
+}
+// Wind-call uncertainty — new to this page, not an override of anything else in the app. Shares
+// mph/kph display conversion with the wind fields above, but is its own independent figure (how
+// wrong the wind guess above might be), not a copy of the wind speed itself.
+function readPhWindUncMph(){
+  var el=document.getElementById('fPhWindUnc');
+  if(!el)return phWindUncertaintyMph;
+  var raw=parseFloat(el.value);
+  if(isNaN(raw)||raw<0)return phWindUncertaintyMph;
+  return unitSystem==='metric'?raw/1.60934:raw;
+}
+function writePhWindUncMph(mph){
+  var el=document.getElementById('fPhWindUnc');
+  if(!el)return;
+  var met=unitSystem==='metric';
+  el.value=met?(mph*1.60934).toFixed(1):mph.toFixed(1);
+  var lbl=document.getElementById('phWindUncUnitLbl');
+  if(lbl)lbl.textContent=met?'kph':'mph';
+}
+function onPhWindUncChange(){phWindUncertaintyMph=readPhWindUncMph();renderProbHit();}
+
+// Velocity override — identical pattern to HUD's readHudVelocityFps/writeHudVelocityFps/
+// updateHudVelocitySuggestion/onHudVelocityChange/resetHudVelocity/stepHudVelocity, duplicated for
+// the same independent-state reason as the wind override above. velocityStepFps() itself (the
+// +/-10fps / +/-5m/s nudge size) is shared directly with HUD/Compare rather than re-derived.
+function readPhVelocityFps(){
+  var el=document.getElementById('fPhVelocity');
+  if(!el)return 0;
+  var raw=parseFloat(el.value)||0;
+  if(raw<=0)return 0;
+  return unitSystem==='metric'?raw/0.3048:raw;
+}
+function writePhVelocityFps(fps){
+  var el=document.getElementById('fPhVelocity');
+  if(!el)return;
+  var met=unitSystem==='metric';
+  el.value=met?Math.round(fps*0.3048):Math.round(fps);
+  var lbl=document.getElementById('phVelocityUnitLbl');
+  if(lbl)lbl.textContent=met?'m/s':'fps';
+}
+function updatePhVelocitySuggestion(){
+  if(phVelocityCustomized||!lastResults)return;
+  writePhVelocityFps(lastResults.params.mvFps);
+}
+function onPhVelocityChange(){phVelocityCustomized=true;renderProbHit();}
+function resetPhVelocity(){phVelocityCustomized=false;updatePhVelocitySuggestion();renderProbHit();}
+function stepPhVelocity(dir){
+  var cur=readPhVelocityFps()||(lastResults?lastResults.params.mvFps:0);
+  var next=Math.max(1,cur+dir*velocityStepFps());
+  phVelocityCustomized=true;
+  writePhVelocityFps(next);
+  renderProbHit();
+}
+
+// Velocity SD — this load's own round-to-round muzzle velocity spread. Starts manual; switches to
+// 'log' only via applyFxChronoSd() (Trajectory Truing's chronograph import, extended separately) —
+// any hand-edit here afterwards reverts the label straight back to 'manual', so it can never keep
+// claiming a log-measured figure the shooter has since typed over.
+function readPhVelocitySdFps(){
+  var el=document.getElementById('fPhVelocitySd');
+  if(!el)return phVelocitySdFps;
+  var raw=parseFloat(el.value);
+  if(isNaN(raw)||raw<0)return phVelocitySdFps;
+  return unitSystem==='metric'?raw/0.3048:raw;
+}
+function writePhVelocitySdFps(fps){
+  var el=document.getElementById('fPhVelocitySd');
+  if(!el)return;
+  var met=unitSystem==='metric';
+  el.value=met?(fps*0.3048).toFixed(1):fps.toFixed(0);
+  var lbl=document.getElementById('phVelocitySdUnitLbl');
+  if(lbl)lbl.textContent=met?'m/s':'fps';
+  updatePhVelocitySdSourceLbl();
+}
+function updatePhVelocitySdSourceLbl(){
+  var lbl=document.getElementById('phVelocitySdSourceLbl');
+  if(!lbl)return;
+  lbl.textContent=phVelocitySdSource==='log'?'From chronograph log':'Manual estimate — read a chronograph log on the Trajectory Truing tab for a measured figure.';
+}
+function onPhVelocitySdChange(){
+  phVelocitySdFps=readPhVelocitySdFps();
+  phVelocitySdSource='manual';
+  updatePhVelocitySdSourceLbl();
+  renderProbHit();
+}
+
+// Shooter proficiency — a GLOBAL setting per explicit design decision (describes the shooter, not
+// any one rifle/load), persisted via savePrefs/loadPrefs exactly like unitSystem/currentMode.
+function onPhShooterMoaChange(){
+  var el=document.getElementById('fPhShooterMoa');
+  phShooterProficiencyMoa=Math.max(0,parseFloat(el.value)||0);
+  savePrefs({shooterMoa:phShooterProficiencyMoa});
+  renderProbHit();
+}
+
+// Rifle mechanical precision (group size) — saved per-preset (see buildPresetEntryFromForm/
+// loadPreset), unlike shooter proficiency above. Mirrors Trajectory Truing's trueUnit/setTrueUnit
+// toggle pattern for the angular-vs-linear unit buttons themselves.
+function setPhGroupUnit(u){
+  phGroupUnit=u;
+  ['Mils','Moa','In','Cm'].forEach(function(k){var el=document.getElementById('btnPhGroupUnit'+k);if(el)el.classList.toggle('active',u===k.toLowerCase());});
+  var lbl=document.getElementById('phGroupUnitLbl');
+  if(lbl)lbl.textContent=u==='mils'?'mils':u==='moa'?'MOA':u;
+  var distRow=document.getElementById('phGroupDistanceRow');
+  if(distRow)distRow.style.display=(u==='in'||u==='cm')?'':'none';
+}
+function readPhGroupDistanceYd(){
+  var el=document.getElementById('fPhGroupDistance');
+  var raw=el?(parseFloat(el.value)||0):phGroupDistanceVal;
+  if(raw<=0)return 0;
+  return unitSystem==='metric'?Math.round(raw/0.9144):Math.round(raw);
+}
+function onPhGroupChange(){
+  phGroupSizeVal=parseFloat(document.getElementById('fPhGroupVal').value)||0;
+  var distEl=document.getElementById('fPhGroupDistance');
+  if(distEl)phGroupDistanceVal=parseFloat(distEl.value)||phGroupDistanceVal;
+  renderProbHit();
+}
+function refreshPhGroupFields(){
+  setPhGroupUnit(phGroupUnit);
+  var valEl=document.getElementById('fPhGroupVal');
+  if(valEl)valEl.value=phGroupSizeVal;
+  var distEl=document.getElementById('fPhGroupDistance'),distLbl=document.getElementById('phGroupDistanceUnitLbl');
+  if(distEl)distEl.value=phGroupDistanceVal;
+  if(distLbl)distLbl.textContent=unitSystem==='metric'?'m':'yd';
+}
+
+// Target size — user-selectable rather than a fixed list (explicit design decision), with different
+// built-in defaults per discipline (TARGET_SIZE_DEFAULTS above) plus any custom sizes the shooter
+// adds, persisted per-mode via loadCustomTargets/saveCustomTargets. Deliberately lighter-weight than
+// the main preset system above (no drag-reorder, no hide/restore) — this is a small, flat list.
+function renderPhTargetChips(){
+  var container=document.getElementById('phTargetChips');
+  if(!container)return;
+  var list=getOrderedTargets(currentMode),met=unitSystem==='metric';
+  container.innerHTML=list.map(function(t){
+    var selected=phTargetDiameterIn!==null&&Math.abs(phTargetDiameterIn-t.diameterIn)<0.001;
+    var disp=met?(t.diameterIn*2.54).toFixed(1)+'cm':t.diameterIn.toFixed(1)+'in';
+    return '<button type="button" class="compare-tile'+(selected?' selected':'')+'" onclick="selectPhTarget('+t.diameterIn+')"><strong>'+t.name+'</strong>'+disp+'</button>';
+  }).join('')||'<p style="color:var(--muted);font-size:12px;">No target sizes yet — add one below.</p>';
+  var unitLbl=document.getElementById('phTargetDiamUnitLbl');
+  if(unitLbl)unitLbl.textContent=met?'cm':'in';
+}
+function selectPhTarget(diameterIn){phTargetDiameterIn=diameterIn;renderPhTargetChips();renderProbHit();}
+function addPhCustomTarget(){
+  var nameEl=document.getElementById('fPhTargetName'),diamEl=document.getElementById('fPhTargetDiam');
+  var name=(nameEl.value||'').trim(),diamRaw=parseFloat(diamEl.value)||0;
+  if(!name||diamRaw<=0)return;
+  var diameterIn=unitSystem==='metric'?diamRaw/2.54:diamRaw;
+  var d=loadCustomTargets();
+  d[currentMode]=d[currentMode]||[];
+  d[currentMode].push({name:name,diameterIn:diameterIn});
+  saveCustomTargets(d);
+  nameEl.value='';diamEl.value='';
+  phTargetDiameterIn=diameterIn;
+  renderPhTargetChips();
+  renderProbHit();
+}
+
+function onPhRangeChange(){phRangeYd=readPhRangeYd();renderProbHit();}
+
+function showProbHit(){
+  if(!lastResults)return;
+  document.getElementById('phSubtitle').textContent=(document.getElementById('fCalibr').value||'Probability of Hit')+' · pick a range and target size';
+  updatePhWindSuggestion();
+  updatePhVelocitySuggestion();
+  writePhWindUncMph(phWindUncertaintyMph);
+  writePhVelocitySdFps(phVelocitySdFps);
+  document.getElementById('fPhShooterMoa').value=phShooterProficiencyMoa;
+  refreshPhGroupFields();
+  document.getElementById('phRangeUnitLbl').textContent=unitSystem==='metric'?'m':'yd';
+  if(phRangeYd)document.getElementById('fPhRange').value=unitSystem==='metric'?Math.round(phRangeYd*0.9144):phRangeYd;
+  if(phTargetDiameterIn===null){
+    var defaults=TARGET_SIZE_DEFAULTS[currentMode];
+    if(defaults&&defaults.length)phTargetDiameterIn=defaults[0].diameterIn;
+  }
+  renderPhTargetChips();
+  renderProbHit();
+  document.getElementById('phModal').style.display='block';
+}
+function hideProbHit(){
+  var el=document.getElementById('phModal');
+  if(el)el.style.display='none';
+}
+
+// The core recompute — same "always a genuine fresh computeTrajectory() call, never a rescale of
+// cached rows" principle established for HUD's own renderHud() (see its comment block above), plus
+// the same safeMaxYd zero-range guard for exactly the same reason.
+//
+// Sensitivity is finite-difference: each uncertain input (velocity, wind) is nudged by its own
+// 1-sigma figure in both directions and the resulting point-of-impact shift versus the unperturbed
+// baseline is averaged (central difference) into a 1-sigma linear dispersion. Rifle mechanical
+// precision and shooter proficiency aren't run through computeTrajectory() at all — they're already
+// angular dispersion figures (MOA), so they convert directly to inches-at-range via
+// moaToInchesAtRange() instead. All four sources are then combined by root-sum-square (independent
+// uncertainties add in quadrature, not linearly) into one elevation sigma and one windage sigma, and
+// phHitProbability() integrates those against the selected circular target.
+function renderProbHit(){
+  if(!lastResults)return;
+  var targetYd=phRangeYd=readPhRangeYd();
+  var empty=document.getElementById('phEmptyState'),solution=document.getElementById('phSolution');
+  if(!targetYd||phTargetDiameterIn===null){
+    empty.style.display='';
+    empty.textContent='Enter a distance to target and pick a target size above.';
+    solution.style.display='none';
+    return;
+  }
+  var phWindMph=readPhWindMph();
+  var phVelocityFps=readPhVelocityFps()||lastResults.params.mvFps;
+  var velSdFps=readPhVelocitySdFps();
+  var windUncMph=readPhWindUncMph();
+  var safeMaxYd=Math.max(targetYd,lastResults.params.zeroYd+20);
+  var baseParams=Object.assign({},lastResults.params,{windMph:phWindMph,windClock:phWindClockVal,mvFps:phVelocityFps,maxYd:safeMaxYd,maxNative:safeMaxYd,intervalNative:null,windTargetRefYd:lastResults.params.maxYd});
+
+  function rowAt(params){
+    var res=computeTrajectory(params,true);
+    if(!res||!res.length)return null;
+    return res.find(function(r){return r.yd===targetYd;})||res[res.length-1];
+  }
+  var baseRow=rowAt(baseParams);
+  if(!baseRow){
+    empty.style.display='';
+    empty.textContent='No trajectory reaches this distance — check the range and loaded settings.';
+    solution.style.display='none';
+    return;
+  }
+  var baseElevIn=parseFloat(baseRow.dropIn),baseWindIn=parseFloat(baseRow.driftIn)+parseFloat(baseRow.spinIn)+parseFloat(baseRow.coriolisIn);
+
+  function delta(mutate){
+    var pPlus=Object.assign({},baseParams);mutate(pPlus,1);
+    var pMinus=Object.assign({},baseParams);mutate(pMinus,-1);
+    var rPlus=rowAt(pPlus),rMinus=rowAt(pMinus);
+    if(!rPlus||!rMinus)return{elevIn:0,windIn:0};
+    var ePlus=parseFloat(rPlus.dropIn)-baseElevIn,eMinus=parseFloat(rMinus.dropIn)-baseElevIn;
+    var wPlus=(parseFloat(rPlus.driftIn)+parseFloat(rPlus.spinIn)+parseFloat(rPlus.coriolisIn))-baseWindIn;
+    var wMinus=(parseFloat(rMinus.driftIn)+parseFloat(rMinus.spinIn)+parseFloat(rMinus.coriolisIn))-baseWindIn;
+    return{elevIn:(Math.abs(ePlus)+Math.abs(eMinus))/2,windIn:(Math.abs(wPlus)+Math.abs(wMinus))/2};
+  }
+  var velSens=velSdFps>0?delta(function(p,dir){p.mvFps=Math.max(1,baseParams.mvFps+dir*velSdFps);}):{elevIn:0,windIn:0};
+  var windSens=windUncMph>0?delta(function(p,dir){p.windMph=Math.max(0,baseParams.windMph+dir*windUncMph);}):{elevIn:0,windIn:0};
+
+  var rifleMoa=groupSizeToMoa(phGroupSizeVal,phGroupUnit,(phGroupUnit==='in'||phGroupUnit==='cm')?readPhGroupDistanceYd():0);
+  var rifleIn=moaToInchesAtRange(rifleMoa,targetYd);
+  var shooterIn=moaToInchesAtRange(phShooterProficiencyMoa,targetYd);
+
+  var sigmaElevIn=Math.sqrt(velSens.elevIn*velSens.elevIn+windSens.elevIn*windSens.elevIn+rifleIn*rifleIn+shooterIn*shooterIn);
+  var sigmaWindIn=Math.sqrt(velSens.windIn*velSens.windIn+windSens.windIn*windSens.windIn+rifleIn*rifleIn+shooterIn*shooterIn);
+
+  var prob=phHitProbability(sigmaElevIn,sigmaWindIn,phTargetDiameterIn);
+  empty.style.display='none';
+  solution.style.display='';
+  document.getElementById('phHitProbValue').textContent=prob===null?'—':Math.round(prob*100)+'%';
+
+  var sources=[
+    {name:'Velocity spread ('+(phVelocitySdSource==='log'?'from log':'manual')+')',elevIn:velSens.elevIn,windIn:velSens.windIn},
+    {name:'Wind call uncertainty',elevIn:windSens.elevIn,windIn:windSens.windIn},
+    {name:'Rifle mechanical precision',elevIn:rifleIn,windIn:rifleIn},
+    {name:'Shooter proficiency',elevIn:shooterIn,windIn:shooterIn}
+  ];
+  var biggest=sources.reduce(function(a,b){
+    var av=a.elevIn*a.elevIn+a.windIn*a.windIn,bv=b.elevIn*b.elevIn+b.windIn*b.windIn;
+    return bv>av?b:a;
+  },sources[0]);
+  var anyContribution=sources.some(function(s){return s.elevIn>0||s.windIn>0;});
+  document.getElementById('phBiggestContributor').textContent=anyContribution?'Biggest contributor: '+biggest.name:'';
+  var met=unitSystem==='metric';
+  function dispIn(v){return met?(v*2.54).toFixed(2)+'cm':v.toFixed(2)+'in';}
+  document.getElementById('phBudgetTable').querySelector('tbody').innerHTML=sources.map(function(s){
+    return '<tr><td class="metric-label">'+s.name+'</td><td>'+dispIn(s.elevIn)+'</td><td>'+dispIn(s.windIn)+'</td></tr>';
+  }).join('')+'<tr><td class="metric-label"><strong>Combined (RSS)</strong></td><td><strong>'+dispIn(sigmaElevIn)+'</strong></td><td><strong>'+dispIn(sigmaWindIn)+'</strong></td></tr>';
+}
+
 function showReticleView(){
   if(!lastResults)return;
   var met=unitSystem==='metric';
@@ -4569,12 +5176,15 @@ if(_prefs.unit==='metric')setUnitSystem('metric');
 if(_prefs.mode==='cf')setMode('cf');else if(_prefs.mode==='rf')setMode('rf');
 else{document.getElementById('fDrag').value='ga';lastDragModel='ga';syncBcPrimaryLabel();} // air
 // is the default mode and isn't routed through setMode() here, so mirror its GA default by hand.
+// Shooter proficiency (Probability of Hit) is a global setting, restored the same way as unit/mode.
+if(_prefs.shooterMoa!==undefined&&_prefs.shooterMoa!==null&&!isNaN(parseFloat(_prefs.shooterMoa)))phShooterProficiencyMoa=parseFloat(_prefs.shooterMoa);
 updateSortModeLink();
 renderPresets();
 syncLayout();
 initCompareWindDial();
 initReticleWindDial();
 initHudWindDial();
+initPhWindDial();
 </script>
 </body>
 </html>
