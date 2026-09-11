@@ -826,6 +826,10 @@
           <div class="hud-hero-value" id="phHitProbValue">&mdash;</div>
           <div class="hud-hero-unit">at selected target size &amp; range</div>
         </div>
+        <div style="flex:none;width:128px;display:flex;flex-direction:column;align-items:center;">
+          <div id="phScatterWrap" style="width:120px;height:120px;"></div>
+          <div style="font-size:9px;color:var(--muted);text-align:center;margin-top:2px;line-height:1.3;">Illustrative shot scatter &mdash; one random draw from the modelled dispersion</div>
+        </div>
       </div>
       <div id="phBiggestContributor" style="font-size:12px;color:var(--muted);margin:8px 0;text-align:center;"></div>
       <div class="tbl-wrap"><table class="compare-table" id="phBudgetTable"><thead><tr><th>Error source</th><th>Elevation</th><th>Windage</th></tr></thead><tbody></tbody></table></div>
@@ -4759,6 +4763,56 @@ function hideProbHit(){
 // moaToInchesAtRange() instead. All four sources are then combined by root-sum-square (independent
 // uncertainties add in quadrature, not linearly) into one elevation sigma and one windage sigma, and
 // phHitProbability() integrates those against the selected circular target.
+// Standard normal sample via the Box-Muller transform — used only for the illustrative shot-scatter
+// graphic below, never for anything the hit-probability figure itself is computed from (that stays
+// the exact numerical integration in phHitProbability()). Guards against Math.random() returning
+// exactly 0 (which would make Math.log(0) = -Infinity).
+function phRandNormal(){
+  var u=0,v=0;
+  while(u===0)u=Math.random();
+  while(v===0)v=Math.random();
+  return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);
+}
+// Draws a random sample of simulated impact points against the selected target, purely as a visual
+// aid alongside the headline percentage above — never itself the source of that number, which comes
+// from phHitProbability()'s exact integration. A small sample (24 points) drawn from the same
+// elevation/windage sigmas will not always land in the target in exactly the displayed proportion
+// (sampling variance at n=24 is real), which is exactly why this is captioned "illustrative" rather
+// than given its own percentage readout — showing a second, sample-based percentage that could
+// disagree with the analytically correct headline figure would be misleading, not merely imprecise.
+function renderPhScatter(sigmaElevIn,sigmaWindIn,targetDiameterIn){
+  var el=document.getElementById('phScatterWrap');
+  if(!el)return;
+  if(!(sigmaElevIn>=0)||!(sigmaWindIn>=0)||!(targetDiameterIn>0)){el.innerHTML='';return;}
+  var targetRadiusIn=targetDiameterIn/2;
+  var n=24,pts=[];
+  for(var i=0;i<n;i++){
+    var x=phRandNormal()*sigmaWindIn,y=phRandNormal()*sigmaElevIn;
+    pts.push({x:x,y:y,r:Math.sqrt(x*x+y*y)});
+  }
+  // Field of view covers whichever is larger — the target itself, or the furthest-flung sampled
+  // point — with headroom, so a dispersion much wider than the target still shows its outliers
+  // instead of clipping them at the canvas edge.
+  var maxPtR=pts.reduce(function(m,p){return Math.max(m,p.r);},0);
+  var fovIn=Math.max(targetRadiusIn*1.3,maxPtR*1.15,0.01);
+  var size=200,c=size/2,scale=(c*0.9)/fovIn;
+  var targetPx=targetRadiusIn*scale;
+  var svg='<svg viewBox="0 0 '+size+' '+size+'" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">';
+  // Crosshair + outer field-of-view ring, both faint — framing only, not data.
+  svg+='<line x1="0" y1="'+c+'" x2="'+size+'" y2="'+c+'" stroke="var(--border)" stroke-width="1"/>';
+  svg+='<line x1="'+c+'" y1="0" x2="'+c+'" y2="'+size+'" stroke="var(--border)" stroke-width="1"/>';
+  svg+='<circle cx="'+c+'" cy="'+c+'" r="'+(c*0.92)+'" fill="none" stroke="var(--border)" stroke-width="1" stroke-dasharray="3,4"/>';
+  // The target boundary itself, drawn to scale against the sampled points.
+  svg+='<circle cx="'+c+'" cy="'+c+'" r="'+targetPx.toFixed(1)+'" fill="none" stroke="var(--text)" stroke-width="1.5"/>';
+  pts.forEach(function(p,i){
+    var px=c+p.x*scale,py=c+p.y*scale;
+    var isHighlight=(i===0);
+    svg+='<circle cx="'+px.toFixed(1)+'" cy="'+py.toFixed(1)+'" r="'+(isHighlight?4.5:3.5)+'" fill="'+(isHighlight?'#fff':'var(--green)')+'" fill-opacity="'+(isHighlight?'1':'0.8')+'"/>';
+  });
+  svg+='</svg>';
+  el.innerHTML=svg;
+}
+
 function renderProbHit(){
   if(!lastResults)return;
   var targetYd=phRangeYd=readPhRangeYd();
@@ -4814,6 +4868,7 @@ function renderProbHit(){
   empty.style.display='none';
   solution.style.display='';
   document.getElementById('phHitProbValue').textContent=prob===null?'—':Math.round(prob*100)+'%';
+  renderPhScatter(sigmaElevIn,sigmaWindIn,phTargetDiameterIn);
 
   var sources=[
     {name:'Velocity spread ('+(phVelocitySdSource==='log'?'from log':'manual')+')',elevIn:velSens.elevIn,windIn:velSens.windIn},
