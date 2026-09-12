@@ -198,7 +198,12 @@
   .simple-mode-btn{font-size:11px;font-weight:700;padding:4px 12px;border-radius:14px;border:1px solid var(--border);background:var(--surface2);color:var(--text);cursor:pointer;touch-action:manipulation;white-space:nowrap;}
   .simple-mode-btn.on{background:var(--green);border-color:var(--green);color:#0f1117;}
   .help-tip{display:inline-block;width:15px;height:15px;line-height:13px;text-align:center;border-radius:50%;background:var(--surface2);border:1px solid var(--border);color:var(--muted);font-size:9px;font-style:normal;font-weight:700;cursor:pointer;margin-left:3px;vertical-align:middle;touch-action:manipulation;}
-  #helpTipPopover{display:none;position:fixed;z-index:9999;max-width:230px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:11px;line-height:1.45;color:var(--text);box-shadow:0 4px 16px rgba(0,0,0,.45);}
+  /* z-index 10001 — one above the full-screen page modals (HUD/Reticle View/Range Card/
+     Probability of Hit, all z-index 10000). This used to sit at 9999, just under those modals, so
+     tapping a "?" help-tip while one of them was open opened the popover as normal but it rendered
+     behind the modal's own opaque background and was invisible — Probability of Hit is the only
+     one of the four with help-tips inside it, which is why the symptom only ever showed up there. */
+  #helpTipPopover{display:none;position:fixed;z-index:10001;max-width:230px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:11px;line-height:1.45;color:var(--text);box-shadow:0 4px 16px rgba(0,0,0,.45);}
   .rc-row{display:flex;justify-content:space-between;align-items:center;padding:14px 0;border-bottom:1px solid var(--border);}
   .rc-row.rc-zero{background:rgba(79,142,247,.06);}
   .rc-row.rc-spot{background:rgba(224,108,58,.06);}
