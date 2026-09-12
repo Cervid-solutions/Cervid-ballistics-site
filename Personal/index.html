@@ -139,6 +139,11 @@
   .compare-tile.selected{background:var(--surface2);}
   .compare-tile.disabled{opacity:.35;cursor:default;}
   .compare-tile.editing{border-color:var(--accent);}
+  /* Target-size tiles only (Compare Loads' own .compare-tile picker never sets draggable) — same
+     grab-cursor/drop-highlight treatment as .preset-btn's drag-reorder above, reused here so the
+     two drag-to-reorder lists in the app look and feel identical. */
+  .compare-tile[draggable]{cursor:grab;}
+  .compare-tile.drag-over{border-color:var(--accent);box-shadow:0 0 0 2px rgba(96,160,255,.35);}
   .compare-tile .slot-badge{position:absolute;top:6px;right:6px;width:16px;height:16px;border-radius:50%;color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;}
   .compare-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:4px;}
   .compare-table th,.compare-table td{padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;}
@@ -311,8 +316,8 @@
       </div>
       <div id="presetEditStatus" style="font-size:11px;color:var(--muted);margin-top:4px;min-height:14px;line-height:1.4;"></div>
       <div style="display:flex;gap:10px;align-items:center;margin-top:8px;">
-        <span class="link-btn" onclick="exportPresets()">&#11015; Export presets</span>
-        <span class="link-btn" onclick="document.getElementById('importPresetsFile').click()">&#11014; Import presets</span>
+        <span class="link-btn" onclick="exportPresets()" title="Also backs up your Probability of Hit target sizes for every discipline">&#11015; Export presets</span>
+        <span class="link-btn" onclick="document.getElementById('importPresetsFile').click()" title="Also restores target sizes from the file, alongside your load presets">&#11014; Import presets</span>
         <input type="file" id="importPresetsFile" accept="application/json" style="display:none;" onchange="importPresetsFile(this)"/>
       </div>
     </div>
@@ -1678,8 +1683,11 @@ function undoDelete(){
   if(mode===currentMode)renderPresets();
 }
 // ── Preset export / import (backup & restore) ───────────────────────────────
-// Exports only custom presets (not hidden built-ins or drag-order, which are per-device view
-// preferences rather than data worth carrying between machines/browsers).
+// Exports custom load presets, hidden-built-in state, and (since the target-size editor below
+// gained its own edit/delete/reorder controls) every mode's target-size list too — everything a
+// shooter has actually built up and would want to carry to another device/browser/install. Still
+// deliberately excludes drag-order for load presets, which stays a per-device view preference
+// rather than data worth transferring.
 function exportPresets(){
   // Amending a built-in preset (pencil-edit / overflow "Edit") saves the amended values as a
   // custom copy under the same name — already captured by loadCustom() below — but ALSO hides
@@ -1689,7 +1697,8 @@ function exportPresets(){
   // alongside the amended copy — the amendment looked like it hadn't actually replaced anything.
   // Including it here lets import restore the same "this built-in has been superseded" state.
   var hidden=loadHidden();
-  var payload={version:1,exportedAt:new Date().toISOString(),custom:loadCustom(),hidden:{air:[...hidden.air],cf:[...hidden.cf],rf:[...hidden.rf]}};
+  var payload={version:1,exportedAt:new Date().toISOString(),custom:loadCustom(),hidden:{air:[...hidden.air],cf:[...hidden.cf],rf:[...hidden.rf]},
+    targets:{air:getTargetList('air'),cf:getTargetList('cf'),rf:getTargetList('rf')}};
   var blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
   var a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
@@ -1722,6 +1731,24 @@ function mergeImportedHidden(existing,imported){
   });
   return merged;
 }
+// Same never-overwrite-by-name merge as mergeImportedPresets() above, applied to the flat
+// target-size arrays instead — a name that already exists locally (built-in or one you've added)
+// is left exactly as it is, so importing can't silently replace a target you've since renamed or
+// resized with the imported file's original version of it.
+function mergeImportedTargets(existing,imported){
+  var merged={air:(existing.air||[]).slice(),cf:(existing.cf||[]).slice(),rf:(existing.rf||[]).slice()};
+  var added=0,skipped=0;
+  ['air','cf','rf'].forEach(function(mode){
+    var existingNames={};
+    merged[mode].forEach(function(t){existingNames[t.name]=1;});
+    (imported&&imported[mode]||[]).forEach(function(t){
+      if(!t||!t.name||typeof t.diameterIn!=='number'||!(t.diameterIn>0))return;
+      if(existingNames[t.name]){skipped++;}
+      else{merged[mode].push({name:t.name,diameterIn:t.diameterIn});existingNames[t.name]=1;added++;}
+    });
+  });
+  return{merged:merged,added:added,skipped:skipped};
+}
 function importPresetsFile(fileInput){
   var file=fileInput.files&&fileInput.files[0];
   if(!file)return;
@@ -1735,9 +1762,26 @@ function importPresetsFile(fileInput){
     // Older exports (saved before this fix) simply have no `hidden` key — mergeImportedHidden()
     // treats that as "nothing new to hide," leaving today's hidden state untouched.
     if(parsed.hidden)saveHidden(mergeImportedHidden(loadHidden(),parsed.hidden));
+    // Older exports (saved before target-size lists were included) simply have no `targets` key —
+    // skip the merge entirely rather than merging against an empty object, which would otherwise
+    // be indistinguishable from "the file legitimately has zero targets in every mode."
+    var targetResult=null;
+    if(parsed.targets){
+      targetResult=mergeImportedTargets({air:getTargetList('air'),cf:getTargetList('cf'),rf:getTargetList('rf')},parsed.targets);
+      saveTargetListForMode('air',targetResult.merged.air);
+      saveTargetListForMode('cf',targetResult.merged.cf);
+      saveTargetListForMode('rf',targetResult.merged.rf);
+    }
     renderPresets();
+    renderPhTargetChips(); // harmless no-op if the Probability of Hit page hasn't been opened yet
     fileInput.value='';
-    alert('Imported '+result.added+' preset'+(result.added===1?'':'s')+(result.skipped>0?('. Skipped '+result.skipped+' with a name that already exists.'):'.'));
+    var msg='Imported '+result.added+' preset'+(result.added===1?'':'s');
+    if(result.skipped>0)msg+=' (skipped '+result.skipped+' with a name that already exists)';
+    if(targetResult){
+      msg+=' and '+targetResult.added+' target size'+(targetResult.added===1?'':'s');
+      if(targetResult.skipped>0)msg+=' (skipped '+targetResult.skipped+' with a name that already exists)';
+    }
+    alert(msg+'.');
   };
   reader.readAsText(file);
 }
@@ -2861,6 +2905,9 @@ var phRangeYd=null,phTargetDiameterIn=null;
 // so they're reset to null any time that list's shape changes (add/edit/delete/reset) or the mode
 // switches, rather than risking a stale index pointing at the wrong entry after a re-render.
 var phTargetOpenMenuIdx=null,phTargetEditingIdx=null;
+// Drag-reorder source index for the target-size tiles (mouse/trackpad path); mirrors _dragSrcPos
+// used by the main preset grid's own drag-reorder further up this file.
+var _phTargetDragSrcIdx=null;
 // Built-in target-size defaults per discipline (circular-equivalent diameter, inches) — deliberately
 // different per mode since a "reasonable target" for air rifle field target is a very different size
 // than a centrefire big-game vital zone. Purely a starting point, not a fixed list: every one of
@@ -4705,11 +4752,31 @@ function phShooterMoa(){
 // Target size — user-selectable rather than a fixed list (explicit design decision), with different
 // built-in defaults per discipline (TARGET_SIZE_DEFAULTS above) seeding a per-mode list that the
 // shooter can then freely rename, resize, or delete entries from — see getTargetList()/
-// saveOrUpdatePhTarget()/deletePhTarget()/resetPhTargets() above. Deliberately lighter-weight than
-// the main preset system further up this file (no drag-reorder) — this is a small, flat list, and
-// unlike that system there's no separate built-in-vs-custom distinction left to preserve: every
-// tile behaves identically, and "Reset to defaults" is the one way back once a built-in is changed.
+// saveOrUpdatePhTarget()/deletePhTarget()/resetPhTargets() above. Lighter-weight than the main
+// preset system further up this file in one respect: there's no separate built-in-vs-custom
+// distinction left to preserve, so every tile behaves identically and "Reset to defaults" is the
+// one way back once a built-in is changed. It does, however, support the same drag-to-reorder (plus
+// touch long-press equivalent) as the main preset grid — see the drag/touch listeners in
+// renderPhTargetChips() below, which simply splice-and-save the flat per-mode array since there's
+// no manual-vs-calibre sort mode to gate it behind here, unlike presets' draggable toggle.
 function phEscHtml(s){return String(s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+// Moves the target at fromIdx to sit at toIdx within the current mode's list and persists it —
+// the only state a reorder needs to change, since order is simply this array's own order (no
+// separate order-tracking object like presets' persistOrder()/loadOrder() need, because targets
+// have no built-in-vs-custom split to keep stable across a reorder).
+function reorderPhTarget(fromIdx,toIdx){
+  if(fromIdx===toIdx)return;
+  var list=getTargetList(currentMode).slice();
+  if(!list[fromIdx])return;
+  var moved=list.splice(fromIdx,1)[0];
+  list.splice(toIdx,0,moved);
+  saveTargetListForMode(currentMode,list);
+  // Indices shift under a reorder in a way that's not worth re-deriving for an open menu or an
+  // in-progress edit — simplest and safest is to close/cancel both, exactly like add/delete/reset
+  // already do above, rather than risk a stale index now pointing at the wrong tile.
+  phTargetOpenMenuIdx=null;
+  cancelPhTargetEdit(); // also re-renders
+}
 function renderPhTargetChips(){
   var container=document.getElementById('phTargetChips');
   if(!container)return;
@@ -4723,6 +4790,78 @@ function renderPhTargetChips(){
     tile.className='compare-tile'+(selected?' selected':'')+(phTargetEditingIdx===idx?' editing':'');
     tile.innerHTML='<strong>'+phEscHtml(t.name)+'</strong>'+disp;
     tile.onclick=function(){selectPhTarget(t.diameterIn);};
+    // Drag-to-reorder — same mouse/trackpad HTML5 drag-and-drop plus touch long-press fallback
+    // pattern as the main preset grid above (see renderPresets()), adapted to this list's simpler
+    // flat-array-with-no-sort-mode shape: always draggable, and a drop just calls
+    // reorderPhTarget() to splice-and-save rather than needing persistOrder()'s separate ordering
+    // object. Always enabled (no calibre-sort-style toggle exists for target sizes to gate it on).
+    tile.draggable=true;
+    tile.addEventListener('dragstart',function(e){
+      _phTargetDragSrcIdx=idx;e.dataTransfer.effectAllowed='move';
+      setTimeout(function(){tile.style.opacity='0.4';},0);
+    });
+    tile.addEventListener('dragend',function(){
+      tile.style.opacity='';
+      container.querySelectorAll('.compare-tile').forEach(function(b){b.classList.remove('drag-over');});
+    });
+    tile.addEventListener('dragover',function(e){e.preventDefault();e.dataTransfer.dropEffect='move';});
+    tile.addEventListener('dragenter',function(e){e.preventDefault();tile.classList.add('drag-over');});
+    tile.addEventListener('dragleave',function(){tile.classList.remove('drag-over');});
+    tile.addEventListener('drop',function(e){
+      e.preventDefault();e.stopPropagation();
+      tile.classList.remove('drag-over');
+      if(_phTargetDragSrcIdx===null||_phTargetDragSrcIdx===idx)return;
+      reorderPhTarget(_phTargetDragSrcIdx,idx);
+      _phTargetDragSrcIdx=null;
+    });
+    // Touch-based reordering (iOS never fires the HTML5 drag events above for ordinary elements) —
+    // identical press-and-hold-then-drag pattern to the preset grid's own touch handlers, guarded
+    // the same way against a tap landing on the nested "..." menu button/menu rows being hijacked
+    // as the start of a drag.
+    var touchTimer=null,touchDragging=false,touchStartX=0,touchStartY=0,touchOverIdx=null;
+    tile.addEventListener('touchstart',function(e){
+      if(e.target&&e.target.closest&&e.target.closest('button')!==tile)return;
+      var t0=e.touches[0];touchStartX=t0.clientX;touchStartY=t0.clientY;touchDragging=false;touchOverIdx=null;
+      touchTimer=setTimeout(function(){
+        touchDragging=true;_phTargetDragSrcIdx=idx;tile.style.opacity='0.4';
+      },350);
+    },{passive:true});
+    tile.addEventListener('touchmove',function(e){
+      if(touchTimer===null&&!touchDragging)return;
+      var t0=e.touches[0];
+      if(!touchDragging){
+        if(Math.abs(t0.clientX-touchStartX)>8||Math.abs(t0.clientY-touchStartY)>8){
+          clearTimeout(touchTimer);touchTimer=null;
+        }
+        return;
+      }
+      e.preventDefault();
+      container.querySelectorAll('.compare-tile').forEach(function(b){b.classList.remove('drag-over');});
+      var el=document.elementFromPoint(t0.clientX,t0.clientY);
+      var target=el&&el.closest&&el.closest('.compare-tile');
+      if(target&&container.contains(target)){
+        target.classList.add('drag-over');
+        touchOverIdx=parseInt(target.dataset.idx,10);
+      }
+    },{passive:false});
+    tile.addEventListener('touchend',function(){
+      if(touchTimer!==null){clearTimeout(touchTimer);touchTimer=null;}
+      if(touchDragging){
+        tile.style.opacity='';
+        container.querySelectorAll('.compare-tile').forEach(function(b){b.classList.remove('drag-over');});
+        if(touchOverIdx!==null&&touchOverIdx!==_phTargetDragSrcIdx){
+          reorderPhTarget(_phTargetDragSrcIdx,touchOverIdx);
+        }
+        _phTargetDragSrcIdx=null;
+      }
+      touchDragging=false;touchOverIdx=null;
+    });
+    tile.addEventListener('touchcancel',function(){
+      if(touchTimer!==null){clearTimeout(touchTimer);touchTimer=null;}
+      if(touchDragging){tile.style.opacity='';container.querySelectorAll('.compare-tile').forEach(function(b){b.classList.remove('drag-over');});}
+      touchDragging=false;touchOverIdx=null;_phTargetDragSrcIdx=null;
+    });
+    tile.dataset.idx=idx;
     var menuBtn=document.createElement('button');
     menuBtn.type='button';menuBtn.className='preset-menu-toggle';menuBtn.textContent='⋯';menuBtn.title='Edit or delete this target';
     menuBtn.onclick=function(e){e.stopPropagation();phTargetOpenMenuIdx=(phTargetOpenMenuIdx===idx)?null:idx;renderPhTargetChips();};
