@@ -295,8 +295,8 @@
       <div class="preset-section-hdr">
         <div class="section-title">Quick Presets</div>
         <div style="display:flex;gap:10px;align-items:center;">
-          <span class="restore-link" id="sortModeLink" onclick="toggleSortMode()">Sort by calibre</span>
-          <span class="restore-link" onclick="restoreDefaults()">Restore defaults</span>
+          <span class="restore-link" id="sortModeLink" style="font-size:12px;" onclick="toggleSortMode()">Sort by calibre</span>
+          <span class="restore-link" style="font-size:12px;" onclick="restoreDefaults()">Restore defaults</span>
         </div>
       </div>
       <div class="preset-grid" id="presetGrid"></div>
@@ -321,7 +321,7 @@
     <div class="section">
       <div class="preset-section-hdr">
         <div class="section-title">Firearm &amp; Load</div>
-        <button onclick="clearLoadFields()" style="padding:3px 10px;background:var(--accent2);border:none;border-radius:5px;color:#fff;font-size:11px;font-weight:700;cursor:pointer;touch-action:manipulation;" title="Clear all fields to enter a new load">&#10011; New Load</button>
+        <button onclick="clearLoadFields()" style="padding:5px 12px;background:var(--accent2);border:none;border-radius:5px;color:#fff;font-size:13px;font-weight:700;cursor:pointer;touch-action:manipulation;" title="Clear all fields to enter a new load">&#10011; New Load</button>
       </div>
       <div class="field"><label>Calibre / Cartridge</label><input type="text" id="fCalibr" placeholder="e.g. .22 Air / .308 Win"/></div>
       <div class="row2">
@@ -395,7 +395,7 @@
       <div class="preset-section-hdr">
         <div class="section-title">Environmental</div>
         <div style="display:flex;gap:4px;">
-          <button onclick="fetchWeather()" id="btnLiveWeather" style="padding:3px 10px;background:var(--accent);border:none;border-radius:5px;color:#fff;font-size:11px;font-weight:700;cursor:pointer;touch-action:manipulation;">&#127756; Weather</button>
+          <button onclick="fetchWeather()" id="btnLiveWeather" style="padding:5px 12px;background:var(--accent);border:none;border-radius:5px;color:#fff;font-size:13px;font-weight:700;cursor:pointer;touch-action:manipulation;">&#127756; Weather</button>
         </div>
       </div>
       <div id="weatherStatus" style="font-size:10px;color:var(--muted);margin-bottom:4px;min-height:14px;"></div>
